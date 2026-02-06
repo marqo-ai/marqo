@@ -14,7 +14,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 from marqo.tensor_search.models.search import SearchContext
-from marqo.tensor_search.models.sort_by_model import SortByModel
+from marqo.tensor_search.models.sort_by_model import SortByModel, SortOrder
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from copy import deepcopy
@@ -165,10 +165,14 @@ class CollapseSearch:
 
         with RequestMetricsStore.for_request().time("search.hybrid.collapse_search.merge_results"):
             merged_results = self.merge_two_collapse_results(
-                relevance_collapse_results, sorted_collapse_results, collected_parent_ids
+                relevance_collapse_results, sorted_collapse_results
             )
 
         return merged_results
+
+    @staticmethod
+    def _value_is_valid_number(value: Any) -> bool:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
 
     def collect_parent_ids(self, search_results: Dict) -> List[str]:
         """
@@ -179,13 +183,10 @@ class CollapseSearch:
         Returns:
             A list of document IDs (parent IDs) that meet the criteria.
         """
-        def value_is_valid_number(value: Any) -> bool:
-            return isinstance(value, (int, float)) and not isinstance(value, bool)
-
         document_ids = []
         for hit in search_results.get("hits", []):
             value = hit.get(self.internal_params.collapse.sort_by.fields[0].field_name)
-            if self.internal_params.collapse.sort_by.always_fetch_variants or value_is_valid_number(value):
+            if self.internal_params.collapse.sort_by.always_fetch_variants or self._value_is_valid_number(value):
                 parent_id = hit.get(self.internal_params.collapse.name)
                 # Ideally all documents should have the collapse field with a parent id, however, we do a
                 # check here to be safe.
@@ -243,7 +244,40 @@ class CollapseSearch:
         collapse_sort_by_hybrid_parameters.collapse.sort_by.set_collapse_sort_by_filter_string(collapse_filter_string)
         return collapse_sort_by_hybrid_parameters
 
-    def merge_two_collapse_results(self, relevance_collapse_results, sorted_collapse_results, parent_ids: List[str]):
+    def _sorted_variant_is_strictly_better(self, sorted_hit: Dict, relevance_hit: Dict) -> bool:
+        """Check if the sorted variant is strictly better than the relevance hit based on the sort field value.
+
+        Returns True if the sorted variant's sort value is strictly lower (for asc) or strictly higher (for desc)
+        than the relevance hit's sort value.
+
+        Consider the special case that always_fetch_variants is True,
+        in which we will fetch the sort_by variants even if the sort_by field value in relevance
+        hits is not a valid number. In this sense, we do the comparison with the following logic by
+        prioritising the relevance hit in more cases to avoid hurting relevance:
+        1. If sorted_hits has an invalid sort_value -> return False;
+        2. If relevance_hit has an invalid sort_value -> return True;
+        3. If both have valid sort_value, compare them as normal.
+        """
+        sort_field = self.internal_params.collapse.sort_by.fields[0]
+        sorted_value = sorted_hit.get(sort_field.field_name)
+        relevance_value = relevance_hit.get(sort_field.field_name)
+
+        # If the sorted value is not a valid value, we fall back to the original behaviour
+        # Note this shouldn't happen as we already check the validity of the sort value when
+        # collecting parent ids for the sorted search, but we add this check here to be safe.
+        if not self._value_is_valid_number(sorted_value):
+            return False
+
+        # This could happen if always_fetch_variants is True
+        if not self._value_is_valid_number(relevance_value):
+            return True
+
+        if sort_field.order == SortOrder.Asc:
+            return sorted_value < relevance_value
+        else:
+            return sorted_value > relevance_value
+
+    def merge_two_collapse_results(self, relevance_collapse_results, sorted_collapse_results):
         """
         Merge two collapse results by keeping the structure from relevance_collapse_results
         but replacing hits with lower-priced variants from sorted_collapse_results.
@@ -256,10 +290,12 @@ class CollapseSearch:
         For fields exist in relevance results but not in sorted results, we remove them.
         And extra meta field '_originalId' is added to keep track of the original relevance hit ID.
 
+        If the sorted variant's sort value is not strictly better than the relevance hit's (i.e., a tie),
+        the relevance hit is kept as the representative, since it was chosen for higher relevance.
+
         Args:
             relevance_collapse_results: Results from relevance-based collapse search
             sorted_collapse_results: Results from sort-based collapse search (e.g., lowest price)
-            parent_ids: List of collapse field values that were used in the sorted search
 
         Returns:
             Merged results with structure from relevance_collapse_results but variants from sorted_collapse_results
@@ -291,14 +327,19 @@ class CollapseSearch:
 
         # Replace hits in relevance results with sorted variants where available
         merged_hits = []
-        for hit in relevance_collapse_results.get("hits", []):
-            parent_id = hit.get(collapse_field_name)
+        for relevance_hit in relevance_collapse_results.get("hits", []):
+            parent_id = relevance_hit.get(collapse_field_name)
             if parent_id in sorted_hits_by_parent:
-                # Replace with the sorted variant (e.g., lower price)
-                merged_hits.append(merge_hit(sorted_hits_by_parent[parent_id], hit))
+                sorted_hit = sorted_hits_by_parent[parent_id]
+                if self._sorted_variant_is_strictly_better(sorted_hit, relevance_hit):
+                    # Replace with the sorted variant (e.g., lower price)
+                    merged_hits.append(merge_hit(sorted_hit, relevance_hit))
+                else:
+                    # Sorted variant is not strictly better (tie), keep the relevance relevance_hit
+                    merged_hits.append(relevance_hit)
             else:
-                # Keep the original hit (either no sort field or not in sorted results)
-                merged_hits.append(hit)
+                # Keep the original relevance_hit (either no sort field or not in sorted results)
+                merged_hits.append(relevance_hit)
 
             if self.original_attributes_to_retrieve is not None:
                 # Remove collapse field and sort_by field if they were not in the original attributes to retrieve,

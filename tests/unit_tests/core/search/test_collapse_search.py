@@ -345,7 +345,7 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
             },
         ]}
 
-        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        result = cs.merge_two_collapse_results(relevance, sorted_res)
 
         expected = {
             # _id from sorted variant
@@ -371,8 +371,8 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
 
         self.assertEqual(expected, result["hits"][0])
 
-    def test_merge_original_id_equals_id_when_same_variant_selected(self):
-        """When sorted picks the same doc as relevance, _originalId still equals relevance _id."""
+    def test_merge_keeps_relevance_hit_when_sort_value_is_tied(self):
+        """When sorted variant has the same sort value as relevance hit (tie), keep the relevance hit."""
         cs = _make_collapse_search()
 
         relevance = {"hits": [
@@ -382,15 +382,13 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
             {"_id": "same1", "category": "g1", "price": 10},
         ]}
 
-        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        result = cs.merge_two_collapse_results(relevance, sorted_res)
 
         expected = {
             "_id": "same1",
             "category": "g1",
             "price": 10,
             "_score": 0.9,
-            "_highlights": [{}],
-            "_originalId": "same1",
         }
         self.assertEqual(expected, result["hits"][0])
 
@@ -406,7 +404,7 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
             {"_id": "h3", "category": "g1", "price": 10},
         ]}
 
-        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        result = cs.merge_two_collapse_results(relevance, sorted_res)
 
         expected_merged = {
             "_id": "h3",
@@ -436,7 +434,7 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
             ]}
             sorted_res = {"hits": []}
 
-            result = cs.merge_two_collapse_results(relevance, sorted_res, [])
+            result = cs.merge_two_collapse_results(relevance, sorted_res)
             expected = {"hits": [
                 {"_id": "h1", "category": "g1", "price": 100, "_score": 0.9},
                 {"_id": "h2", "category": "g2", "price": 200, "_score": 0.8},
@@ -451,7 +449,7 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
                 {"_id": "h3", "category": None, "price": 10},
             ]}
 
-            result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+            result = cs.merge_two_collapse_results(relevance, sorted_res)
             expected = {"hits": [
                 {"_id": "h1", "category": "g1", "price": 100, "_score": 0.9},
             ]}
@@ -465,7 +463,7 @@ class TestMergeTwoCollapseResults(unittest.TestCase):
             }
             sorted_res = {"hits": [{"_id": "h3", "category": "g1", "price": 10}]}
 
-            result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+            result = cs.merge_two_collapse_results(relevance, sorted_res)
             expected = {
                 "hits": [{
                     "_id": "h3",
@@ -499,7 +497,7 @@ class TestMergeAttributesToRetrieve(unittest.TestCase):
             {"_id": "h3", "category": "g1", "price": 10, "title": "Shoe B"},
         ]}
 
-        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        result = cs.merge_two_collapse_results(relevance, sorted_res)
 
         # 'category' and 'price' should be removed since not in original_attributes_to_retrieve
         expected = {
@@ -526,7 +524,7 @@ class TestMergeAttributesToRetrieve(unittest.TestCase):
             {"_id": "h3", "category": "g1", "price": 10, "title": "Shoe B"},
         ]}
 
-        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        result = cs.merge_two_collapse_results(relevance, sorted_res)
 
         # 'category' and 'price' should be kept since in original_attributes_to_retrieve
         expected = {
@@ -555,7 +553,7 @@ class TestMergeAttributesToRetrieve(unittest.TestCase):
             {"_id": "h3", "category": "g1", "price": 10, "title": "Shoe B"},
         ]}
 
-        result = cs.merge_two_collapse_results(relevance, sorted_res, ["g1"])
+        result = cs.merge_two_collapse_results(relevance, sorted_res)
 
         # All fields should be kept since original_attributes_to_retrieve is None
         expected = {

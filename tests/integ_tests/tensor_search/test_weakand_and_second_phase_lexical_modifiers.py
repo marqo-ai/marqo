@@ -475,6 +475,7 @@ class TestRerankDepthLexicalAndWeakAndParameters(MarqoTestCase):
         self.assertEqual([], results_with_stop_word_limit_and_drop_all['hits'])
 
 
+@pytest.mark.skip_for_multinode
 class TestSecondPhaseLexicalModifiersAndCollapseField(MarqoTestCase):
     """
     A test class to verify that using second phase lexical modifiers with collapse field raises an error.

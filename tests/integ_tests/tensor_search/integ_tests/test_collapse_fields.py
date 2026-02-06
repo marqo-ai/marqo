@@ -381,8 +381,6 @@ class TestCollapseFields(MarqoTestCase):
                 self.assertEqual(4, len(page_2_res["hits"]))
                 page_2_res_groups = set([hit['parent_id'] for hit in page_2_res["hits"]])
                 self.assertEqual(4, len(page_2_res_groups))
-
-                print(retrieval_method, ranking_method, page_1_res_groups, page_2_res_groups)
                 self.assertEqual(10, len(page_1_res_groups.union(page_2_res_groups)))
 
     def test_sort_by(self):
@@ -724,11 +722,12 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         res = tensor_search.search(
             config=self.config,
             index_name=self.default_text_index.name,
-            text="shoe",
+            text="shoe Delta",
             search_method="HYBRID",
             hybrid_parameters=HybridParameters(
                 retrievalMethod=RetrievalMethod.Disjunction,
                 rankingMethod=RankingMethod.RRF,
+                alpha=0
             ),
             collapse=CollapseModel(
                 name="category",
@@ -738,11 +737,8 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
         )
 
         self.assertEqual(["shoe_a4", "shoe_b5"], [hit["_id"] for hit in res["hits"]])
-        # _originalId should be set to the relevance-phase representative's _id
-        for hit in res["hits"]:
-            self.assertIn("_originalId", hit)
-            # The original relevance hit was different from the sorted variant
-            self.assertIsInstance(hit["_originalId"], str)
+        # _originalId is None for shoe_a4 because it's the cheapest in its category, not replacement
+        self.assertEqual([None, "shoe_b4"], [hit.get("_originalId") for hit in res["hits"]])
 
     def test_collapse_sort_by_price_desc(self):
         """Scenario 1b: Collapse with sortBy desc returns the most expensive variant per category."""
@@ -1132,37 +1128,6 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
             # Now group_a enters sort-by phase and picks a3 (cheapest at 30.0), group_b still picks b2
             self.assertEqual(["a3", "b2"], [hit["_id"] for hit in res_with["hits"]])
 
-    # ---- Scenario 5c: _originalId meta field ----
-
-    def test_collapse_sort_by_sets_original_id(self):
-        """Scenario 5c: Merged hits should have _originalId set to the relevance-phase representative's _id.
-        Hits not replaced by sort-by should NOT have _originalId."""
-        self._add_shoe_documents()
-
-        res = tensor_search.search(
-            config=self.config,
-            index_name=self.default_text_index.name,
-            text="shoe",
-            search_method="HYBRID",
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF,
-            ),
-            collapse=CollapseModel(
-                name="category",
-                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
-            ),
-            result_count=10
-        )
-
-        # Both groups have price fields, so sort-by runs and replaces representatives
-        self.assertEqual(2, len(res["hits"]))
-        for hit in res["hits"]:
-            self.assertIn("_originalId", hit)
-            # The cheapest variants (shoe_a4, shoe_b5) replaced the relevance-based representatives
-            # _originalId should differ from _id since a different variant was selected
-            self.assertIsInstance(hit["_originalId"], str)
-
     def test_collapse_without_sort_by_has_no_original_id(self):
         """When collapse is used without sortBy, hits should NOT have _originalId
         since no merge/replacement occurs."""
@@ -1533,3 +1498,187 @@ class TestCollapseWithSortByFeature(MarqoTestCase):
             collapse_search_results_without_sort_by["facets"],
             collapse_search_results_with_sort_by["facets"]
         )
+
+class TestCollapseSortByTieBreaker(MarqoTestCase):
+    """Integration tests for collapse fields with sort by functionality in tie-breaking scenarios.
+
+    This test class must pass on the multi-shard environment to ensure that the collapse sort by logic correctly
+    handles tie-breaking when multiple documents have the same sort field value. The tests cover scenarios where
+    multiple documents within a group have the same price, and we verify that the collapse sort by consistently
+    selects the same representative document based on relevance as a tie-breaker.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        default_text_index = cls.unstructured_marqo_index_request(
+            collapse_fields=[CollapseField(name="category", minGroups=2)]
+        )
+
+        cls.indexes = cls.create_indexes([
+            default_text_index,
+        ])
+
+        cls.default_text_index = cls.indexes[0]
+
+    def setUp(self) -> None:
+        self.clear_indexes(self.indexes)
+
+    def _add_shoe_documents(self):
+        """Add sample shoe documents across two category groups with varying prices."""
+        basic_docs = [
+            # Two basic shoes
+            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 120.0, "cost": 95.0, "brand": "nike"},
+            {"_id": "shoe_b1", "title": "Walking boot Alpha", "category": "shoes_b", "price": 89.99, "cost": 70.0, "brand": "adidas"},
+        ]
+
+        # A lot of identical variants with the same low cost to force ties in collapse sort by
+        shoe_a_variants = [
+            {
+                "_id": f"shoe_a{i}", "title": f"variants",
+             "category": "shoes_a", "price": 120.0, "cost": 15.0,
+            }
+            for i in range(2, 10)
+        ]
+
+        # A lot of identical variants with the same low cost to force ties in collapse sort by
+        shoe_b_variants = [
+            {
+                "_id": f"shoe_b{i}", "title": f"variants",
+                "category": "shoes_b", "price": 120.0, "cost": 1.0,
+            }
+            for i in range(2, 6)
+        ]
+
+        docs = basic_docs + shoe_a_variants + shoe_b_variants
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+    def test_collapse_sort_by_with_ties(self):
+        """When multiple documents within a group have the same sort field value (price),
+        the collapse sort by should consistently select the same representative based on a tie-breaker."""
+        self._add_shoe_documents()
+
+        def get_results():
+            res = tensor_search.search(
+                config=self.config,
+                index_name=self.default_text_index.name,
+                text="running shoe boot alpha",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Disjunction,
+                    rankingMethod=RankingMethod.RRF,
+                    alpha=0,
+                ),
+                collapse=CollapseModel(
+                    name="category",
+                    sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="cost", order="asc")])
+                ),
+                result_count=10
+            )
+            return [hit["_id"] for hit in res["hits"]] + [hit.get("_originalId") for hit in res["hits"]]
+
+        first_result = get_results()
+
+        for i in range(10):
+            # Run the same search multiple times to verify that the same representative is consistently selected
+            result = get_results()
+            self.assertEqual(
+                first_result, result,
+                f"Collapse sort by with ties should consistently select the same representative "
+                f"document based on relevance as a tie-breaker, however got different results across runs. "
+                f"Expected result: {first_result}, Returned result: {result}, in the run {i+1}/10"
+            )
+
+    def test_collapse_sort_by_keeps_relevance_hit_on_tie_asc(self):
+        """When all documents in a group share the same sort value with order=asc,
+        the sorted variant is not strictly cheaper, so the relevance representative is kept"""
+        docs = [
+            # shoes_a: all same price -> tie
+            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_a2", "title": "variants", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_a3", "title": "variants", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_a4", "title": "variants", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_a5", "title": "variants", "category": "shoes_a", "price": 100.0},
+            # shoes_b: all same price -> tie
+            {"_id": "shoe_b1", "title": "Hiking Boot Alpha", "category": "shoes_b", "price": 100.0},
+            {"_id": "shoe_b2", "title": "variants", "category": "shoes_b", "price": 100.0},
+            {"_id": "shoe_b3", "title": "variants", "category": "shoes_b", "price": 100.0},
+        ]
+        res = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="running alpha shoe boot",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="asc")])
+            ),
+            result_count=10
+        )
+        self.assertEqual(["shoe_a1", "shoe_b1"], [hit["_id"] for hit in res["hits"]])
+        for hits in res["hits"]:
+            self.assertNotIn("_originalId", hits)
+
+    def test_collapse_sort_by_keeps_relevance_hit_on_tie_desc(self):
+        """When all documents in a group share the same sort value with order=desc,
+        the sorted variant is not strictly higher, so the relevance representative is kept."""
+        docs = [
+            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_a2", "title": "variants", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_a3", "title": "variants", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_a4", "title": "variants", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_a5", "title": "variants", "category": "shoes_a", "price": 100.0},
+            {"_id": "shoe_b1", "title": "Hiking Boot Alpha", "category": "shoes_b", "price": 100.0},
+            {"_id": "shoe_b2", "title": "variants", "category": "shoes_b", "price": 100.0},
+            {"_id": "shoe_b3", "title": "variants", "category": "shoes_b", "price": 100.0},
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index.name,
+                docs=docs,
+                tensor_fields=["title"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.default_text_index.name,
+            text="running alpha shoe boot",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0,
+            ),
+            collapse=CollapseModel(
+                name="category",
+                sort_by=CollapseSortBy(fields=[CollapseSortByField(fieldName="price", order="desc")])
+            ),
+            result_count=10
+        )
+        self.assertEqual(["shoe_a1", "shoe_b1"], [hit["_id"] for hit in res["hits"]])
+        for hits in res["hits"]:
+            self.assertNotIn("_originalId", hits)
