@@ -43,7 +43,7 @@ class Document:
                       field_count_config=SemiStructuredFieldCountConfig()) -> MarqoAddDocumentsResponse:
         # Check Vespa convergence before reading index settings to avoid stale schema
         if tensor_search_utils.read_env_vars_and_defaults(
-                EnvVars.MARQO_SKIP_ADD_DOCUMENTS_CONVERGENCE_CHECK).lower() != 'true':
+                EnvVars.MARQO_ENABLE_ADD_DOCUMENTS_CONVERGENCE_CHECK).lower() == 'true':
             self.vespa_client.check_for_application_convergence()
 
         marqo_index = self.index_management.get_index(add_docs_params.index_name)

@@ -843,7 +843,7 @@ class VespaClient:
         self._raise_for_status(response)
 
         try:
-            json = response.json()
+            json = orjson.loads(response.content)
             wanted_generation = json['wantedGeneration']
             non_converged_services = [
                 {
@@ -862,7 +862,7 @@ class VespaClient:
                 non_converged_services=non_converged_services,
             )
 
-        except (JSONDecodeError, KeyError) as e:
+        except (orjson.JSONDecodeError, KeyError) as e:
             raise VespaError(f'Unexpected response: {response.text}') from e
 
     async def _feed_batch_async(self, batch: List[VespaDocument],

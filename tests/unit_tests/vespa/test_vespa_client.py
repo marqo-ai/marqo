@@ -264,7 +264,7 @@ class TestVespaClient(unittest.TestCase):
         }
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = response_data
+        mock_response.content = orjson.dumps(response_data)
 
         with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
             status = self.vespa_client._get_convergence_status()
@@ -289,7 +289,7 @@ class TestVespaClient(unittest.TestCase):
         }
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = response_data
+        mock_response.content = orjson.dumps(response_data)
 
         with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
             status = self.vespa_client._get_convergence_status()
@@ -336,7 +336,7 @@ class TestVespaClient(unittest.TestCase):
         }
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = convergence_response
+        mock_response.content = orjson.dumps(convergence_response)
 
         with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
             with self.assertRaises(VespaNotConvergedError) as ctx:
@@ -362,7 +362,7 @@ class TestVespaClient(unittest.TestCase):
         }
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = convergence_response
+        mock_response.content = orjson.dumps(convergence_response)
 
         with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
             with self.assertRaises(VespaNotConvergedError) as ctx:
@@ -399,7 +399,7 @@ class TestVespaClient(unittest.TestCase):
         }
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = convergence_response
+        mock_response.content = orjson.dumps(convergence_response)
 
         # Use a large timeout so the last few sleeps aren't clamped by remaining time
         with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
@@ -443,7 +443,7 @@ class TestVespaClient(unittest.TestCase):
         }
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = convergence_response
+        mock_response.content = orjson.dumps(convergence_response)
 
         with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
             with self.assertRaises(VespaNotConvergedError):
@@ -468,7 +468,7 @@ class TestVespaClient(unittest.TestCase):
         }
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = converged_response
+        mock_response.content = orjson.dumps(converged_response)
 
         with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
             # Should not raise
@@ -495,12 +495,14 @@ class TestVespaClient(unittest.TestCase):
             'currentGeneration': 9, 'wantedGeneration': 9, 'converged': True, 'services': []
         }
 
-        mock_response = Mock()
-        mock_response.status_code = 200
-        # Not converged for 3 checks, then converged
-        mock_response.json.side_effect = [not_converged, not_converged, not_converged, converged]
+        def make_response(data):
+            r = Mock()
+            r.status_code = 200
+            r.content = orjson.dumps(data)
+            return r
 
-        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+        responses = [make_response(not_converged)] * 3 + [make_response(converged)]
+        with patch.object(self.vespa_client.http_client, 'get', side_effect=responses):
             self.vespa_client.wait_for_application_convergence(timeout=120)
 
         # Should have slept 3 times (1s each, all within first 8 attempts)
@@ -528,12 +530,14 @@ class TestVespaClient(unittest.TestCase):
             'currentGeneration': 9, 'wantedGeneration': 9, 'converged': True, 'services': []
         }
 
-        mock_response = Mock()
-        mock_response.status_code = 200
-        # 11 not-converged responses (11s elapsed), then converged
-        mock_response.json.side_effect = [not_converged] * 11 + [converged]
+        def make_response(data):
+            r = Mock()
+            r.status_code = 200
+            r.content = orjson.dumps(data)
+            return r
 
-        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+        responses = [make_response(not_converged)] * 11 + [make_response(converged)]
+        with patch.object(self.vespa_client.http_client, 'get', side_effect=responses):
             self.vespa_client.wait_for_application_convergence(timeout=120)
 
         # Should have logged a warning about slow convergence on success
@@ -569,7 +573,7 @@ class TestVespaClient(unittest.TestCase):
         }
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = not_converged_response
+        mock_response.content = orjson.dumps(not_converged_response)
 
         with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
             with self.assertRaises(VespaNotConvergedError):
@@ -606,12 +610,14 @@ class TestVespaClient(unittest.TestCase):
             'currentGeneration': 9, 'wantedGeneration': 9, 'converged': True, 'services': []
         }
 
-        mock_response = Mock()
-        mock_response.status_code = 200
-        # 3 not-converged responses (3s elapsed), then converged
-        mock_response.json.side_effect = [not_converged] * 3 + [converged]
+        def make_response(data):
+            r = Mock()
+            r.status_code = 200
+            r.content = orjson.dumps(data)
+            return r
 
-        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+        responses = [make_response(not_converged)] * 3 + [make_response(converged)]
+        with patch.object(self.vespa_client.http_client, 'get', side_effect=responses):
             self.vespa_client.wait_for_application_convergence(timeout=120)
 
         mock_logger.warning.assert_not_called()
@@ -628,11 +634,11 @@ class TestVespaClient(unittest.TestCase):
 
         mock_response_not_converged = Mock()
         mock_response_not_converged.status_code = 200
-        mock_response_not_converged.json.return_value = not_converged_response
+        mock_response_not_converged.content = orjson.dumps(not_converged_response)
 
         mock_response_converged = Mock()
         mock_response_converged.status_code = 200
-        mock_response_converged.json.return_value = converged_response
+        mock_response_converged.content = orjson.dumps(converged_response)
 
         # First call raises timeout, second returns not converged, third returns converged
         with patch.object(self.vespa_client.http_client, 'get',

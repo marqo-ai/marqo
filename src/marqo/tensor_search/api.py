@@ -177,7 +177,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
             vespa_exceptions.VespaNotConvergedError,
             # we return 409 in this case since it is likely due to another process triggered a Vespa app deployment
             api_exceptions.OperationConflictError,
-            "Marqo vector store has not converged. Please retry your request.",
+            "Marqo vector store has not converged. Please retry your request again later.",
             None
         ),
 
