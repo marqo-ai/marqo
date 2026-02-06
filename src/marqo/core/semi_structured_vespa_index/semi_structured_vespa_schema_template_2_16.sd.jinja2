@@ -412,10 +412,8 @@ schema {{ index.schema_name }} {
         first-phase {
             expression: collapse_final_score()
         }
-
         function tie_breaker() {
-            # Map to [1e-7, 1e-6] to ensure it is smaller than any meaningful score difference but provides deterministic tie-breaking based on global sequence
-            expression: 1e-7 + (globalSequence / 281474976710656.0) * 9e-7
+            expression: attribute(marqo__id)
         }
         function collapse_final_score() {
             expression: collapse_sort_value() + tie_breaker()
