@@ -373,6 +373,91 @@ class TestVespaClient(unittest.TestCase):
         self.assertIn('wantedGeneration', error_msg)
         self.assertIn("'converged': False", error_msg)
 
+    @patch('marqo.vespa.vespa_client.time')
+    def test_wait_for_convergence_uses_exponential_backoff(self, mock_time):
+        """Test that wait_for_application_convergence sleeps 1s for the first 8 attempts,
+        then uses exponential backoff (2s, 4s, 8s, 16s cap)."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        # Simulate time progressing by the amount slept
+        current_time = [0.0]
+
+        def fake_time():
+            return current_time[0]
+
+        def fake_sleep(duration):
+            current_time[0] += duration
+
+        mock_time.time.side_effect = fake_time
+        mock_time.sleep.side_effect = fake_sleep
+
+        convergence_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': []
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = convergence_response
+
+        # Use a large timeout so the last few sleeps aren't clamped by remaining time
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError):
+                self.vespa_client.wait_for_application_convergence(timeout=200)
+
+        sleep_calls = [call.args[0] for call in mock_time.sleep.call_args_list]
+
+        # First 8 attempts: 1s each
+        self.assertEqual(sleep_calls[:8], [1, 1, 1, 1, 1, 1, 1, 1])
+        # Attempt 8: 2s, attempt 9: 4s, attempt 10: 8s, attempt 11: 16s (cap)
+        self.assertEqual(sleep_calls[8], 2)
+        self.assertEqual(sleep_calls[9], 4)
+        self.assertEqual(sleep_calls[10], 8)
+        self.assertEqual(sleep_calls[11], 16)
+        # After cap, remaining full sleeps should be 16s
+        for s in sleep_calls[12:-1]:
+            self.assertEqual(s, 16)
+
+    @patch('marqo.vespa.vespa_client.time')
+    def test_wait_for_convergence_does_not_sleep_past_timeout(self, mock_time):
+        """Test that sleep duration is capped to not exceed the remaining timeout."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        current_time = [0.0]
+
+        def fake_time():
+            return current_time[0]
+
+        def fake_sleep(duration):
+            current_time[0] += duration
+
+        mock_time.time.side_effect = fake_time
+        mock_time.sleep.side_effect = fake_sleep
+
+        convergence_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': []
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = convergence_response
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError):
+                self.vespa_client.wait_for_application_convergence(timeout=10)
+
+        sleep_calls = [call.args[0] for call in mock_time.sleep.call_args_list]
+        # Total sleep should not exceed the timeout
+        self.assertLessEqual(sum(sleep_calls), 10)
+        # No individual sleep should exceed the remaining time
+        elapsed = 0.0
+        for s in sleep_calls:
+            self.assertLessEqual(s, 10 - elapsed + 0.001)  # small float tolerance
+            elapsed += s
+
 
 if __name__ == '__main__':
     unittest.main()
