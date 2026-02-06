@@ -369,7 +369,8 @@ schema marqo__test_00semi_00structured_00schema {
             expression: collapse_final_score()
         }
         function tie_breaker() {
-            expression: random(1024).match * 1e-9
+            # Map to [1e-7, 1e-6] to ensure it is smaller than any meaningful score difference but provides deterministic tie-breaking based on global sequence
+            expression: 1e-7 + (globalSequence / 281474976710656.0) * 9e-7
         }
         function collapse_final_score() {
             expression: collapse_sort_value() + tie_breaker()
