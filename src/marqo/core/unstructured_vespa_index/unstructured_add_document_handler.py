@@ -32,9 +32,10 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
     _MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS = semver.VersionInfo.parse("2.9.0")
 
     def __init__(self, marqo_index: UnstructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient,
-                 inference: Inference):
+                 inference: Inference, convergence_timeout_seconds: int = 120):
         self._validate_add_docs_params(add_docs_params)
-        super().__init__(marqo_index, add_docs_params, vespa_client, inference)
+        super().__init__(marqo_index, add_docs_params, vespa_client, inference,
+                         convergence_timeout_seconds=convergence_timeout_seconds)
         self.marqo_index = marqo_index
         self.vespa_index = UnstructuredVespaIndex(marqo_index)
 

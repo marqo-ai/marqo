@@ -174,6 +174,12 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
             "Vector store request timed out. Try your request again later.",
             None
         ),
+        (
+            vespa_exceptions.VespaNotConvergedError,
+            api_exceptions.BackendCommunicationError,
+            "Marqo vector store has not converged. Please retry your request.",
+            None
+        ),
 
         # Base exceptions
         (base_exceptions.InternalError, api_exceptions.InternalError, None, None),

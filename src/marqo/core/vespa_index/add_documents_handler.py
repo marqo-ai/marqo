@@ -113,11 +113,13 @@ class AddDocumentsHandler(ABC):
     """
 
     def __init__(self, marqo_index: MarqoIndex, add_docs_params: AddDocsParams,
-                 vespa_client: VespaClient, inference: Inference):
+                 vespa_client: VespaClient, inference: Inference,
+                 convergence_timeout_seconds: int = 120):
         self.marqo_index = marqo_index
         self.add_docs_params = add_docs_params
         self.vespa_client = vespa_client
         self.inference = inference
+        self.convergence_timeout_seconds = convergence_timeout_seconds
         # only normalise custom vector in new indexes to keep the backward compatibility
         self.should_normalise_custom_vector = (marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version()
                                                >= MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION)

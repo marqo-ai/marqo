@@ -39,13 +39,16 @@ class Config:
 
         # Initialize Core layer dependencies
         deployment_lock_timeout = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT)
+        convergence_timeout = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_VESPA_CONVERGENCE_TIMEOUT)
         self.index_management = IndexManagement(vespa_client, zookeeper_client,
                                                 enable_index_operations=True,
-                                                deployment_lock_timeout_seconds=deployment_lock_timeout)
+                                                deployment_lock_timeout_seconds=deployment_lock_timeout,
+                                                convergence_timeout_seconds=convergence_timeout)
 
         self.inference = inference
         self.monitoring = Monitoring(vespa_client, self.index_management)
-        self.document = Document(vespa_client, self.index_management, self.inference)
+        self.document = Document(vespa_client, self.index_management, self.inference,
+                                 convergence_timeout_seconds=convergence_timeout)
         self.recommender = Recommender(vespa_client, self.index_management, self.inference)
         self.embed = Embed(vespa_client, self.index_management, self.inference)
         self.typeahead = Typeahead(vespa_client, self.index_management)
