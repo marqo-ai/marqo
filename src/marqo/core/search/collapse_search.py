@@ -170,6 +170,10 @@ class CollapseSearch:
 
         return merged_results
 
+    @staticmethod
+    def _value_is_valid_number(value: Any) -> bool:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
     def collect_parent_ids(self, search_results: Dict) -> List[str]:
         """
         Collect parent IDs from the collapse field in search results. Only include those where the sort_by field value is a valid number
@@ -179,13 +183,10 @@ class CollapseSearch:
         Returns:
             A list of document IDs (parent IDs) that meet the criteria.
         """
-        def value_is_valid_number(value: Any) -> bool:
-            return isinstance(value, (int, float)) and not isinstance(value, bool)
-
         document_ids = []
         for hit in search_results.get("hits", []):
             value = hit.get(self.internal_params.collapse.sort_by.fields[0].field_name)
-            if self.internal_params.collapse.sort_by.always_fetch_variants or value_is_valid_number(value):
+            if self.internal_params.collapse.sort_by.always_fetch_variants or self._value_is_valid_number(value):
                 parent_id = hit.get(self.internal_params.collapse.name)
                 # Ideally all documents should have the collapse field with a parent id, however, we do a
                 # check here to be safe.
@@ -265,11 +266,11 @@ class CollapseSearch:
         # If the sorted value is not a valid value, we fall back to the original behaviour
         # Note this shouldn't happen as we already check the validity of the sort value when
         # collecting parent ids for the sorted search, but we add this check here to be safe.
-        if not isinstance(sorted_value, (int, float)) or isinstance(sorted_value, bool):
+        if not self._value_is_valid_number(sorted_value):
             return False
 
         # This could happen if always_fetch_variants is True
-        if not isinstance(relevance_value, (int, float)) or isinstance(relevance_value, bool):
+        if not self._value_is_valid_number(relevance_value):
             return True
 
         if sort_field.order == SortOrder.Asc:
@@ -330,7 +331,7 @@ class CollapseSearch:
         for relevance_hit in relevance_collapse_results.get("hits", []):
             parent_id = relevance_hit.get(collapse_field_name)
             if parent_id in sorted_hits_by_parent:
-                sorted_hit = sorted_hits_by_parent.get(parent_id, dict())
+                sorted_hit = sorted_hits_by_parent[parent_id]
                 if self._sorted_variant_is_strictly_better(sorted_hit, relevance_hit):
                     # Replace with the sorted variant (e.g., lower price)
                     merged_hits.append(merge_hit(sorted_hit, relevance_hit))
