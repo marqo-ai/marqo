@@ -1,3 +1,4 @@
+import os
 from unittest.mock import Mock, MagicMock, call, patch
 
 from marqo.core.document.document import Document
@@ -78,6 +79,28 @@ class TestDocumentConvergence(MarqoTestCase):
             doc.add_documents(add_docs_params)
 
             self.mock_vespa_client.check_for_application_convergence.assert_called_once_with()
+
+    def test_add_documents_skips_convergence_when_env_var_set(self):
+        """Verify convergence check is skipped when MARQO_SKIP_ADD_DOCUMENTS_CONVERGENCE_CHECK=TRUE."""
+        self.mock_index_management.get_index.return_value = self._make_structured_index("test_index")
+
+        with patch('marqo.core.document.document.StructuredAddDocumentsHandler') as mock_handler_cls, \
+                patch.dict(os.environ, {"MARQO_SKIP_ADD_DOCUMENTS_CONVERGENCE_CHECK": "TRUE"}):
+            mock_handler = Mock()
+            mock_handler.add_documents.return_value = Mock()
+            mock_handler_cls.return_value = mock_handler
+
+            doc = Document(self.mock_vespa_client, self.mock_index_management, self.mock_inference)
+            add_docs_params = AddDocsParams(
+                index_name="test_index",
+                docs=[{"_id": "doc1", "title": "test"}],
+                tensor_fields=[],
+            )
+
+            doc.add_documents(add_docs_params)
+
+            self.mock_vespa_client.check_for_application_convergence.assert_not_called()
+            self.mock_index_management.get_index.assert_called_once_with("test_index")
 
     def _make_structured_index(self, name):
         from marqo.core.models.marqo_index import StructuredMarqoIndex, Model, TextPreProcessing, TextSplitMethod, \
