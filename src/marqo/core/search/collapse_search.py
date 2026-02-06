@@ -330,10 +330,10 @@ class CollapseSearch:
         for relevance_hit in relevance_collapse_results.get("hits", []):
             parent_id = relevance_hit.get(collapse_field_name)
             if parent_id in sorted_hits_by_parent:
-                sorted_relevance_hit = sorted_hits_by_parent[parent_id]
-                if self._sorted_variant_is_strictly_better(sorted_relevance_hit, relevance_hit):
+                sorted_hit = sorted_hits_by_parent[parent_id]
+                if self._sorted_variant_is_strictly_better(sorted_hit, relevance_hit):
                     # Replace with the sorted variant (e.g., lower price)
-                    merged_hits.append(merge_hit(sorted_relevance_hit, relevance_hit))
+                    merged_hits.append(merge_hit(sorted_hit, relevance_hit))
                 else:
                     # Sorted variant is not strictly better (tie), keep the relevance relevance_hit
                     merged_hits.append(relevance_hit)
