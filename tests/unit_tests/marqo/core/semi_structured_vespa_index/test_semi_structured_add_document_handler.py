@@ -514,12 +514,12 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         self.assertEqual(0, len(error_items))
 
     @patch('marqo.core.inference.modality_utils.infer_modality')
-    def test_pre_persist_waits_for_convergence_before_feed_batch(self, mock_infer_modality):
-        """Verify wait_for_application_convergence is called before feed_batch."""
+    def test_pre_persist_checks_convergence_before_feed_batch(self, mock_infer_modality):
+        """Verify check_for_application_convergence is called before feed_batch."""
         call_order = []
 
-        self.mock_vespa_client.wait_for_application_convergence.side_effect = (
-            lambda **kwargs: call_order.append('wait_for_convergence')
+        self.mock_vespa_client.check_for_application_convergence.side_effect = (
+            lambda: call_order.append('check_convergence')
         )
 
         def feed_batch_side_effect(*args, **kwargs):
@@ -559,16 +559,16 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
 
         handler.add_documents()
 
-        self.assertIn('wait_for_convergence', call_order)
+        self.assertIn('check_convergence', call_order)
         self.assertIn('feed_batch', call_order)
-        convergence_idx = call_order.index('wait_for_convergence')
+        convergence_idx = call_order.index('check_convergence')
         feed_idx = call_order.index('feed_batch')
         self.assertLess(convergence_idx, feed_idx,
-                        "wait_for_convergence should be called before feed_batch")
+                        "check_for_application_convergence should be called before feed_batch")
 
     @patch('marqo.core.inference.modality_utils.infer_modality')
-    def test_pre_persist_waits_for_convergence_when_no_update_needed(self, mock_infer_modality):
-        """Verify convergence is waited for even when should_update_index is False."""
+    def test_pre_persist_checks_convergence_when_no_update_needed(self, mock_infer_modality):
+        """Verify convergence is checked even when should_update_index is False."""
         self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
             responses=[FeedBatchDocumentResponse(status=200, id="doc1", message="OK")],
             errors=False
@@ -604,14 +604,14 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
 
         # should_update_index should be False since title already exists
         self.assertFalse(handler.should_update_index)
-        # Convergence should still be waited for
-        self.mock_vespa_client.wait_for_application_convergence.assert_called_once()
+        # Convergence should still be checked
+        self.mock_vespa_client.check_for_application_convergence.assert_called_once()
 
     @patch('marqo.core.inference.modality_utils.infer_modality')
     def test_pre_persist_convergence_failure_stops_feed(self, mock_infer_modality):
         """Verify that convergence failure in _pre_persist_to_vespa prevents feed_batch."""
-        self.mock_vespa_client.wait_for_application_convergence.side_effect = (
-            VespaNotConvergedError("Vespa application did not converge")
+        self.mock_vespa_client.check_for_application_convergence.side_effect = (
+            VespaNotConvergedError("Vespa application has not converged")
         )
         mock_infer_modality.return_value = Modality.TEXT
 
@@ -643,45 +643,3 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
             handler.add_documents()
 
         self.mock_vespa_client.feed_batch.assert_not_called()
-
-    @patch('marqo.core.inference.modality_utils.infer_modality')
-    def test_pre_persist_uses_configured_convergence_timeout(self, mock_infer_modality):
-        """Verify custom convergence timeout is passed to wait_for_application_convergence."""
-        self.mock_vespa_client.feed_batch.return_value = FeedBatchResponse(
-            responses=[FeedBatchDocumentResponse(status=200, id="doc1", message="OK")],
-            errors=False
-        )
-        self.mock_vespa_client.translate_vespa_document_response.return_value = (200, "OK")
-        mock_infer_modality.return_value = Modality.TEXT
-
-        marqo_index = self.semi_structured_marqo_index(
-            name="test_index",
-            tensor_field_names=[],
-            lexical_field_names=[],
-            string_array_field_names=[]
-        )
-
-        add_docs_params = AddDocsParams(
-            index_name="test_index",
-            docs=[{"_id": "doc1", "title": "test doc"}],
-            tensor_fields=[],
-            device="cpu",
-            use_existing_tensors=False,
-        )
-
-        custom_timeout = 60
-        handler = SemiStructuredAddDocumentsHandler(
-            marqo_index=marqo_index,
-            add_docs_params=add_docs_params,
-            vespa_client=self.mock_vespa_client,
-            index_management=self.mock_index_management,
-            inference=self.mock_inference,
-            field_count_config=self.field_count_config,
-            convergence_timeout_seconds=custom_timeout
-        )
-
-        handler.add_documents()
-
-        self.mock_vespa_client.wait_for_application_convergence.assert_called_once_with(
-            timeout=custom_timeout
-        )

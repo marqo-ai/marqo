@@ -179,8 +179,12 @@ class VespaClient:
         Raises:
             VespaNotConvergedError: If the application has not converged
         """
-        if not self.get_application_has_converged():
-            raise VespaNotConvergedError('Vespa application has not converged')
+        convergence_status = self._get_convergence_status()
+        if not convergence_status.converged:
+            raise VespaNotConvergedError(
+                f'Vespa application has not converged. '
+                f'The convergence status is {convergence_status.to_dict()}'
+            )
 
     def get_application_generation(self) -> int:
         """

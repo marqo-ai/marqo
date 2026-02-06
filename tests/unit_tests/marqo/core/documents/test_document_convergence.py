@@ -13,12 +13,12 @@ class TestDocumentConvergence(MarqoTestCase):
         self.mock_index_management = Mock()
         self.mock_inference = Mock()
 
-    def test_add_documents_waits_for_convergence_before_get_index(self):
-        """Verify wait_for_application_convergence is called before get_index."""
+    def test_add_documents_checks_convergence_before_get_index(self):
+        """Verify check_for_application_convergence is called before get_index."""
         call_order = []
 
-        self.mock_vespa_client.wait_for_application_convergence.side_effect = (
-            lambda **kwargs: call_order.append('wait_for_convergence')
+        self.mock_vespa_client.check_for_application_convergence.side_effect = (
+            lambda: call_order.append('check_convergence')
         )
         self.mock_index_management.get_index.side_effect = (
             lambda name: call_order.append('get_index') or self._make_structured_index(name)
@@ -39,12 +39,12 @@ class TestDocumentConvergence(MarqoTestCase):
 
             doc.add_documents(add_docs_params)
 
-            self.assertEqual(call_order, ['wait_for_convergence', 'get_index'])
+            self.assertEqual(call_order, ['check_convergence', 'get_index'])
 
     def test_add_documents_convergence_failure_propagates(self):
         """Verify convergence failure propagates and get_index is never called."""
-        self.mock_vespa_client.wait_for_application_convergence.side_effect = (
-            VespaNotConvergedError("Vespa application did not converge within 120 seconds.")
+        self.mock_vespa_client.check_for_application_convergence.side_effect = (
+            VespaNotConvergedError("Vespa application has not converged.")
         )
 
         doc = Document(self.mock_vespa_client, self.mock_index_management, self.mock_inference)
@@ -59,8 +59,8 @@ class TestDocumentConvergence(MarqoTestCase):
 
         self.mock_index_management.get_index.assert_not_called()
 
-    def test_add_documents_convergence_uses_configured_timeout(self):
-        """Verify custom timeout is passed to wait_for_application_convergence."""
+    def test_add_documents_does_not_pass_convergence_timeout(self):
+        """Verify check_for_application_convergence is called without timeout."""
         self.mock_index_management.get_index.return_value = self._make_structured_index("test_index")
 
         with patch('marqo.core.document.document.StructuredAddDocumentsHandler') as mock_handler_cls:
@@ -68,9 +68,7 @@ class TestDocumentConvergence(MarqoTestCase):
             mock_handler.add_documents.return_value = Mock()
             mock_handler_cls.return_value = mock_handler
 
-            custom_timeout = 30
-            doc = Document(self.mock_vespa_client, self.mock_index_management, self.mock_inference,
-                           convergence_timeout_seconds=custom_timeout)
+            doc = Document(self.mock_vespa_client, self.mock_index_management, self.mock_inference)
             add_docs_params = AddDocsParams(
                 index_name="test_index",
                 docs=[{"_id": "doc1", "title": "test"}],
@@ -79,38 +77,7 @@ class TestDocumentConvergence(MarqoTestCase):
 
             doc.add_documents(add_docs_params)
 
-            self.mock_vespa_client.wait_for_application_convergence.assert_called_once_with(
-                timeout=custom_timeout
-            )
-
-    def test_add_documents_passes_convergence_timeout_to_semi_structured_handler(self):
-        """Verify convergence timeout is passed to the SemiStructuredAddDocumentsHandler constructor."""
-        marqo_index = self.semi_structured_marqo_index(
-            name="test_index",
-            tensor_field_names=[],
-            lexical_field_names=[],
-            string_array_field_names=[]
-        )
-        self.mock_index_management.get_index.return_value = marqo_index
-
-        with patch('marqo.core.document.document.SemiStructuredAddDocumentsHandler') as mock_handler_cls:
-            mock_handler = Mock()
-            mock_handler.add_documents.return_value = Mock()
-            mock_handler_cls.return_value = mock_handler
-
-            custom_timeout = 45
-            doc = Document(self.mock_vespa_client, self.mock_index_management, self.mock_inference,
-                           convergence_timeout_seconds=custom_timeout)
-            add_docs_params = AddDocsParams(
-                index_name="test_index",
-                docs=[{"_id": "doc1", "title": "test"}],
-                tensor_fields=[],
-            )
-
-            doc.add_documents(add_docs_params)
-
-            _, kwargs = mock_handler_cls.call_args
-            self.assertEqual(kwargs['convergence_timeout_seconds'], custom_timeout)
+            self.mock_vespa_client.check_for_application_convergence.assert_called_once_with()
 
     def _make_structured_index(self, name):
         from marqo.core.models.marqo_index import StructuredMarqoIndex, Model, TextPreProcessing, TextSplitMethod, \

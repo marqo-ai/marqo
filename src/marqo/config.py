@@ -47,8 +47,7 @@ class Config:
 
         self.inference = inference
         self.monitoring = Monitoring(vespa_client, self.index_management)
-        self.document = Document(vespa_client, self.index_management, self.inference,
-                                 convergence_timeout_seconds=convergence_timeout)
+        self.document = Document(vespa_client, self.index_management, self.inference)
         self.recommender = Recommender(vespa_client, self.index_management, self.inference)
         self.embed = Embed(vespa_client, self.index_management, self.inference)
         self.typeahead = Typeahead(vespa_client, self.index_management)

@@ -35,10 +35,8 @@ class SemiStructuredFieldCountConfig(ImmutableStrictBaseModel):
 class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
     def __init__(self, marqo_index: SemiStructuredMarqoIndex, add_docs_params: AddDocsParams,
                  vespa_client: VespaClient, index_management: IndexManagement, inference: Inference,
-                 field_count_config=SemiStructuredFieldCountConfig(),
-                 convergence_timeout_seconds: int = 120):
+                 field_count_config=SemiStructuredFieldCountConfig()):
         super().__init__(marqo_index, add_docs_params, vespa_client, inference)
-        self.convergence_timeout_seconds = convergence_timeout_seconds
         self.index_management = index_management
         self.marqo_index = marqo_index
         self.vespa_index = SemiStructuredVespaIndex(marqo_index)
@@ -138,9 +136,9 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             from marqo.tensor_search import index_meta_cache
             index_meta_cache.get_index(self.index_management, self.marqo_index.name, force_refresh=True)
 
-        # Always wait for convergence before feeding documents, even if no schema update
+        # Check convergence before feeding documents, even if no schema update
         # was needed in this request, to handle concurrent deployments from other requests
-        self.vespa_client.wait_for_application_convergence(timeout=self.convergence_timeout_seconds)
+        self.vespa_client.check_for_application_convergence()
 
     def _get_field_language(self, field_name):
         """Extract language specification for a field from mappings and validate."""

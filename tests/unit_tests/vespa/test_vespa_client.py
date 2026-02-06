@@ -347,6 +347,32 @@ class TestVespaClient(unittest.TestCase):
         self.assertIn('wantedGeneration', error_msg)
         self.assertIn("'converged': False", error_msg)
 
+    def test_check_for_application_convergence_error_message_contains_status(self):
+        """Test that check_for_application_convergence error includes convergence status details."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        convergence_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': [
+                {'host': 'node1', 'port': 8080, 'type': 'container', 'currentGeneration': 9},
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = convergence_response
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError) as ctx:
+                self.vespa_client.check_for_application_convergence()
+
+        error_msg = str(ctx.exception)
+        self.assertIn('node2', error_msg)
+        self.assertIn('wantedGeneration', error_msg)
+        self.assertIn("'converged': False", error_msg)
+
 
 if __name__ == '__main__':
     unittest.main()

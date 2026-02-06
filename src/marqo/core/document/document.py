@@ -32,17 +32,15 @@ logger = get_logger(__name__)
 class Document:
     """A class that handles the document API in Marqo"""
 
-    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference,
-                 convergence_timeout_seconds: int = 120):
+    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference):
         self.vespa_client = vespa_client
         self.index_management = index_management
         self.inference = inference
-        self.convergence_timeout_seconds = convergence_timeout_seconds
 
     def add_documents(self, add_docs_params: AddDocsParams,
                       field_count_config=SemiStructuredFieldCountConfig()) -> MarqoAddDocumentsResponse:
-        # Wait for Vespa convergence before reading index settings to avoid stale schema
-        self.vespa_client.wait_for_application_convergence(timeout=self.convergence_timeout_seconds)
+        # Check Vespa convergence before reading index settings to avoid stale schema
+        self.vespa_client.check_for_application_convergence()
 
         marqo_index = self.index_management.get_index(add_docs_params.index_name)
 
@@ -52,8 +50,7 @@ class Document:
         elif isinstance(marqo_index, SemiStructuredMarqoIndex):
             add_docs_handler = SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params,
                                                                  self.vespa_client, self.index_management,
-                                                                 self.inference, field_count_config,
-                                                                 convergence_timeout_seconds=self.convergence_timeout_seconds)
+                                                                 self.inference, field_count_config)
         elif isinstance(marqo_index, UnstructuredMarqoIndex):
             add_docs_handler = UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client,
                                                                self.inference)
