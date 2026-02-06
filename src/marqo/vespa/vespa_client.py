@@ -261,10 +261,15 @@ class VespaClient:
             time.sleep(min(sleep_time, remaining))
             attempt += 1
 
-        convergence_status = self._get_convergence_status()
+        try:
+            convergence_status = self._get_convergence_status()
+            status_info = f"The convergence status is {convergence_status.to_dict()}"
+        except (httpx.TimeoutException, httpcore.TimeoutException):
+            status_info = "The final convergence status check also timed out"
+
         raise VespaNotConvergedError(
             f"Vespa application did not converge within {timeout} seconds. "
-            f"The convergence status is {convergence_status.to_dict()}"
+            f"{status_info}"
         )
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,

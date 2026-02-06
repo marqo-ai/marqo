@@ -744,7 +744,7 @@ class TestIndexManagement(MarqoTestCase):
                                  expected_typeahead_schema=None, expected_version=1):
         # assert index setting exists and equals to expected value
         saved_index = self.index_management.get_index(expected_index.name)
-        exclude_fields = {'model', 'version'}
+        exclude_fields = {'model', 'version', 'updated_at'}
         self.assertEqual(saved_index.dict(exclude=exclude_fields), expected_index.dict(exclude=exclude_fields))
         self.assertEqual(saved_index.version, expected_version)
 
