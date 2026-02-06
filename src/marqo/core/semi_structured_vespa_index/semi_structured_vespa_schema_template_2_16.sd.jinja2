@@ -410,7 +410,7 @@ schema {{ index.schema_name }} {
     }
     rank-profile collapse_to_sort_value inherits base_rank_profile{
         first-phase {
-            expression: collapse_sort_value()
+            expression: collapse_final_score()
         }
 
         function tie_breaker() {
