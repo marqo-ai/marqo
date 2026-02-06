@@ -1587,14 +1587,14 @@ class TestCollapseSortByTieBreaker(MarqoTestCase):
 
         first_result = get_results()
 
-        for _ in range(10):
+        for i in range(10):
             # Run the same search multiple times to verify that the same representative is consistently selected
             result = get_results()
             self.assertEqual(
                 first_result, result,
                 f"Collapse sort by with ties should consistently select the same representative "
                 f"document based on relevance as a tie-breaker, however got different results across runs. "
-                f"Expected result: {first_result}, Returned result: {result}"
+                f"Expected result: {first_result}, Returned result: {result}, in the run {i+1}/10"
             )
 
     def test_collapse_sort_by_keeps_relevance_hit_on_tie_asc(self):
