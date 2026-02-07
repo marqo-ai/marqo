@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 
 class TimerError(Exception):
-    """An error occured whn operating on a metric timer (e.g. stopping a stopped timer)"""
+    """An error occurred when operating on a metric timer (e.g. stopping a stopped timer)"""
     pass
 
 
