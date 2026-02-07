@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch, call
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -481,7 +481,7 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
     def test_collapse_field_validation_no_collapse_fields_configured(self):
         """Test that validation is skipped when no collapse fields are configured"""
         docs = [{"_id": "doc1", "title": "Test document"}]
-
+        
         add_docs_params = AddDocsParams(
             index_name="test_index",
             docs=docs,
@@ -511,4 +511,3 @@ class TestSemiStructuredAddDocumentsHandler(MarqoTestCase):
         response = handler.add_documents()
         error_items = [item for item in response.items if item.status != 200]
         self.assertEqual(0, len(error_items))
-
