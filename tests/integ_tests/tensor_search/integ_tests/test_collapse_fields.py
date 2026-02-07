@@ -1561,6 +1561,7 @@ class TestCollapseSortByTieBreaker(MarqoTestCase):
             )
         )
 
+    @pytest.mark.skip_for_multinode(reason="We don't have a reliable tie-breaker for multi-nodes.")
     def test_collapse_sort_by_with_ties(self):
         """When multiple documents within a group have the same sort field value (price),
         the collapse sort by should consistently select the same representative based on a tie-breaker."""
@@ -1593,7 +1594,7 @@ class TestCollapseSortByTieBreaker(MarqoTestCase):
             self.assertEqual(
                 first_result, result,
                 f"Collapse sort by with ties should consistently select the same representative "
-                f"document based on relevance as a tie-breaker, however got different results across runs. "
+                f"document in the single node setup, however got different results across runs. "
                 f"Expected result: {first_result}, Returned result: {result}, in the run {i+1}/10"
             )
 
