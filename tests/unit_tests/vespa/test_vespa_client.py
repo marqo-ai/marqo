@@ -303,24 +303,6 @@ class TestVespaClient(unittest.TestCase):
             'host': 'node2', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 7
         })
 
-    def test_convergence_status_to_dict_includes_non_converged_services(self):
-        """Test that to_dict includes nonConvergedServices only when non-empty."""
-        status_converged = VespaClient._ConvergenceStatus(
-            current_generation=9, wanted_generation=9, converged=True,
-            non_converged_services=[]
-        )
-        d = status_converged.to_dict()
-        self.assertNotIn('nonConvergedServices', d)
-
-        non_converged = [{'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8}]
-        status_not_converged = VespaClient._ConvergenceStatus(
-            current_generation=8, wanted_generation=9, converged=False,
-            non_converged_services=non_converged
-        )
-        d = status_not_converged.to_dict()
-        self.assertIn('nonConvergedServices', d)
-        self.assertEqual(d['nonConvergedServices'], non_converged)
-
     def test_wait_for_convergence_error_message_contains_non_converged_services(self):
         """Test that the timeout error message includes non-converged service details."""
         from marqo.vespa.exceptions import VespaNotConvergedError
@@ -342,10 +324,19 @@ class TestVespaClient(unittest.TestCase):
             with self.assertRaises(VespaNotConvergedError) as ctx:
                 self.vespa_client.wait_for_application_convergence(timeout=1)
 
-        error_msg = str(ctx.exception)
-        self.assertIn('node2', error_msg)
-        self.assertIn('wantedGeneration', error_msg)
-        self.assertIn("'converged': False", error_msg)
+        expected_status = {
+            'current_generation': 8,
+            'wanted_generation': 9,
+            'converged': False,
+            'non_converged_services': [
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8}
+            ],
+        }
+        self.assertEqual(
+            str(ctx.exception),
+            f"Vespa application did not converge within 1 seconds. "
+            f"The convergence status is {expected_status}"
+        )
 
     def test_check_for_application_convergence_error_message_contains_status(self):
         """Test that check_for_application_convergence error includes convergence status details."""
@@ -368,10 +359,19 @@ class TestVespaClient(unittest.TestCase):
             with self.assertRaises(VespaNotConvergedError) as ctx:
                 self.vespa_client.check_for_application_convergence()
 
-        error_msg = str(ctx.exception)
-        self.assertIn('node2', error_msg)
-        self.assertIn('wantedGeneration', error_msg)
-        self.assertIn("'converged': False", error_msg)
+        expected_status = {
+            'current_generation': 8,
+            'wanted_generation': 9,
+            'converged': False,
+            'non_converged_services': [
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8}
+            ],
+        }
+        self.assertEqual(
+            str(ctx.exception),
+            f"Vespa application has not converged. "
+            f"The convergence status is {expected_status}"
+        )
 
     @patch('marqo.vespa.vespa_client.time')
     def test_wait_for_convergence_uses_exponential_backoff(self, mock_time):

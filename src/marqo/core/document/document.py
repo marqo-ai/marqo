@@ -41,12 +41,16 @@ class Document:
 
     def add_documents(self, add_docs_params: AddDocsParams,
                       field_count_config=SemiStructuredFieldCountConfig()) -> MarqoAddDocumentsResponse:
-        # Check Vespa convergence before reading index settings to avoid stale schema
+        marqo_index = self.index_management.get_index(add_docs_params.index_name)
+
+        # Check convergence after reading settings, not before. Checking before get_index
+        # doesn't prevent the race: fields could be added between the convergence check and
+        # the settings read, so get_index could still return a non-converged schema generation.
+        # Checking after ensures that the schema generation we just read is fully deployed
+        # across all nodes before we feed documents against it.
         if tensor_search_utils.read_env_vars_and_defaults(
                 EnvVars.MARQO_ENABLE_ADD_DOCUMENTS_CONVERGENCE_CHECK).lower() == 'true':
             self.vespa_client.check_for_application_convergence()
-
-        marqo_index = self.index_management.get_index(add_docs_params.index_name)
 
         if isinstance(marqo_index, StructuredMarqoIndex):
             add_docs_handler = StructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client,

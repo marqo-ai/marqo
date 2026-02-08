@@ -15,8 +15,8 @@ class TestDocumentConvergence(MarqoTestCase):
         self.mock_index_management = Mock()
         self.mock_inference = Mock()
 
-    def test_add_documents_checks_convergence_before_get_index(self):
-        """Verify check_for_application_convergence is called before get_index."""
+    def test_add_documents_checks_convergence_after_get_index(self):
+        """Verify check_for_application_convergence is called after get_index."""
         call_order = []
 
         self.mock_vespa_client.check_for_application_convergence.side_effect = (
@@ -41,10 +41,11 @@ class TestDocumentConvergence(MarqoTestCase):
 
             doc.add_documents(add_docs_params)
 
-            self.assertEqual(call_order, ['check_convergence', 'get_index'])
+            self.assertEqual(call_order, ['get_index', 'check_convergence'])
 
     def test_add_documents_convergence_failure_propagates(self):
-        """Verify convergence failure propagates and get_index is never called."""
+        """Verify convergence failure propagates after get_index is called."""
+        self.mock_index_management.get_index.return_value = self._make_semi_structured_index("test_index")
         self.mock_vespa_client.check_for_application_convergence.side_effect = (
             VespaNotConvergedError("Vespa application has not converged.")
         )
@@ -59,7 +60,7 @@ class TestDocumentConvergence(MarqoTestCase):
         with self.assertRaises(VespaNotConvergedError):
             doc.add_documents(add_docs_params)
 
-        self.mock_index_management.get_index.assert_not_called()
+        self.mock_index_management.get_index.assert_called_once_with("test_index")
 
     def test_add_documents_skips_convergence_when_env_var_disabled(self):
         """Verify convergence check is skipped when MARQO_ENABLE_ADD_DOCUMENTS_CONVERGENCE_CHECK=FALSE."""

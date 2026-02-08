@@ -48,16 +48,6 @@ class VespaClient:
             self.converged = converged
             self.non_converged_services = non_converged_services or []
 
-        def to_dict(self) -> Dict[str, Any]:
-            result = {
-                'currentGeneration': self.current_generation,
-                'wantedGeneration': self.wanted_generation,
-                'converged': self.converged,
-            }
-            if self.non_converged_services:
-                result['nonConvergedServices'] = self.non_converged_services
-            return result
-
     def __init__(self, config_url: str, document_url: str, query_url: str,
                  content_cluster_name: str, default_search_timeout_ms: int = 1000,
                  pool_size: int = 10, feed_pool_size: int = 10, get_pool_size: int = 10,
@@ -183,7 +173,7 @@ class VespaClient:
         if not convergence_status.converged:
             raise VespaNotConvergedError(
                 f'Vespa application has not converged. '
-                f'The convergence status is {convergence_status.to_dict()}'
+                f'The convergence status is {vars(convergence_status)}'
             )
 
     def get_application_generation(self) -> int:
@@ -238,7 +228,7 @@ class VespaClient:
                     if elapsed > _SLOW_CONVERGENCE_THRESHOLD:
                         logger.warning(
                             f'Vespa application has not converged after {elapsed:.1f}s. '
-                            f'Convergence status: {convergence_status.to_dict()}'
+                            f'Convergence status: {vars(convergence_status)}'
                         )
                     else:
                         logger.debug('Waiting for Vespa application to converge')
@@ -263,7 +253,7 @@ class VespaClient:
 
         try:
             convergence_status = self._get_convergence_status()
-            status_info = f"The convergence status is {convergence_status.to_dict()}"
+            status_info = f"The convergence status is {vars(convergence_status)}"
         except (httpx.TimeoutException, httpcore.TimeoutException):
             status_info = "The final convergence status check also timed out"
 
