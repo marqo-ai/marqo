@@ -160,7 +160,6 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.OperationConflictError, api_exceptions.OperationConflictError, None, None),
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
         (core_exceptions.ZeroMagnitudeVectorError, api_exceptions.BadRequestError, None, None),
-        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
         (core_exceptions.UnsupportedFeatureError, api_exceptions.BadRequestError, None, None),
         (core_exceptions.InternalError, api_exceptions.InternalError, None, None),
         (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None, None),
@@ -172,6 +171,13 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
             vespa_exceptions.VespaTimeoutError,
             api_exceptions.VectorStoreTimeoutError,
             "Vector store request timed out. Try your request again later.",
+            None
+        ),
+        (
+            vespa_exceptions.VespaNotConvergedError,
+            # we return 409 in this case since it is likely due to another process triggered a Vespa app deployment
+            api_exceptions.OperationConflictError,
+            "Marqo vector store has not converged. Please retry your request again later.",
             None
         ),
 

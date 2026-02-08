@@ -4,6 +4,7 @@ import io
 import tarfile
 import tempfile
 import textwrap
+import time
 from abc import ABC, abstractmethod
 from typing import Optional, List, Union, Tuple, Generator, Dict
 
@@ -774,7 +775,8 @@ class VespaApplicationPackage:
         self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
         self._index_setting_store.save_index_setting(index.copy(update={
             'version': version,
-            'schema_template_version': marqo_version.get_version()
+            'schema_template_version': marqo_version.get_version(),
+            'updated_at': int(time.time())
         }))
         self._persist_index_settings()
 

@@ -474,26 +474,29 @@ class TestVespaClient(AsyncMarqoTestCase):
 
     @patch.object(
         VespaClient,
-        'get_application_has_converged',
+        '_get_convergence_status',
         side_effect=httpx._exceptions.ReadTimeout("Read Timeout")
     )
-    def test_vespa_client_timeout_exception_handled(self, mock_get_application_has_converged):
+    def test_vespa_client_timeout_exception_handled(self, mock_get_convergence_status):
         """If a timeout exception is raised, the method should retry until the total wait time is reached"""
         side_effects = [
             httpx._exceptions.ReadTimeout("Read Timeout"),
             httpcore._exceptions.ReadTimeout("Read Timeout")
         ]
         for side_effect in side_effects:
+            mock_get_convergence_status.side_effect = side_effect
+            mock_get_convergence_status.reset_mock()
             with self.subTest(side_effect=side_effect):
                 vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                            "http://localhost:8080", "content_default")
                 with self.assertRaises(VespaError) as e:
                     vespa_client.wait_for_application_convergence(0.1)
-                self.assertGreaterEqual(mock_get_application_has_converged.call_count, 5)
                 self.assertIn("Vespa application did not converge", str(e.exception))
 
-    @patch.object(VespaClient, 'get_application_has_converged', return_value=False)
-    def test_application_convergence_timeout_fails(self, mock_get_application_has_converged):
+    @patch.object(VespaClient, '_get_convergence_status',
+                  return_value=VespaClient._ConvergenceStatus(
+                      current_generation=1, wanted_generation=2, converged=False))
+    def test_application_convergence_timeout_fails(self, mock_get_convergence_status):
         """If the total wait time is reached, the method should raise a VespaError"""
         vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                    "http://localhost:8080", "content_default")
@@ -657,8 +660,10 @@ class TestVespaClient(AsyncMarqoTestCase):
         generation_after_deployment = vespa_client.get_application_generation()
         self.assertEqual(generation_after_deployment, int(session_id))
 
-    @patch.object(VespaClient, 'get_application_has_converged', return_value=False)
-    def test_check_for_application_convergence_not_converged(self, mock_get_application_has_converged):
+    @patch.object(VespaClient, '_get_convergence_status',
+                  return_value=VespaClient._ConvergenceStatus(
+                      current_generation=1, wanted_generation=2, converged=False))
+    def test_check_for_application_convergence_not_converged(self, mock_get_convergence_status):
         """Test that check_for_application_convergence raises an error if the application has not converged"""
         vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                    "http://localhost:8080", "content_default")

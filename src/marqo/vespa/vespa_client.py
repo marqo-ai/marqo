@@ -41,10 +41,12 @@ class VespaClient:
     }
 
     class _ConvergenceStatus:
-        def __init__(self, current_generation: int, wanted_generation: int, converged: bool):
+        def __init__(self, current_generation: int, wanted_generation: int, converged: bool,
+                     non_converged_services: List[Dict[str, Any]] = None):
             self.current_generation = current_generation
             self.wanted_generation = wanted_generation
             self.converged = converged
+            self.non_converged_services = non_converged_services or []
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
                  content_cluster_name: str, default_search_timeout_ms: int = 1000,
@@ -167,8 +169,12 @@ class VespaClient:
         Raises:
             VespaNotConvergedError: If the application has not converged
         """
-        if not self.get_application_has_converged():
-            raise VespaNotConvergedError('Vespa application has not converged')
+        convergence_status = self._get_convergence_status()
+        if not convergence_status.converged:
+            raise VespaNotConvergedError(
+                f'Vespa application has not converged. '
+                f'The convergence status is {vars(convergence_status)}'
+            )
 
     def get_application_generation(self) -> int:
         """
@@ -193,25 +199,68 @@ class VespaClient:
 
     def wait_for_application_convergence(self, timeout: int = 120) -> None:
         """
-        Wait for Vespa application to converge, checking every second.
+        Wait for Vespa application to converge.
+
+        Polls every 1 second for the first 8 attempts, then uses exponential backoff
+        (2s, 4s, 8s, ...) for subsequent attempts, until the total timeout is reached.
 
         Args:
             timeout: Timeout in seconds
         """
+        _INITIAL_INTERVAL = 1
+        _BACKOFF_AFTER_ATTEMPTS = 8
+        _BACKOFF_BASE = 2
+        _MAX_INTERVAL = 16
+
+        _SLOW_CONVERGENCE_THRESHOLD = 10
+
         start_time = time.time()
+        attempt = 0
         while time.time() - start_time < timeout:
             try:
-                if self.get_application_has_converged():
+                convergence_status = self._get_convergence_status()
+                elapsed = time.time() - start_time
+                if convergence_status.converged:
+                    if elapsed > _SLOW_CONVERGENCE_THRESHOLD:
+                        logger.warning(f'Vespa application converged after {elapsed:.1f}s')
                     return
                 else:
-                    logger.debug('Waiting for Vespa application to converge')
-                    time.sleep(1)
+                    if elapsed > _SLOW_CONVERGENCE_THRESHOLD:
+                        logger.warning(
+                            f'Vespa application has not converged after {elapsed:.1f}s. '
+                            f'Convergence status: {vars(convergence_status)}'
+                        )
+                    else:
+                        logger.debug('Waiting for Vespa application to converge')
             # TODO Find out what exceptions is raised here
             except (httpx.TimeoutException, httpcore.TimeoutException):
                 logger.error("Marqo timed out waiting for Vespa application to converge. Will retry.")
 
-        raise VespaError(f"Vespa application did not converge within {timeout} seconds. "
-                         f"The convergence status is {self._get_convergence_status()}")
+            if attempt < _BACKOFF_AFTER_ATTEMPTS:
+                sleep_time = _INITIAL_INTERVAL
+            else:
+                sleep_time = min(
+                    _BACKOFF_BASE ** (attempt - _BACKOFF_AFTER_ATTEMPTS + 1),
+                    _MAX_INTERVAL
+                )
+
+            # Don't sleep past the timeout
+            remaining = timeout - (time.time() - start_time)
+            if remaining <= 0:
+                break
+            time.sleep(min(sleep_time, remaining))
+            attempt += 1
+
+        try:
+            convergence_status = self._get_convergence_status()
+            status_info = f"The convergence status is {vars(convergence_status)}"
+        except (httpx.TimeoutException, httpcore.TimeoutException):
+            status_info = "The final convergence status check also timed out"
+
+        raise VespaNotConvergedError(
+            f"Vespa application did not converge within {timeout} seconds. "
+            f"{status_info}"
+        )
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, timeout: Optional[float] = None, **kwargs) -> QueryResult:
@@ -784,14 +833,26 @@ class VespaClient:
         self._raise_for_status(response)
 
         try:
-            json = response.json()
+            json = orjson.loads(response.content)
+            wanted_generation = json['wantedGeneration']
+            non_converged_services = [
+                {
+                    'host': svc.get('host'),
+                    'port': svc.get('port'),
+                    'type': svc.get('type'),
+                    'currentGeneration': svc.get('currentGeneration'),
+                }
+                for svc in json.get('services', [])
+                if svc.get('currentGeneration') != wanted_generation
+            ]
             return self._ConvergenceStatus(
                 current_generation=json['currentGeneration'],
-                wanted_generation=json['wantedGeneration'],
-                converged=json['converged']
+                wanted_generation=wanted_generation,
+                converged=json['converged'],
+                non_converged_services=non_converged_services,
             )
 
-        except (JSONDecodeError, KeyError) as e:
+        except (orjson.JSONDecodeError, KeyError) as e:
             raise VespaError(f'Unexpected response: {response.text}') from e
 
     async def _feed_batch_async(self, batch: List[VespaDocument],

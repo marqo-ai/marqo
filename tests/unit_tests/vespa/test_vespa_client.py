@@ -251,5 +251,406 @@ class TestVespaClient(unittest.TestCase):
         self.assertIn('fieldSet=test_schema:title', call_url)
 
 
+    def test_get_convergence_status_all_converged(self):
+        """Test _get_convergence_status when all services are converged."""
+        response_data = {
+            'currentGeneration': 9,
+            'wantedGeneration': 9,
+            'converged': True,
+            'services': [
+                {'host': 'node1', 'port': 8080, 'type': 'container', 'currentGeneration': 9},
+                {'host': 'node1', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 9},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(response_data)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            status = self.vespa_client._get_convergence_status()
+
+        self.assertTrue(status.converged)
+        self.assertEqual(status.current_generation, 9)
+        self.assertEqual(status.wanted_generation, 9)
+        self.assertEqual(status.non_converged_services, [])
+
+    def test_get_convergence_status_some_not_converged(self):
+        """Test _get_convergence_status lists services not at wantedGeneration."""
+        response_data = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': [
+                {'host': 'node1', 'port': 8080, 'type': 'container', 'currentGeneration': 9},
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8},
+                {'host': 'node2', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 7},
+                {'host': 'node1', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 9},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(response_data)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            status = self.vespa_client._get_convergence_status()
+
+        self.assertFalse(status.converged)
+        self.assertEqual(len(status.non_converged_services), 2)
+        self.assertEqual(status.non_converged_services[0], {
+            'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8
+        })
+        self.assertEqual(status.non_converged_services[1], {
+            'host': 'node2', 'port': 19108, 'type': 'searchnode', 'currentGeneration': 7
+        })
+
+    def test_wait_for_convergence_error_message_contains_non_converged_services(self):
+        """Test that the timeout error message includes non-converged service details."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        convergence_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': [
+                {'host': 'node1', 'port': 8080, 'type': 'container', 'currentGeneration': 9},
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(convergence_response)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError) as ctx:
+                self.vespa_client.wait_for_application_convergence(timeout=1)
+
+        expected_status = {
+            'current_generation': 8,
+            'wanted_generation': 9,
+            'converged': False,
+            'non_converged_services': [
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8}
+            ],
+        }
+        self.assertEqual(
+            str(ctx.exception),
+            f"Vespa application did not converge within 1 seconds. "
+            f"The convergence status is {expected_status}"
+        )
+
+    def test_check_for_application_convergence_error_message_contains_status(self):
+        """Test that check_for_application_convergence error includes convergence status details."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        convergence_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': [
+                {'host': 'node1', 'port': 8080, 'type': 'container', 'currentGeneration': 9},
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(convergence_response)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError) as ctx:
+                self.vespa_client.check_for_application_convergence()
+
+        expected_status = {
+            'current_generation': 8,
+            'wanted_generation': 9,
+            'converged': False,
+            'non_converged_services': [
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8}
+            ],
+        }
+        self.assertEqual(
+            str(ctx.exception),
+            f"Vespa application has not converged. "
+            f"The convergence status is {expected_status}"
+        )
+
+    @patch('marqo.vespa.vespa_client.time')
+    def test_wait_for_convergence_uses_exponential_backoff(self, mock_time):
+        """Test that wait_for_application_convergence sleeps 1s for the first 8 attempts,
+        then uses exponential backoff (2s, 4s, 8s, 16s cap)."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        # Simulate time progressing by the amount slept
+        current_time = [0.0]
+
+        def fake_time():
+            return current_time[0]
+
+        def fake_sleep(duration):
+            current_time[0] += duration
+
+        mock_time.time.side_effect = fake_time
+        mock_time.sleep.side_effect = fake_sleep
+
+        convergence_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': []
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(convergence_response)
+
+        # Use a large timeout so the last few sleeps aren't clamped by remaining time
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError):
+                self.vespa_client.wait_for_application_convergence(timeout=200)
+
+        sleep_calls = [call.args[0] for call in mock_time.sleep.call_args_list]
+
+        # First 8 attempts: 1s each
+        self.assertEqual(sleep_calls[:8], [1, 1, 1, 1, 1, 1, 1, 1])
+        # Attempt 8: 2s, attempt 9: 4s, attempt 10: 8s, attempt 11: 16s (cap)
+        self.assertEqual(sleep_calls[8], 2)
+        self.assertEqual(sleep_calls[9], 4)
+        self.assertEqual(sleep_calls[10], 8)
+        self.assertEqual(sleep_calls[11], 16)
+        # After cap, remaining full sleeps should be 16s
+        for s in sleep_calls[12:-1]:
+            self.assertEqual(s, 16)
+
+    @patch('marqo.vespa.vespa_client.time')
+    def test_wait_for_convergence_does_not_sleep_past_timeout(self, mock_time):
+        """Test that sleep duration is capped to not exceed the remaining timeout."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        current_time = [0.0]
+
+        def fake_time():
+            return current_time[0]
+
+        def fake_sleep(duration):
+            current_time[0] += duration
+
+        mock_time.time.side_effect = fake_time
+        mock_time.sleep.side_effect = fake_sleep
+
+        convergence_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': []
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(convergence_response)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError):
+                self.vespa_client.wait_for_application_convergence(timeout=10)
+
+        sleep_calls = [call.args[0] for call in mock_time.sleep.call_args_list]
+        # Total sleep should not exceed the timeout
+        self.assertLessEqual(sum(sleep_calls), 10)
+        # No individual sleep should exceed the remaining time
+        elapsed = 0.0
+        for s in sleep_calls:
+            self.assertLessEqual(s, 10 - elapsed + 0.001)  # small float tolerance
+            elapsed += s
+
+    def test_wait_for_convergence_returns_immediately_when_converged(self):
+        """Test that wait returns immediately when already converged, with no sleep."""
+        converged_response = {
+            'currentGeneration': 9,
+            'wantedGeneration': 9,
+            'converged': True,
+            'services': []
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(converged_response)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            # Should not raise
+            self.vespa_client.wait_for_application_convergence(timeout=10)
+
+    @patch('marqo.vespa.vespa_client.time')
+    def test_wait_for_convergence_returns_after_retries(self, mock_time):
+        """Test that wait returns successfully when convergence happens after a few retries."""
+        current_time = [0.0]
+
+        def fake_time():
+            return current_time[0]
+
+        def fake_sleep(duration):
+            current_time[0] += duration
+
+        mock_time.time.side_effect = fake_time
+        mock_time.sleep.side_effect = fake_sleep
+
+        not_converged = {
+            'currentGeneration': 8, 'wantedGeneration': 9, 'converged': False, 'services': []
+        }
+        converged = {
+            'currentGeneration': 9, 'wantedGeneration': 9, 'converged': True, 'services': []
+        }
+
+        def make_response(data):
+            r = Mock()
+            r.status_code = 200
+            r.content = orjson.dumps(data)
+            return r
+
+        responses = [make_response(not_converged)] * 3 + [make_response(converged)]
+        with patch.object(self.vespa_client.http_client, 'get', side_effect=responses):
+            self.vespa_client.wait_for_application_convergence(timeout=120)
+
+        # Should have slept 3 times (1s each, all within first 8 attempts)
+        self.assertEqual(mock_time.sleep.call_count, 3)
+
+    @patch('marqo.vespa.vespa_client.logger')
+    @patch('marqo.vespa.vespa_client.time')
+    def test_wait_for_convergence_logs_warning_on_slow_convergence(self, mock_time, mock_logger):
+        """Test that a warning is logged when convergence takes longer than 10 seconds."""
+        current_time = [0.0]
+
+        def fake_time():
+            return current_time[0]
+
+        def fake_sleep(duration):
+            current_time[0] += duration
+
+        mock_time.time.side_effect = fake_time
+        mock_time.sleep.side_effect = fake_sleep
+
+        not_converged = {
+            'currentGeneration': 8, 'wantedGeneration': 9, 'converged': False, 'services': []
+        }
+        converged = {
+            'currentGeneration': 9, 'wantedGeneration': 9, 'converged': True, 'services': []
+        }
+
+        def make_response(data):
+            r = Mock()
+            r.status_code = 200
+            r.content = orjson.dumps(data)
+            return r
+
+        responses = [make_response(not_converged)] * 11 + [make_response(converged)]
+        with patch.object(self.vespa_client.http_client, 'get', side_effect=responses):
+            self.vespa_client.wait_for_application_convergence(timeout=120)
+
+        # Should have logged a warning about slow convergence on success
+        warning_calls = [str(c) for c in mock_logger.warning.call_args_list]
+        converged_warnings = [c for c in warning_calls if 'converged after' in c]
+        self.assertTrue(len(converged_warnings) > 0,
+                        f"Expected a 'converged after' warning, got: {warning_calls}")
+
+    @patch('marqo.vespa.vespa_client.logger')
+    @patch('marqo.vespa.vespa_client.time')
+    def test_wait_for_convergence_logs_warning_with_status_when_slow(self, mock_time, mock_logger):
+        """Test that warnings include convergence status when not converged after 10s."""
+        from marqo.vespa.exceptions import VespaNotConvergedError
+
+        current_time = [0.0]
+
+        def fake_time():
+            return current_time[0]
+
+        def fake_sleep(duration):
+            current_time[0] += duration
+
+        mock_time.time.side_effect = fake_time
+        mock_time.sleep.side_effect = fake_sleep
+
+        not_converged_response = {
+            'currentGeneration': 8,
+            'wantedGeneration': 9,
+            'converged': False,
+            'services': [
+                {'host': 'node2', 'port': 8080, 'type': 'container', 'currentGeneration': 8},
+            ]
+        }
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = orjson.dumps(not_converged_response)
+
+        with patch.object(self.vespa_client.http_client, 'get', return_value=mock_response):
+            with self.assertRaises(VespaNotConvergedError):
+                self.vespa_client.wait_for_application_convergence(timeout=20)
+
+        # Should have logged warnings with convergence status after 10s
+        warning_calls = [str(c) for c in mock_logger.warning.call_args_list]
+        status_warnings = [c for c in warning_calls if 'has not converged after' in c]
+        self.assertTrue(len(status_warnings) > 0,
+                        f"Expected 'has not converged after' warnings, got: {warning_calls}")
+        # Verify the status dict is included
+        self.assertTrue(any('node2' in c for c in status_warnings),
+                        f"Expected non-converged service details in warnings, got: {status_warnings}")
+
+    @patch('marqo.vespa.vespa_client.logger')
+    @patch('marqo.vespa.vespa_client.time')
+    def test_wait_for_convergence_no_warning_when_fast(self, mock_time, mock_logger):
+        """Test that no warning is logged when convergence happens within 10 seconds."""
+        current_time = [0.0]
+
+        def fake_time():
+            return current_time[0]
+
+        def fake_sleep(duration):
+            current_time[0] += duration
+
+        mock_time.time.side_effect = fake_time
+        mock_time.sleep.side_effect = fake_sleep
+
+        not_converged = {
+            'currentGeneration': 8, 'wantedGeneration': 9, 'converged': False, 'services': []
+        }
+        converged = {
+            'currentGeneration': 9, 'wantedGeneration': 9, 'converged': True, 'services': []
+        }
+
+        def make_response(data):
+            r = Mock()
+            r.status_code = 200
+            r.content = orjson.dumps(data)
+            return r
+
+        responses = [make_response(not_converged)] * 3 + [make_response(converged)]
+        with patch.object(self.vespa_client.http_client, 'get', side_effect=responses):
+            self.vespa_client.wait_for_application_convergence(timeout=120)
+
+        mock_logger.warning.assert_not_called()
+
+    @patch('marqo.vespa.vespa_client.logger')
+    def test_wait_for_convergence_retries_on_httpx_timeout(self, mock_logger):
+        """Test that httpx timeout exceptions are caught and retried."""
+        not_converged_response = {
+            'currentGeneration': 8, 'wantedGeneration': 9, 'converged': False, 'services': []
+        }
+        converged_response = {
+            'currentGeneration': 9, 'wantedGeneration': 9, 'converged': True, 'services': []
+        }
+
+        mock_response_not_converged = Mock()
+        mock_response_not_converged.status_code = 200
+        mock_response_not_converged.content = orjson.dumps(not_converged_response)
+
+        mock_response_converged = Mock()
+        mock_response_converged.status_code = 200
+        mock_response_converged.content = orjson.dumps(converged_response)
+
+        # First call raises timeout, second returns not converged, third returns converged
+        with patch.object(self.vespa_client.http_client, 'get',
+                          side_effect=[httpx.TimeoutException("timeout"),
+                                       mock_response_not_converged,
+                                       mock_response_converged]):
+            self.vespa_client.wait_for_application_convergence(timeout=10)
+
+        # Should have logged the timeout error
+        error_calls = [str(c) for c in mock_logger.error.call_args_list]
+        self.assertTrue(any('timed out' in c.lower() for c in error_calls))
+
+
 if __name__ == '__main__':
     unittest.main()
