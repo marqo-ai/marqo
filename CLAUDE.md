@@ -1,3 +1,6 @@
+# General Guidelines
+- All imports should be at the top of the file whenever possible.
+
 # Environment Setup
 
 Make sure the virtual environment is activated before running any commands.

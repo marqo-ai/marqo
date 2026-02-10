@@ -46,8 +46,12 @@ QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL = 'marqo__add_weights_lexical'
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR = 'marqo__mult_weights_tensor'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR = 'marqo__add_weights_tensor'
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL = 'marqo__mult_weights_global'
+QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL = 'marqo__custom_score_add_weights_global'
+QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL = 'marqo__custom_score_mult_weights_global'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL = 'marqo__add_weights_global'
 MARQO_GLOBAL_SCORE_MODIFIERS = 'global'
+MARQO_CUSTOM_SCORE_RERANK_MODIFIERS = 'custom_score_rerank'
+MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX = "marqo__score_"
 
 # For recency scoring
 QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE = 'marqo__recency_should_calculate_score'
