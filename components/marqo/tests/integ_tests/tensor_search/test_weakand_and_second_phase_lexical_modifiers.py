@@ -7,10 +7,10 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
+from marqo.tensor_search.models.collapse_model import CollapseModel
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierOperator
 from tests.integ_tests.marqo_test import MarqoTestCase
-from pydantic.v1 import ValidationError
 
 
 @pytest.mark.skip_for_multinode
@@ -555,7 +555,7 @@ class TestSecondPhaseLexicalModifiersAndCollapseField(MarqoTestCase):
                 ),
                 secondPhaseModifier=False,
             ),
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             result_count=10,
             offset=0
         )
@@ -586,7 +586,7 @@ class TestSecondPhaseLexicalModifiersAndCollapseField(MarqoTestCase):
                 ),
                 secondPhaseModifier=True,
             ),
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             result_count=10,
             offset=0
         )

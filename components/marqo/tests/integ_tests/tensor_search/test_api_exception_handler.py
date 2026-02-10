@@ -99,6 +99,15 @@ class TestBaseExceptionHandler(MarqoTestCase):
             marqo_base_exception_handler(self.normal_request, vespa_exceptions.VespaError(self.generic_error_message))
             assert isinstance(mock_api_exception_handler.call_args_list[-1][0][1], api_exceptions.MarqoWebError)
 
+        with self.subTest("Vespa error: VespaNotConvergedError"):
+            marqo_base_exception_handler(
+                self.normal_request,
+                vespa_exceptions.VespaNotConvergedError("Vespa application did not converge")
+            )
+            converted = mock_api_exception_handler.call_args_list[-1][0][1]
+            assert isinstance(converted, api_exceptions.OperationConflictError)
+            assert "not converged" in converted.message.lower()
+
     @mock.patch("marqo.tensor_search.api.marqo_api_exception_handler")
     def test_base_exception_handler_unhandled_error(self, mock_api_exception_handler):
         # Ensure that an unhandled error is converted to a MarqoWebError and the original message is not propagated

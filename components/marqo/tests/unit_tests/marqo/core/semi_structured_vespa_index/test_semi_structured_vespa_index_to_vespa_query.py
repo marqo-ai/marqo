@@ -29,7 +29,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import (
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.version import get_version
 from tests.unit_tests.marqo_test import MarqoTestCase
-
+from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
 
 class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
 
@@ -931,7 +931,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
             or_phrases=[],
             and_phrases=[],
             hybrid_parameters=HybridParameters(),
-            collapse_field_name='parent_id',
+            collapse=CollapseModel(name="parent_id"),
             facets=FacetsParameters(
                 fields={
                     "price": FieldFacetsConfiguration(type="number", ranges=[
@@ -1041,7 +1041,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
             or_phrases=[],
             and_phrases=[],
             hybrid_parameters=HybridParameters(),
-            collapse_field_name='parent_id',
+            collapse=CollapseModel(name="parent_id"),
         )
         vespa_query = vespa_index.to_vespa_query(marqo_query)
 
@@ -1061,7 +1061,7 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseFields(MarqoTestCase):
             or_phrases=[],
             and_phrases=[],
             hybrid_parameters=HybridParameters(secondPhaseModifier=True),
-            collapse_field_name='parent_id',
+            collapse=CollapseModel(name="parent_id"),
             facets=FacetsParameters(
                 fields={
                     "price": FieldFacetsConfiguration(type="number", ranges=[
@@ -1171,7 +1171,7 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
             or_phrases=["test query"],
             and_phrases=[],
             attributes_to_retrieve=["title", "description"],
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             limit=10,
             offset=0
         )
@@ -1201,7 +1201,7 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
             or_phrases=["test query"],
             and_phrases=[],
             attributes_to_retrieve=[],
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             limit=10,
             offset=0
         )
@@ -1227,7 +1227,7 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
             or_phrases=["test query"],
             and_phrases=[],
             attributes_to_retrieve=["title", "parent_id"],  # collapse field already present
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             limit=10,
             offset=0
         )
@@ -1275,7 +1275,7 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
             ),
             or_phrases=["test query"],
             and_phrases=[],
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
             limit=10,
             offset=0
         )
@@ -1312,6 +1312,88 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
                 self.assertNotIn("parent_id", vespa_query["yql"])
                 self.assertNotIn("parent_id", marqo_query.attributes_to_retrieve)
 
+class TestSemiStructuredVespaIndexToVespaQueryCollapseSortBy(MarqoTestCase):
+    """Tests for the collapse sort_by code path in to_vespa_query.
+
+    When collapse.sort_by is set and should_execute_sort() is True, the vespa query should:
+    1. Override lexical ranking to 'collapse_to_sort_value'
+    2. Set query_features with marqo__collapse_sort_weights (asc → -1, desc → 1)
+    3. Set hits to COLLAPSE_SORT_BY_QUERY_LIMIT (9999)
+    4. Optionally set ranking.matching.numThreadsPerSearch
+
+    When should_execute_sort() is False, the query should use standard diversity ranking
+    and not include any collapse sort parameters.
+    """
+
+    def setUp(self):
+        marqo_index = self.semi_structured_marqo_index(
+            "test_index",
+            collapse_fields=[CollapseField(name='parent_id')]
+        )
+        self.vespa_index = SemiStructuredVespaIndex(marqo_index)
+
+    def _build_query(self, collapse, hybrid_parameters=None):
+        return MarqoHybridQuery(
+            index_name="test_index", limit=10, offset=0,
+            or_phrases=[], and_phrases=[],
+            hybrid_parameters=hybrid_parameters or HybridParameters(),
+            collapse=collapse,
+        )
+
+    def _make_collapse(self, field_name="price", order="asc", execute=False, num_threads=None):
+        collapse = CollapseModel(
+            name="parent_id",
+            sort_by=CollapseSortBy(
+                fields=[CollapseSortByField(fieldName=field_name, order=order)],
+                numThreadsPerSearch=num_threads,
+            )
+        )
+        if execute:
+            collapse.sort_by.enable_execute_sort()
+        return collapse
+
+    def test_collapse_sort_by_executed(self):
+        """When should_execute_sort() is True, verify sort-related keys in the full query."""
+        # (name, field, order, num_threads, expected_weight)
+        cases = [
+            ('asc',              'price', 'asc',  None, {'price': -1}),
+            ('desc',             'price', 'desc', None, {'price': 1}),
+            ('desc_with_threads', 'price', 'desc', 4,   {'price': 1}),
+            ('different_field',  'cost',  'asc',  None, {'cost': -1}),
+        ]
+
+        for name, field, order, threads, expected_weight in cases:
+            with self.subTest(case=name):
+                self.maxDiff = None
+                collapse = self._make_collapse(field_name=field, order=order, execute=True, num_threads=threads)
+                vespa_query = self.vespa_index.to_vespa_query(self._build_query(collapse))
+
+                # Sort-by specific assertions
+                self.assertEqual('collapse_to_sort_value', vespa_query['marqo__ranking.lexical.lexical'])
+                self.assertEqual(expected_weight, vespa_query['query_features']['marqo__collapse_sort_weights'])
+                self.assertEqual(9999, vespa_query['hits'])
+
+                # numThreadsPerSearch
+                if threads:
+                    self.assertEqual(threads, vespa_query['ranking.matching.numThreadsPerSearch'])
+                else:
+                    self.assertNotIn('ranking.matching.numThreadsPerSearch', vespa_query)
+
+                # Collapse field params always present
+                self.assertEqual('parent_id', vespa_query['collapsefield'])
+                self.assertEqual(1, vespa_query['collapsesize'])
+
+    def test_collapse_sort_by_not_executed(self):
+        """When should_execute_sort() is False, no sort params are added; diversity ranking is used."""
+        collapse = self._make_collapse(execute=False)
+        vespa_query = self.vespa_index.to_vespa_query(self._build_query(collapse))
+
+        self.assertEqual('bm25_diversity', vespa_query['marqo__ranking.lexical.lexical'])
+        self.assertNotIn('marqo__collapse_sort_weights', vespa_query.get('query_features', {}))
+        self.assertEqual(10, vespa_query['hits'])
+        self.assertNotIn('ranking.matching.numThreadsPerSearch', vespa_query)
+        self.assertEqual('parent_id', vespa_query['collapsefield'])
+
 
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()

@@ -168,6 +168,10 @@ schema {{ index.schema_name }} {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+            {%- if collapse_field %}
+
+            query(marqo__collapse_sort_weights) tensor<double>(p{})
+            {%- endif %}
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============
@@ -354,6 +358,11 @@ schema {{ index.schema_name }} {
         function collapse_field_hash() {
             expression: attribute({{ collapse_field.name }})
         }
+
+        function collapse_sort_value() {
+            expression: if (count(query(marqo__collapse_sort_weights) * attribute(marqo__score_modifiers)) == 0, -1e50, reduce(query(marqo__collapse_sort_weights) * attribute(marqo__score_modifiers), prod))
+        }
+
         {% endif -%}
         match-features {
             global_mult_modifier
@@ -397,6 +406,18 @@ schema {{ index.schema_name }} {
         }
         second-phase {
             expression: modify(firstPhase, query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+    }
+    rank-profile collapse_to_sort_value inherits base_rank_profile{
+        first-phase {
+            expression: collapse_sort_value()
+        }
+        diversity {
+            attribute: {{ collapse_field.name }}
+            min-groups: {{ collapse_field.min_groups }}
+        }
+        second-phase {
+            expression: firstPhase
         }
     }
     {% endif -%}
@@ -461,6 +482,10 @@ schema {{ index.schema_name }} {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+            {%- if collapse_field %}
+
+            query(marqo__collapse_sort_weights) tensor<double>(p{})
+            {%- endif %}
         }
     }
 

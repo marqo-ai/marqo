@@ -222,8 +222,9 @@ class VespaIndex(ABC):
             additional_hits = 0
 
         return query.rerank_depth_tensor if query.rerank_depth_tensor else base_rerank_depth, additional_hits
- 
-    def escape(self, s: str) -> str:
+
+    @staticmethod
+    def escape(s: str) -> str:
         """
         Used for filter string construction.
         Add backslash character in front of any special character (backslash or double quote)
