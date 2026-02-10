@@ -177,7 +177,7 @@ class TestCollapseFields(MarqoTestCase):
                     hybrid_parameters=HybridParameters(
                         retrievalMethod=retrieval_method,
                         rankingMethod=ranking_method,
-                        rerankDepthTensor=10,  # tensor-tensor will have fewer hits if we do not increase this, why?
+                        rerankDepthTensor=50,  # tensor-tensor will have fewer hits if we do not increase this, why?
                     ),
                     # parent id is not added here, it will be added in the query for collapsing, but not in the result
                     attributes_to_retrieve=["title", "group"],
