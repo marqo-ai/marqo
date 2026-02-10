@@ -1,9 +1,9 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
-from marqo.exceptions import InternalError
+from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
 
 class VespaIndex(ABC):
@@ -119,6 +119,81 @@ class VespaIndex(ABC):
 
         return mult_tensor, add_tensor
 
+    def _convert_hybrid_global_score_modifiers_to_tensors(self, score_modifiers: List[ScoreModifier]) -> Dict[
+        str, Dict[str, float]]:
+        """
+        Specifically for hybrid search. Allows extraction of global score modifiers and custom score rerankers separately.
+        Helper function that converts a list of raw global score modifiers into 4 dictionaries:
+        These dictionaries are
+        1. global score modifiers 'mult' weights
+        2. global score modifiers 'add' weights
+        3. custom score reranker 'mult' weights
+        4. custom score reranker 'add' weights
+        """
+        global_score_modifiers_mult_tensor = {}
+        global_score_modifiers_add_tensor = {}
+        custom_score_rerankers_mult_tensor = {}
+        custom_score_rerankers_add_tensor = {}
+
+        for modifier in score_modifiers:
+            if modifier.field.startswith(constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX):
+                field_name_to_use = modifier.field[len(constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX):]
+                if VespaIndex.parse_custom_score_key(field_name_to_use) is None:
+                    raise InvalidArgumentError(
+                        "Attempted to use custom score reranker with invalid format. "
+                        f"Field name '{modifier.field}' does not match expected patterns (e.g. marqo__score_bm25_field_<field>, "
+                        "marqo__score_bm25_sum, marqo__score_closeness_retrieval_vector_field_<field>)."
+                    )
+                mult_tensor = custom_score_rerankers_mult_tensor
+                add_tensor = custom_score_rerankers_add_tensor
+            else:
+                field_name_to_use = modifier.field
+                mult_tensor = global_score_modifiers_mult_tensor
+                add_tensor = global_score_modifiers_add_tensor
+
+            # Put it in mult or add tensor, depending on type
+            if modifier.type == ScoreModifierType.Multiply:
+                mult_tensor[field_name_to_use] = modifier.weight
+            elif modifier.type == ScoreModifierType.Add:
+                add_tensor[field_name_to_use] = modifier.weight
+            else:
+                raise InternalError(f'Unknown score modifier type {modifier.type}')
+
+        # TODO: Add validation. score type, aggregate type, field must exist.
+        return global_score_modifiers_mult_tensor, global_score_modifiers_add_tensor, \
+                custom_score_rerankers_mult_tensor, custom_score_rerankers_add_tensor
+
+    @staticmethod
+    def parse_custom_score_key(key: str) -> Optional[Tuple[str, Optional[str], Optional[str]]]:
+        """
+        Parse a custom score rerank key into (score_type, field_name, aggregate_type).
+
+        Key formats (only bm25 and closeness_retrieval_vector per plan):
+        - {score_type}_field_{FIELD_NAME} -> (score_type, "FIELD_NAME", None)
+        - {score_type}_{sum|max|avg} -> (score_type, None, aggregate)
+
+        Returns None for unsupported score types or invalid keys.
+        """
+        supported_score_types = ("bm25", "closeness_retrieval_vector")
+        aggregate_types = ("sum", "max", "avg")
+
+        if not key or "_" not in key:
+            return None
+
+        for score_type in supported_score_types:
+            prefix = score_type + "_"
+            if not key.startswith(prefix):
+                continue
+            rest = key[len(prefix):]
+            if rest in aggregate_types:
+                return (score_type, None, rest)
+            if rest.startswith("field_"):
+                field_name = rest[6:]  # len("field_") == 6
+                return None if not field_name else (score_type, field_name, None)
+            return None
+
+        return None
+
     def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
         """
         Returns classic score modifiers (from tensor or lexical queries) as a dictionary of dictionaries.
@@ -152,7 +227,7 @@ class VespaIndex(ABC):
 
         """
         Specifically for hybrid queries.
-        Returns a dictionary with 3 keys: 'lexical', 'tensor', and 'global'.
+        Returns a dictionary with 4 keys: 'lexical', 'tensor', 'global', and 'custom_score_rerank'.
         Each key points to a dictionary containing the score modifiers for the respective field types.
 
         Example:
@@ -180,6 +255,17 @@ class VespaIndex(ABC):
                 'marqo__add_weights_global': {
                     'field11': 23, 'field12': 12
                 }
+            },
+            'custom_score_rerank': {
+                'marqo__custom_score_mult_weights_global': {
+                    'bm25_sum': 0.5,
+                    'closeness_retrieval_vector_field_variantImage': 0.4
+                },
+                'marqo__custom_score_add_weights_global': {
+                    'bm25_field_variantTitle': 0.5,
+                    'closeness_retrieval_vector_avg': 0.4
+                },
+            }
         }
         """
 
@@ -204,11 +290,22 @@ class VespaIndex(ABC):
             }
 
         # Treat root level score modifiers as global. Currently only supported for RRF.
+        # Separate the global score modifiers list into: (1) score modifiers and (2) custom score rerankers
         if hybrid_query.score_modifiers:
-            mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(hybrid_query.score_modifiers)
+            global_score_modifiers_mult_tensor, global_score_modifiers_add_tensor, \
+                custom_score_rerankers_mult_tensor, custom_score_rerankers_add_tensor \
+                = self._convert_hybrid_global_score_modifiers_to_tensors(hybrid_query.score_modifiers)
+
+            # Query input for global score modifiers
             result[constants.MARQO_GLOBAL_SCORE_MODIFIERS] = {
-                constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL: mult_tensor,
-                constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL: add_tensor
+                constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL: global_score_modifiers_mult_tensor,
+                constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL: global_score_modifiers_add_tensor
+            }
+
+            # Query input for custom score rerankers (separate from global score modifiers)
+            result[constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS] = {
+                constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL: custom_score_rerankers_mult_tensor,
+                constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL: custom_score_rerankers_add_tensor
             }
 
         return result

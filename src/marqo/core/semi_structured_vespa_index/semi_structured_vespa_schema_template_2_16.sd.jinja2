@@ -168,6 +168,10 @@ schema {{ index.schema_name }} {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+
+            # Custom Score Global Reranking
+            query(marqo__custom_score_mult_weights_global) tensor<double>(p{})
+            query(marqo__custom_score_add_weights_global) tensor<double>(p{})
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============
@@ -362,6 +366,15 @@ schema {{ index.schema_name }} {
             sort_field_value_1
             sort_field_value_2
             recency_score
+
+            # For custom score reranking
+            {%- for tensor_field in index.tensor_fields %}
+            closeness(field, {{ tensor_field.embeddings_field_name }})
+            {%- endfor %}
+            {%- for lexical_field in index.lexical_fields %}
+            bm25({{ lexical_field.lexical_field_name }})
+            {%- endfor %}
+
             {% if collapse_field %}collapse_field_hash{% endif %}
         }
     }
@@ -461,6 +474,10 @@ schema {{ index.schema_name }} {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+
+            # Custom Score Global Reranking
+            query(marqo__custom_score_mult_weights_global) tensor<double>(p{})
+            query(marqo__custom_score_add_weights_global) tensor<double>(p{})
         }
     }
 

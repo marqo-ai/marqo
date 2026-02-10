@@ -719,7 +719,7 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
         if doc.id.startswith("group:facet:"):  # Not an actual document id but group's id returned by vespa
             continue
         marqo_doc = vespa_index.to_marqo_document(dict(doc), return_highlights=highlights)
-        marqo_doc['_score'] = doc.relevance
+        marqo_doc["_score"] = doc.relevance
 
         if attributes_to_retrieve_set is not None:
             marqo_doc = select_attributes(marqo_doc, attributes_to_retrieve_set)

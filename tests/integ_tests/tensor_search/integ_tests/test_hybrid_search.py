@@ -11,6 +11,7 @@ from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls, EXAMPLE_F
 
 import marqo.core.exceptions as core_exceptions
 import marqo.vespa.exceptions as vespa_exceptions
+from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import *
@@ -1186,6 +1187,199 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc7"] + 5*1)
                     for hits in modified_res["hits"][1:]:
                         self.assertEqual(hits["_score"], unmodified_scores[hits["_id"]])
+
+    @pytest.mark.skip_for_multinode
+    def test_hybrid_search_custom_score_rerank_single_bm25_field(self):
+        """Hybrid search with custom score rerank (single bm25 field) returns hits."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.name):
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+                        if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    score_modifiers=ScoreModifierLists(
+                        add_to_score=[
+                            {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_text_field_1", "weight": 1.0}
+                        ]
+                    ),
+                    result_count=10
+                )
+                self.assertIn("hits", res)
+                self.assertGreater(len(res["hits"]), 0)
+
+    @pytest.mark.skip_for_multinode
+    def test_hybrid_search_custom_score_rerank_invalid_key_raises(self):
+        """Hybrid search with invalid custom score key raises."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.name):
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=self.docs_list[:3],
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+                        if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+                with self.assertRaises((api_exception.InvalidArgError, core_exceptions.InvalidArgumentError)):
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                        ),
+                        score_modifiers=ScoreModifierLists(
+                            add_to_score=[
+                                {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}invalid_xyz", "weight": 1.0}
+                            ]
+                        ),
+                        result_count=10
+                    )
+
+    @pytest.mark.skip_for_multinode
+    def test_hybrid_search_custom_score_rerank_with_regular_modifiers(self):
+        """Custom score rerank and regular global score modifiers can be used together."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.name):
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+                        if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    score_modifiers=ScoreModifierLists(
+                        add_to_score=[
+                            {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_text_field_1", "weight": 0.1}
+                        ],
+                        multiply_score_by=[
+                            {"field_name": "mult_field_1", "weight": 1.0}
+                        ]
+                    ),
+                    result_count=10
+                )
+                self.assertIn("hits", res)
+                self.assertGreater(len(res["hits"]), 0)
+
+    @pytest.mark.skip_for_multinode
+    def test_hybrid_search_custom_score_rerank_with_facets(self):
+        """Custom score rerank with facets: structured raises (facets unsupported), semi-structured returns hits and facets."""
+        facets_params = FacetsParameters(fields={"text_field_1": FieldFacetsConfiguration(type="string")})
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.name):
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=self.docs_list[:5],
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+                        if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+                if isinstance(index, StructuredMarqoIndex) and not isinstance(index, UnstructuredMarqoIndex):
+                    # Facets are only supported for unstructured/semi-structured; structured raises as before
+                    with self.assertRaises(core_exceptions.UnsupportedFeatureError):
+                        tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text="dogs",
+                            search_method="HYBRID",
+                            hybrid_parameters=HybridParameters(
+                                retrievalMethod=RetrievalMethod.Disjunction,
+                                rankingMethod=RankingMethod.RRF,
+                            ),
+                            score_modifiers=ScoreModifierLists(
+                                add_to_score=[
+                                    {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum", "weight": 0.1}
+                                ]
+                            ),
+                            result_count=10,
+                            facets=facets_params,
+                        )
+                else:
+                    res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                        ),
+                        score_modifiers=ScoreModifierLists(
+                            add_to_score=[
+                                {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum", "weight": 0.1}
+                            ]
+                        ),
+                        result_count=10,
+                        facets=facets_params,
+                    )
+                    self.assertIn("hits", res)
+                    self.assertIn("facets", res)
+
+    @pytest.mark.skip_for_multinode
+    def test_hybrid_search_custom_score_rerank_with_pagination(self):
+        """Custom score rerank with limit/offset returns correct window."""
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.name):
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+                        if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                    ),
+                    score_modifiers=ScoreModifierLists(
+                        add_to_score=[
+                            {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_text_field_1", "weight": 0.1}
+                        ]
+                    ),
+                    result_count=3,
+                    offset=2
+                )
+                self.assertIn("hits", res)
+                self.assertLessEqual(len(res["hits"]), 3)
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_global_score_modifiers_with_rerank_depth(self):

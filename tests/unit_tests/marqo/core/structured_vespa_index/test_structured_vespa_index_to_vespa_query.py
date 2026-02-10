@@ -2,6 +2,7 @@ import time
 import unittest
 from typing import List
 
+from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoHybridQuery
 from marqo.core.models.marqo_index import (
     StructuredMarqoIndex, Model, TextPreProcessing, TextSplitMethod,
@@ -11,7 +12,9 @@ from marqo.core.models.marqo_index import (
 from marqo.core.models.hybrid_parameters import (
     HybridParameters, RankingMethod, RetrievalMethod
 )
+from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.exceptions import InternalError
 
 
 class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
@@ -150,6 +153,215 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
                 self.assertEqual(vespa_query['searchChain'], 'marqo')
                 self.assertIn('marqo__hybrid.retrievalMethod', vespa_query)
                 self.assertIn('marqo__hybrid.rankingMethod', vespa_query)
+
+    def test_get_fields_to_bm25_rerank_by(self):
+        """_get_fields_to_bm25_rerank_by returns fields or ['*'] for aggregate."""
+        self.assertEqual(
+            self.vespa_index._get_fields_to_bm25_rerank_by({'bm25_field_title'}),
+            ['title'],
+        )
+        self.assertEqual(
+            self.vespa_index._get_fields_to_bm25_rerank_by({'bm25_field_title', 'bm25_field_description'}),
+            ['description', 'title'],
+        )
+        self.assertEqual(
+            self.vespa_index._get_fields_to_bm25_rerank_by({'bm25_sum'}),
+            ['*'],
+        )
+        self.assertEqual(
+            self.vespa_index._get_fields_to_bm25_rerank_by({'bm25_field_title', 'bm25_max'}),
+            ['*'],
+        )
+
+    def test_get_fields_to_closeness_rerank_by(self):
+        """_get_fields_to_closeness_rerank_by returns tensor fields or all for aggregate."""
+        self.assertEqual(
+            self.vespa_index._get_fields_to_closeness_rerank_by({'closeness_retrieval_vector_field_title'}),
+            ['title'],
+        )
+        self.assertCountEqual(
+            self.vespa_index._get_fields_to_closeness_rerank_by({'closeness_retrieval_vector_sum'}),
+            ['description', 'title'],
+        )
+
+    def test_get_lexical_contains_term_with_attributes_to_search(self):
+        """_get_lexical_contains_term with _is_ranking_term=True uses attributes_to_search."""
+        term = self.vespa_index._get_lexical_contains_term(
+            'hello', attributes_to_search=['*'], _is_ranking_term=True
+        )
+        self.assertEqual(term, 'default contains "hello"')
+        term = self.vespa_index._get_lexical_contains_term(
+            'hello', attributes_to_search=['title'], _is_ranking_term=True
+        )
+        self.assertIn('title_lexical', term)
+        self.assertIn('hello', term)
+
+    def test_get_individual_field_tensor_search_terms_ranking_term_uses_searchable_attributes(self):
+        """With _is_ranking_term=True uses only searchable_attributes; term includes targetHits:1."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['x'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        terms = self.vespa_index._get_individual_field_tensor_search_terms(
+            q, searchable_attributes=['title'], _is_ranking_term=True
+        )
+        self.assertEqual(len(terms), 1)
+        self.assertIn('title_embeddings', terms[0])
+        self.assertIn('nearestNeighbor', terms[0])
+        self.assertIn('targetHits:1', terms[0])
+
+    def test_get_individual_field_tensor_search_terms_ranking_term_requires_searchable_attributes(self):
+        """With _is_ranking_term=True and searchable_attributes=None raises."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['x'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        with self.assertRaises(InternalError) as ctx:
+            self.vespa_index._get_individual_field_tensor_search_terms(q, _is_ranking_term=True)
+        self.assertIn('searchable_attributes', str(ctx.exception))
+
+    def test_get_individual_field_tensor_search_terms_non_ranking_includes_target_hits(self):
+        """With _is_ranking_term=False derives from query and term includes targetHits."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['x'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        terms = self.vespa_index._get_individual_field_tensor_search_terms(q)
+        self.assertGreater(len(terms), 0)
+        self.assertIn('targetHits', terms[0])
+
+    def test_generate_or_terms_ranking_term_no_target_hits(self):
+        """_generate_or_terms with _is_ranking_term=True returns weakAnd without targetHits."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        result = self.vespa_index._generate_or_terms(
+            q, _is_ranking_term=True, attributes_to_search=['title']
+        )
+        self.assertIn('weakAnd', result)
+        self.assertNotIn('targetHits', result)
+        self.assertIn('search', result)
+
+    def test_get_lexical_search_term_ranking_term(self):
+        """_get_lexical_search_term with _is_ranking_term=True uses attributes_to_search, no targetHits."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['hello'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        result = self.vespa_index._get_lexical_search_term(
+            q, _is_ranking_term=True, attributes_to_search=['title']
+        )
+        self.assertNotEqual(result, 'false')
+        self.assertNotIn('targetHits', result)
+        self.assertIn('hello', result)
+
+    def test_hybrid_query_with_custom_score_modifiers_includes_rank_in_yql(self):
+        """With custom score modifiers, lexical and tensor YQL should wrap in rank() with extra terms."""
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        marqo_query = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_parameters,
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        tensor_yql = vespa_query.get('marqo__yql.tensor', '')
+        self.assertIn('rank(', lexical_yql)
+        self.assertIn('rank(', tensor_yql)
+        self.assertIn('marqo__custom_score_add_weights_global', str(vespa_query.get('query_features', {})))
+
+    def test_hybrid_query_without_custom_score_modifiers_no_extra_rank_terms(self):
+        """Without custom score modifiers, YQL need not have rank() for custom scores (may still have rank for lexical/tensor combo)."""
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        marqo_query = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_parameters,
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+        self.assertNotIn('marqo__custom_score_add_weights_global', str(vespa_query.get('query_features', {})))
+        self.assertNotIn('marqo__custom_score_mult_weights_global', str(vespa_query.get('query_features', {})))
 
 
 if __name__ == '__main__':

@@ -52,6 +52,10 @@ public class HybridSearcher extends Searcher {
     private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
     private static String QUERY_INPUT_MULT_WEIGHTS_GLOBAL = "marqo__mult_weights_global";
     private static String QUERY_INPUT_ADD_WEIGHTS_GLOBAL = "marqo__add_weights_global";
+    private static String QUERY_INPUT_CUSTOM_SCORE_MULT_WEIGHTS_GLOBAL =
+            "marqo__custom_score_mult_weights_global";
+    private static String QUERY_INPUT_CUSTOM_SCORE_ADD_WEIGHTS_GLOBAL =
+            "marqo__custom_score_add_weights_global";
     private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
@@ -85,6 +89,23 @@ public class HybridSearcher extends Searcher {
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    /**
+     * Parsed custom score rerank key. Matches Python parse_custom_score_key.
+     * Key formats: {scoreType}_field_{fieldName} or {scoreType}_{sum|max|avg}.
+     */
+    @VisibleForTesting
+    static final class CustomScoreKeyParsed {
+        final String scoreType;
+        final String fieldName; // null for aggregate
+        final String aggregateType; // null for single-field
+
+        CustomScoreKeyParsed(String scoreType, String fieldName, String aggregateType) {
+            this.scoreType = scoreType;
+            this.fieldName = fieldName;
+            this.aggregateType = aggregateType;
         }
     }
 
@@ -990,15 +1011,26 @@ public class HybridSearcher extends Searcher {
             logHitGroup(excessHits, verbose);
         }
 
-        // Apply global score modifiers and rerank
-        // Skip whole process if global modifier weight tensors don't exist in query
+        // Apply global score modifiers and rerank when regular global weights and/or custom score
+        // rerank weights are present
         Tensor queryMultWeightsGlobal =
                 extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
         Tensor queryAddWeightsGlobal =
                 extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
+        Tensor customScoreMult =
+                extractTensorRankFeature(
+                        query, addQueryWrapper(QUERY_INPUT_CUSTOM_SCORE_MULT_WEIGHTS_GLOBAL));
+        Tensor customScoreAdd =
+                extractTensorRankFeature(
+                        query, addQueryWrapper(QUERY_INPUT_CUSTOM_SCORE_ADD_WEIGHTS_GLOBAL));
+        boolean hasGlobalWeights =
+                (queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
+                        || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty());
+        boolean hasCustomScoreWeights =
+                (customScoreMult != null && !customScoreMult.isEmpty())
+                        || (customScoreAdd != null && !customScoreAdd.isEmpty());
 
-        if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
-                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
+        if (hasGlobalWeights || hasCustomScoreWeights) {
             logIfVerbose("Applying global score modifiers and reranking.", verbose);
             resultToRerank = applyGlobalScoreModifiers(resultToRerank, query, verbose);
         } else if (query.properties().getBoolean("marqo__recency_apply_in_global_ranking_phase")) {
@@ -1461,6 +1493,310 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
+     * Parses a custom score rerank key into score type, optional field name, and optional aggregate
+     * type. Matches Python parse_custom_score_key (prefix marqo__score_ is stripped before calling).
+     *
+     * @param key Key without prefix, e.g. "bm25_field_title", "bm25_sum",
+     *     "closeness_retrieval_vector_field_variantImage"
+     * @return Parsed key or null if unsupported/invalid
+     */
+    @VisibleForTesting
+    static CustomScoreKeyParsed parseCustomScoreKey(String key) {
+        if (key == null || key.isEmpty() || !key.contains("_")) {
+            return null;
+        }
+        String[] supportedScoreTypes = {"bm25", "closeness_retrieval_vector"};
+        String[] aggregateTypes = {"sum", "max", "avg"};
+        for (String scoreType : supportedScoreTypes) {
+            String prefix = scoreType + "_";
+            if (!key.startsWith(prefix)) {
+                continue;
+            }
+            String rest = key.substring(prefix.length());
+            if (Arrays.asList(aggregateTypes).contains(rest)) {
+                return new CustomScoreKeyParsed(scoreType, null, rest);
+            }
+            if (rest.startsWith("field_")) {
+                String fieldName = rest.substring(6);
+                if (fieldName.isEmpty()) {
+                    return null;
+                }
+                return new CustomScoreKeyParsed(scoreType, fieldName, null);
+            }
+            return null;
+        }
+        return null;
+    }
+
+    /**
+     * Returns the set of match feature names from hit match features. FeatureData is not a Map;
+     * it exposes featureNames(). We use that so bm25(*) and closeness(field,*) keys are available
+     * for custom score extraction and aggregates.
+     */
+    private static Set<String> getMatchFeatureKeys(FeatureData matchFeatures) {
+        if (matchFeatures == null) {
+            return Collections.emptySet();
+        }
+        return new HashSet<>(matchFeatures.featureNames());
+    }
+
+    /**
+     * Finds the bm25 match feature name for the given Marqo field name. Tries conventional
+     * schema naming: bm25(marqo__lexical_&lt;field&gt;) and bm25(&lt;field&gt;_lexical).
+     */
+    @VisibleForTesting
+    static String findBm25MatchFeatureName(Set<String> matchFeatureKeys, String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return null;
+        }
+        String withUnderscore = "_" + fieldName;
+        for (String key : matchFeatureKeys) {
+            if (!key.startsWith("bm25(") || !key.endsWith(")")) {
+                continue;
+            }
+            String inner = key.substring(5, key.length() - 1);
+            if (inner.endsWith(withUnderscore)
+                    || inner.equals(fieldName)
+                    || inner.endsWith("_" + fieldName)
+                    || inner.contains("lexical") && inner.contains(fieldName)) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Finds the closeness(field, ...) match feature name for the given Marqo field name. Tries
+     * conventional naming: closeness(field,marqo__embeddings_&lt;field&gt;) and
+     * closeness(field,&lt;field&gt;_embeddings).
+     */
+    @VisibleForTesting
+    static String findClosenessMatchFeatureName(Set<String> matchFeatureKeys, String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return null;
+        }
+        for (String key : matchFeatureKeys) {
+            if (!key.startsWith("closeness(field,") || !key.endsWith(")")) {
+                continue;
+            }
+            String inner = key.substring(16, key.length() - 1).trim();
+            if (inner.endsWith("_" + fieldName)
+                    || inner.equals(fieldName + "_embeddings")
+                    || inner.equals("marqo__embeddings_" + fieldName)
+                    || inner.contains("embeddings") && inner.contains(fieldName)) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Extracts the custom score value for one key from a hit's match features. For single-field
+     * keys returns the corresponding bm25 or closeness value; for aggregate keys returns sum/max/avg
+     * of all matching features. Returns null if the score cannot be determined.
+     */
+    @VisibleForTesting
+    static Double extractCustomScoreForHit(
+            FeatureData matchFeatures,
+            String key,
+            CustomScoreKeyParsed parsed,
+            Set<String> matchFeatureKeys) {
+        if (matchFeatures == null || parsed == null) {
+            return null;
+        }
+        if ("bm25".equals(parsed.scoreType)) {
+            if (parsed.aggregateType != null) {
+                return aggregateBm25FromMatchFeatures(
+                        matchFeatures, parsed.aggregateType, matchFeatureKeys);
+            }
+            String featName = findBm25MatchFeatureName(matchFeatureKeys, parsed.fieldName);
+            return featName != null ? matchFeatures.getDouble(featName) : null;
+        }
+        if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
+            if (parsed.aggregateType != null) {
+                return aggregateClosenessFromMatchFeatures(
+                        matchFeatures, parsed.aggregateType, matchFeatureKeys);
+            }
+            String featName = findClosenessMatchFeatureName(matchFeatureKeys, parsed.fieldName);
+            return featName != null ? matchFeatures.getDouble(featName) : null;
+        }
+        return null;
+    }
+
+    private static Double aggregateBm25FromMatchFeatures(
+            FeatureData matchFeatures, String aggregateType, Set<String> matchFeatureKeys) {
+        List<Double> values = new ArrayList<>();
+        for (String k : matchFeatureKeys) {
+            if (k.startsWith("bm25(") && k.endsWith(")")) {
+                Double v = matchFeatures.getDouble(k);
+                if (v != null && !Double.isNaN(v)) {
+                    values.add(v);
+                }
+            }
+        }
+        return aggregateValues(values, aggregateType);
+    }
+
+    private static Double aggregateClosenessFromMatchFeatures(
+            FeatureData matchFeatures, String aggregateType, Set<String> matchFeatureKeys) {
+        List<Double> values = new ArrayList<>();
+        for (String k : matchFeatureKeys) {
+            if (k.startsWith("closeness(field,") && k.endsWith(")")) {
+                Double v = matchFeatures.getDouble(k);
+                if (v != null && !Double.isNaN(v)) {
+                    values.add(v);
+                }
+            }
+        }
+        return aggregateValues(values, aggregateType);
+    }
+
+    private static Double aggregateValues(List<Double> values, String aggregateType) {
+        if (values.isEmpty()) {
+            return null;
+        }
+        return switch (aggregateType) {
+            case "sum" -> values.stream().mapToDouble(Double::doubleValue).sum();
+            case "max" -> values.stream().mapToDouble(Double::doubleValue).max().orElse(Double.NaN);
+            case "avg" ->
+                    values.stream().mapToDouble(Double::doubleValue).average().orElse(Double.NaN);
+            default -> null;
+        };
+    }
+
+    /**
+     * Computes min-max normalization (value in [0,1]) for a list of bm25 values. If min == max,
+     * returns 1.0 for all to avoid division by zero.
+     */
+    @VisibleForTesting
+    static double minMaxNormalize(double value, double min, double max) {
+        if (min >= max || Double.isNaN(min) || Double.isNaN(max)) {
+            return 1.0;
+        }
+        double normalized = (value - min) / (max - min);
+        return Math.max(0.0, Math.min(1.0, normalized));
+    }
+
+    /**
+     * Returns weight * normalizedScore for one custom-score cell, or null if the score is missing
+     * or the key is invalid. BM25 scores are min-max normalized when min/max are available.
+     */
+    private Double getWeightedNormalizedScoreForCell(
+            Cell cell,
+            FeatureData hitMatchFeatures,
+            Set<String> matchFeatureKeys,
+            Map<String, double[]> bm25MinMaxPerKey) {
+        String key = cell.getKey().label(0);
+        CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+        if (parsed == null) return null;
+        Double score = extractCustomScoreForHit(hitMatchFeatures, key, parsed, matchFeatureKeys);
+        if (score == null || Double.isNaN(score)) return null;
+        double weight = cell.getValue().doubleValue();
+        double normalizedScore = score;
+        if ("bm25".equals(parsed.scoreType)) {
+            double[] minMax = bm25MinMaxPerKey.get(key);
+            if (minMax != null && minMax.length == 2) {
+                normalizedScore = minMaxNormalize(score, minMax[0], minMax[1]);
+            }
+        }
+        return weight * normalizedScore;
+    }
+
+    /**
+     * Applies custom score rerank weights to add and mult modifiers: for each key in add weights,
+     * adds (weight * score) to addModifier; for each key in mult weights, multiplies multModifier
+     * by (weight * normalizedScore). BM25 scores are normalized with the provided min/max map.
+     */
+    private void applyCustomScoreContributions(
+            Double addModifier,
+            Double multModifier,
+            FeatureData hitMatchFeatures,
+            Set<String> matchFeatureKeys,
+            Tensor customAddWeights,
+            Tensor customMultWeights,
+            Map<String, double[]> bm25MinMaxPerKey,
+            double[] outAdd,
+            double[] outMult,
+            boolean verbose) {
+        double add = addModifier != null ? addModifier : 0.0;
+        double mult = multModifier != null ? multModifier : 1.0;
+
+        if (customAddWeights != null && !customAddWeights.isEmpty()) {
+            for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
+                Double contrib =
+                        getWeightedNormalizedScoreForCell(
+                                it.next(), hitMatchFeatures, matchFeatureKeys, bm25MinMaxPerKey);
+                if (contrib != null) add += contrib;
+            }
+        }
+
+        if (customMultWeights != null && !customMultWeights.isEmpty()) {
+            for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
+                Double contrib =
+                        getWeightedNormalizedScoreForCell(
+                                it.next(), hitMatchFeatures, matchFeatureKeys, bm25MinMaxPerKey);
+                if (contrib != null) mult *= contrib;
+            }
+        }
+
+        outAdd[0] = add;
+        outMult[0] = mult;
+    }
+
+    /**
+     * Compute per-key min and max bm25 values across hits for keys that require bm25 normalization.
+     */
+    private Map<String, double[]> computeBm25MinMaxPerKey(
+            HitGroup hits,
+            Tensor customAddWeights,
+            Tensor customMultWeights,
+            Set<String> allMatchFeatureKeys) {
+        Map<String, double[]> result = new HashMap<>();
+        Set<String> bm25Keys = new HashSet<>();
+        if (customAddWeights != null) {
+            for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
+                Cell cell = it.next();
+                String key = cell.getKey().label(0);
+                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+                if (parsed != null && "bm25".equals(parsed.scoreType)) {
+                    bm25Keys.add(key);
+                }
+            }
+        }
+        if (customMultWeights != null) {
+            for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
+                Cell cell = it.next();
+                String key = cell.getKey().label(0);
+                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+                if (parsed != null && "bm25".equals(parsed.scoreType)) {
+                    bm25Keys.add(key);
+                }
+            }
+        }
+        for (String key : bm25Keys) {
+            CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+            if (parsed == null) continue;
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
+            for (Hit hit : hits) {
+                FeatureData mf = (FeatureData) hit.getField("matchfeatures");
+                if (mf == null) continue;
+                Set<String> keys = getMatchFeatureKeys(mf);
+                if (keys.isEmpty()) keys = allMatchFeatureKeys;
+                Double v = extractCustomScoreForHit(mf, key, parsed, keys);
+                if (v != null && !Double.isNaN(v)) {
+                    min = Math.min(min, v);
+                    max = Math.max(max, v);
+                }
+            }
+            if (min <= max && Double.isFinite(min) && Double.isFinite(max)) {
+                result.put(key, new double[] {min, max});
+            }
+        }
+        return result;
+    }
+
+    /**
      * Apply global score modifiers to the hit group. Modifies hit scores, does not add/remove hits.
      * @param hits The hit group to apply global score modifiers to.
      * @param query The query to check recency mode.
@@ -1474,6 +1810,42 @@ public class HybridSearcher extends Searcher {
             return hits;
         }
 
+        Tensor customAddWeights =
+                extractTensorRankFeature(
+                        query, addQueryWrapper(QUERY_INPUT_CUSTOM_SCORE_ADD_WEIGHTS_GLOBAL));
+        Tensor customMultWeights =
+                extractTensorRankFeature(
+                        query, addQueryWrapper(QUERY_INPUT_CUSTOM_SCORE_MULT_WEIGHTS_GLOBAL));
+        boolean hasCustomScores =
+                (customAddWeights != null && !customAddWeights.isEmpty())
+                        || (customMultWeights != null && !customMultWeights.isEmpty());
+
+        logger.info(
+                "[CustomScoreRerank] customAddWeights="
+                        + (customAddWeights == null ? "null" : "size=" + customAddWeights.size())
+                        + " customMultWeights="
+                        + (customMultWeights == null ? "null" : "size=" + customMultWeights.size())
+                        + " hasCustomScores="
+                        + hasCustomScores);
+
+        Set<String> allMatchFeatureKeys = new HashSet<>();
+        Map<String, double[]> bm25MinMaxPerKey = new HashMap<>();
+        if (hasCustomScores) {
+            Hit firstHit = hits.get(0);
+            FeatureData firstMf = (FeatureData) firstHit.getField("matchfeatures");
+            if (firstMf != null) {
+                allMatchFeatureKeys = getMatchFeatureKeys(firstMf);
+            }
+            logger.info(
+                    "[CustomScoreRerank] match feature keys from first hit (count="
+                            + allMatchFeatureKeys.size()
+                            + "): "
+                            + allMatchFeatureKeys);
+            bm25MinMaxPerKey =
+                    computeBm25MinMaxPerKey(
+                            hits, customAddWeights, customMultWeights, allMatchFeatureKeys);
+        }
+
         boolean applyRecency =
                 query.properties().getBoolean("marqo__recency_apply_in_global_ranking_phase");
 
@@ -1483,9 +1855,9 @@ public class HybridSearcher extends Searcher {
                         .getDouble(addQueryWrapper("marqo__recency_add_to_score_weight"))
                         .orElse(0.0);
 
+        int hitIndex = 0;
         for (Hit hit : hits) {
             logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
-            // Extract the mult and add modifiers from match-features
             hitMatchFeatures = (FeatureData) hit.getField("matchfeatures");
             if (hitMatchFeatures != null) {
                 mult_modifier = hitMatchFeatures.getDouble("global_mult_modifier");
@@ -1493,18 +1865,52 @@ public class HybridSearcher extends Searcher {
                 recencyScore = applyRecency ? hitMatchFeatures.getDouble("recency_score") : 1.0;
 
                 if (mult_modifier != null && add_modifier != null) {
-                    // Apply the modifiers to the hit's relevance
+                    double effectiveMult = mult_modifier;
+                    double effectiveAdd = add_modifier;
+                    if (hasCustomScores) {
+                        Set<String> hitMatchFeatureKeys = getMatchFeatureKeys(hitMatchFeatures);
+                        if (hitMatchFeatureKeys.isEmpty()) {
+                            hitMatchFeatureKeys = allMatchFeatureKeys;
+                        }
+                        double[] outAdd = new double[1];
+                        double[] outMult = new double[1];
+                        applyCustomScoreContributions(
+                                add_modifier,
+                                mult_modifier,
+                                hitMatchFeatures,
+                                hitMatchFeatureKeys,
+                                customAddWeights,
+                                customMultWeights,
+                                bm25MinMaxPerKey,
+                                outAdd,
+                                outMult,
+                                verbose);
+                        effectiveAdd = outAdd[0];
+                        effectiveMult = outMult[0];
+                        if (hitIndex == 0) {
+                            logger.info(
+                                    String.format(
+                                            "[CustomScoreRerank] first hit add_modifier=%.5f"
+                                                    + " outAdd=%.5f outMult=%.5f bm25MinMaxKeys=%d",
+                                            add_modifier,
+                                            outAdd[0],
+                                            outMult[0],
+                                            bm25MinMaxPerKey.size()));
+                        }
+                    }
+
                     original_score = hit.getRelevance().getScore();
-                    double baseScore = original_score * mult_modifier + add_modifier;
+                    double baseScore = original_score * effectiveMult + effectiveAdd;
 
                     if (!applyRecency) {
                         modified_score = baseScore;
                     } else if (addToScoreWeight > 0) {
-                        // Additive mode: base + (recency * weight)
-                        modified_score = baseScore + (recencyScore * addToScoreWeight);
+                        modified_score =
+                                baseScore
+                                        + (recencyScore != null ? recencyScore : 1.0)
+                                                * addToScoreWeight;
                     } else {
-                        // Multiplicative mode (default): base * recency
-                        modified_score = baseScore * recencyScore;
+                        modified_score = baseScore * (recencyScore != null ? recencyScore : 1.0);
                     }
 
                     logIfVerbose(
@@ -1513,12 +1919,23 @@ public class HybridSearcher extends Searcher {
                                         + " recency score: %.5f, addToScoreWeight: %.5f, Modified"
                                         + " score: %.7f",
                                     original_score,
-                                    mult_modifier,
-                                    add_modifier,
-                                    recencyScore,
+                                    effectiveMult,
+                                    effectiveAdd,
+                                    recencyScore != null ? recencyScore : 1.0,
                                     addToScoreWeight,
                                     modified_score),
                             verbose);
+                    if (hasCustomScores && hit.getRelevance().getScore() != modified_score) {
+                        logger.info(
+                                String.format(
+                                        "[CustomScoreRerank] hit=%s original=%.7f effectiveAdd=%.5f"
+                                                + " effectiveMult=%.5f modified=%.7f",
+                                        hit.getId(),
+                                        original_score,
+                                        effectiveAdd,
+                                        effectiveMult,
+                                        modified_score));
+                    }
                     hit.setRelevance(modified_score);
                 } else {
                     throw new RuntimeException(
@@ -1533,6 +1950,7 @@ public class HybridSearcher extends Searcher {
                                 + hit.getId()
                                 + " is missing matchfeatures.");
             }
+            hitIndex++;
         }
         return hits;
     }
