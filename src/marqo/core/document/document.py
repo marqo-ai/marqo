@@ -32,10 +32,9 @@ logger = get_logger(__name__)
 
 
 class Document:
-    GENERIC_UPDATE_DOCUMENT_ERROR_MESSAGE = "Marqo vector store couldn't update the document. " + \
-                                  "Please see: " + update_documents_response() + " for more details"
-
     """A class that handles the document API in Marqo"""
+    GENERIC_UPDATE_DOCUMENT_ERROR_MESSAGE = "Marqo vector store couldn't update the document. " + \
+                                            "Please see: " + update_documents_response() + " for more details"
 
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference):
         self.vespa_client = vespa_client
