@@ -1457,3 +1457,93 @@ class TestPartialUpdate(MarqoTestCase):
             ("string_array", MarqoFieldTypes.STRING_ARRAY),
             ("lexical_field", MarqoFieldTypes.STRING)
         ])
+
+    def test_batch_update_with_nonexistent_map_doc_does_not_crash(self):
+        """Test that a batch update containing a non-existent document with map fields
+        does not crash the entire request.
+
+        Reproduces the bug where partial_update_documents raised:
+            TypeError: 'NoneType' object cannot be interpreted as an integer
+        on items.insert(loc, error_info) because get_batch returned an ID that
+        didn't match the documents_that_contain_maps dict key."""
+        update_documents = [
+            {
+                # The '#' in the ID is critical: it's a URL fragment separator, so Vespa
+                # receives a truncated ID and returns a different ID in its response.
+                # This caused documents_that_contain_maps.get(id) to return None for loc,
+                # which then crashed at items.insert(None, error_info).
+                "_id": "search-results-going out #",
+                "int_field": 10,
+                "float_field": 20.0,
+                "int_map": {
+                    "pixel_1": 4,
+                    "pixel_2": 8,
+                }
+            },
+            {
+                "_id": "2",
+                "int_field": 20,
+                "float_field": 40.0,
+            }
+        ]
+
+        # This must not raise TypeError
+        res = self.config.document.partial_update_documents(update_documents, self.index)
+
+        self.assertTrue(res.errors)
+        self.assertEqual(len(res.items), 2)
+
+        # First doc: non-existent with maps -> should be a 400 error
+        self.assertEqual(400, res.items[0].status)
+        self.assertIn("couldn't update the document", res.items[0].error)
+
+        # Second doc: existing, no maps -> should succeed
+        self.assertEqual(200, res.items[1].status)
+
+        # Verify the existing doc was actually updated
+        updated_doc = tensor_search.get_document_by_id(self.config, self.index.name, "2")
+        self.assertEqual(20, updated_doc["int_field"])
+        self.assertEqual(40.0, updated_doc["float_field"])
+
+    def test_batch_update_with_non_printable_ascii_in_id_does_not_crash(self):
+        """Test that a batch update containing a document whose _id has non-printable ASCII
+        characters does not crash the entire request.
+
+        Non-printable ASCII characters (0x00-0x1F, 0x7F) cause httpx.InvalidURL when
+        interpolated into URLs. The fix in vespa_client._get_document_async catches this
+        and returns a 400 response, and document.py surfaces it as a per-document error."""
+        non_printable_ids = [
+            "doc-with-null\x00char",
+            "doc-with-tab\tchar",
+            "doc-with-newline\nchar",
+        ]
+
+        for bad_id in non_printable_ids:
+            with self.subTest(bad_id=repr(bad_id)):
+                update_documents = [
+                    {
+                        "_id": bad_id,
+                        "int_map": {"key1": 1},  # map field triggers get_batch path
+                    },
+                    {
+                        "_id": "2",
+                        "int_field": 999,
+                    }
+                ]
+
+                # This must not raise httpx.InvalidURL or any other exception
+                res = self.config.document.partial_update_documents(update_documents, self.index)
+
+                self.assertTrue(res.errors)
+                self.assertEqual(len(res.items), 2)
+
+                # First doc: non-printable char -> should be a 400 error
+                self.assertEqual(400, res.items[0].status)
+                self.assertIsNotNone(res.items[0].error)
+
+                # Second doc: existing, valid -> should succeed
+                self.assertEqual(200, res.items[1].status)
+
+                # Verify the valid doc was actually updated
+                updated_doc = tensor_search.get_document_by_id(self.config, self.index.name, "2")
+                self.assertEqual(999, updated_doc["int_field"])
