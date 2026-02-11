@@ -1496,6 +1496,10 @@ class TestPartialUpdate(MarqoTestCase):
         # First doc: non-existent with maps -> should be a 400 error
         self.assertEqual(400, res.items[0].status)
         self.assertIn("couldn't update the document", res.items[0].error)
+        # Verify the response preserves the ORIGINAL _id (with #), not Vespa's truncated version.
+        # The old code used extract_document_id_from_vespa_id(resp) which returned the truncated ID
+        # from Vespa (without #). The fix uses fetch_ids[idx] to preserve the original ID.
+        self.assertEqual("search-results-going out #", res.items[0].id)
 
         # Second doc: existing, no maps -> should succeed
         self.assertEqual(200, res.items[1].status)

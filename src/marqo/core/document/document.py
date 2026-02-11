@@ -359,5 +359,8 @@ class Document:
                                          processingTimeMs=add_docs_processing_time_ms)
 
     def extract_document_id_from_vespa_id(self, resp):
+        # TODO - This method is not reliable as Vespa might prune the document ID in the response if
+        #  the ID certain characters (e.g., #). We should update our code to either remove those illegal characters
+        #  from the document ID before feeding to Vespa, or implement a more reliable solution
         doc_id = resp.id.split('::')[-1] if resp.id else None
         return doc_id
