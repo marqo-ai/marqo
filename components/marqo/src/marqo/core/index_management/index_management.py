@@ -1,8 +1,8 @@
 import difflib
+import json
 import semver
 from contextlib import contextmanager
-from typing import List, Tuple, Dict
-from typing import Optional
+from typing import List, Tuple, Dict, Any, Optional
 
 import marqo.logging
 import marqo.vespa.vespa_client
@@ -219,21 +219,46 @@ class IndexManagement:
         with self._vespa_deployment_lock():
             self._get_vespa_application().batch_delete_index_setting_and_schema(index_names)
 
-    def update_index_settings_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
+    def update_index_settings_by_settings_dict(
+            self, index_name: str, settings_dict: dict,
+            force: bool = False, dry_run: bool = False
+    ) -> Dict[str, Any]:
         """
         Update index settings by settings dict. No schema update. Currently only modelProperties can be updated.
 
         When calling this method, you must consider the scenario distributed Marqo instances. Some Marqo instances
         could still be running the old version so the updated modelProperties must be compatible with the old version.
 
+        This method:
+        1. Retrieves the existing index
+        2. Validates the updated settings
+        3. Behavior based on parameters:
+           - dry_run=True: Show changes, never deploy
+           - dry_run=False, force=False: Deploy only if validation passes
+           - dry_run=False, force=True: Always deploy, despite validation errors
+
         Args:
             index_name: Name of the index to update
             settings_dict: Settings dict to update the index, currently only modelProperties can be updated.
+            force: If True, skip validation and proceed with update. Default is False.
+            dry_run: If True, show what would change without applying the update. Default is False.
+
+        Returns:
+            Dict with update status:
+            {
+                "updated": bool,                    # Whether settings were actually deployed
+                "error": bool,                      # Whether there was a validation error
+                "oldSettings": dict,                # Current settings (for updated fields only)
+                "newSettings": dict,                # Proposed new settings (for updated fields only)
+                "settingsDiff": str,                # Unified diff between old and new settings
+                "reason": str,                      # Explanation of the result
+            }
+
         Raises:
             IndexNotFoundError: If an index does not exist
-            UnsupportedFeatureError: If the updated modelProperties results in dimension change
+            OperationConflictError: If deployment lock cannot be acquired
         """
-        if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS): #pragma: no cover
+        if not set(settings_dict.keys()).issubset(self._ALLOWED_MODIFIED_SETTINGS):  # pragma: no cover
             # Should not happen since we validate the settings in the API layer
             raise InternalError(f"Only the following settings can be updated: {self._ALLOWED_MODIFIED_SETTINGS}. "
                                 f"Provided settings: {list(settings_dict.keys())}")
@@ -243,12 +268,89 @@ class IndexManagement:
             updated_version = existing_index.version + 1 if existing_index.version is not None else 1
             updated_index = existing_index.copy(deep=True, update={'version': updated_version})
 
+            # Build old and new settings for comparison
+            old_settings = {}
+            new_settings = {}
+
             if "modelProperties" in settings_dict:
-                self.validate_updated_model_properties(existing_index.model.properties, settings_dict["modelProperties"])
+                old_settings["modelProperties"] = existing_index.model.properties
+                new_settings["modelProperties"] = settings_dict["modelProperties"]
+
+            # Check if settings actually changed
+            settings_changed = old_settings != new_settings
+
+            # Generate settings diff
+            old_settings_json = json.dumps(old_settings, indent=2, sort_keys=True)
+            new_settings_json = json.dumps(new_settings, indent=2, sort_keys=True)
+            old_settings_lines = old_settings_json.splitlines(keepends=True)
+            new_settings_lines = new_settings_json.splitlines(keepends=True)
+            diff_lines = list(difflib.unified_diff(
+                old_settings_lines,
+                new_settings_lines,
+                fromfile='old_settings',
+                tofile='new_settings',
+                lineterm=''
+            ))
+            settings_diff = ''.join(diff_lines) if diff_lines else ''
+
+            # Initialize response template
+            result = {
+                "updated": False,
+                "error": False,
+                "oldSettings": old_settings,
+                "newSettings": new_settings,
+                "settingsDiff": settings_diff,
+                "reason": "",
+            }
+
+            # Scenario 1: No changes needed
+            if not settings_changed:
+                logger.info(f'Settings for index {index_name} are already up to date')
+                result["reason"] = "Settings are already up to date"
+                return result
+
+            # Validate unless force=True
+            validation_error = None
+            try:
+                if "modelProperties" in settings_dict:
+                    self.validate_updated_model_properties(
+                        existing_index.model.properties,
+                        settings_dict["modelProperties"]
+                    )
+            except InvalidModelPropertiesError as e:
+                validation_error = e
+                result["error"] = True
+
+            # Scenario 2: dry_run=True - never deploy, just return info
+            if dry_run:
+                logger.info(f'Dry run for index {index_name} - showing settings changes without deploying')
+                if validation_error:
+                    result["reason"] = f"Dry run - validation would fail: {str(validation_error)}"
+                else:
+                    result["reason"] = "Dry run - no changes deployed"
+                return result
+
+            # Scenario 3: dry_run=False, force=False - block if validation fails
+            if validation_error and not force:
+                result["reason"] = "Validation failed: " + str(validation_error)
+                return result
+
+            # Scenario 4: dry_run=False, force=True OR validation passed - proceed with deployment
+            if "modelProperties" in settings_dict:
                 updated_index = self._updated_index_with_model_properties(updated_index, settings_dict["modelProperties"])
 
-                logger.debug(f'Updating index {updated_index.name} with settings: {settings_dict}')
-                self._get_vespa_application().update_index_setting(updated_index)
+            logger.debug(f'Updating index {updated_index.name} with settings: {settings_dict}')
+            self._get_vespa_application().update_index_setting(updated_index)
+            logger.info(f'Successfully updated settings for index {index_name}')
+
+            result["updated"] = True
+            if force and validation_error:
+                result["reason"] = "Update forced despite validation errors: " + str(validation_error)
+            else:
+                result["reason"] = "Settings updated successfully"
+            from marqo.tensor_search import index_meta_cache
+            index_meta_cache.get_index(self, index_name, force_refresh=True)  # Refresh cache
+            return result
 
     def _updated_index_with_model_properties(self, index: MarqoIndex, model_properties: dict) -> MarqoIndex:
         """

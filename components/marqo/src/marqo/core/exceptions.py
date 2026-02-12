@@ -123,5 +123,5 @@ class CudaOutOfMemoryError(DeviceError):
     pass
 
 
-class InvalidModelPropertiesError(MarqoError):
+class InvalidModelPropertiesError(InvalidArgumentError):
     pass
