@@ -7,7 +7,7 @@ WORKDIR /app
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
- && rm -rf /var/mlib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
 # Install uv
 RUN pip install --no-cache-dir uv
@@ -24,7 +24,8 @@ COPY src ./src
 # Set Python path
 ENV PYTHONPATH=/app/src
 ENV PATH="/app/.venv/bin:$PATH"
+ENV MARQO_HOST=0.0.0.0
 RUN echo $COMMITHASH > build_info.txt
 
-# Run with gunicorn and uvicorn worker
-CMD ["uvicorn", "model_management.main:app", "--host", "0.0.0.0", "--port", "8883"]
+# Run the FastAPI app with uvicorn
+CMD ["sh", "-c", "exec uvicorn model_management.main:app --host ${MARQO_HOST} --port 8883"]
