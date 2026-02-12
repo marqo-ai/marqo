@@ -454,3 +454,13 @@ class TestSettings(TestCase):
             self.assertEqual(
                 "s3://marqo-default-models-os", settings.marqo_default_models_s3_bucket
             )
+
+    def test_default_models_bucket_rejects_empty_string(self):
+        """Test that the validator raises ValueError when bucket is set to an empty string."""
+        with self.assertRaises(ValidationError) as context:
+            with patch.dict(
+                os.environ, {"MARQO_DEFAULT_MODELS_S3_BUCKET": ""}, clear=True
+            ):
+                Settings(_env_file=None)
+
+        self.assertIn("cannot be empty", str(context.exception).lower())
