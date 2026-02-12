@@ -73,7 +73,9 @@ services:
 
   mioc:
     image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/inference-orchestrator:latest
-    build: ./components/inference_orchestrator
+    build:
+      context: ./components
+      dockerfile: inference_orchestrator/Dockerfile
     stdin_open: true
     tty: true
     environment:
