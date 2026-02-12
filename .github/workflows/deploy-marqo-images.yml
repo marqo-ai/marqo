@@ -1,4 +1,6 @@
 name: Deploy Marqo Images to All ECRs (os, staging, preprod, prod)
+# This workflow is mainly for release usage where we want to push images to all ECRs used by different AWS environments.
+# If you want to just push images for dev purposes, please use the 'Build and Push Marqo Images to ECR' workflow.
 
 on:
   workflow_dispatch:
@@ -13,13 +15,17 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+    group: deploy-marqo-images-${{ github.ref }} - ${{ inputs.tags }}
+    cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     name: Build and Deploy Marqo Images to ECR for all AWS Environments
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [staging, preprod, os]
+        environment: [staging, preprod, os, prod-cell-1]
     environment: ${{ matrix.environment }}
     defaults:
       run:
@@ -76,8 +82,11 @@ jobs:
           echo "inference_tags=${INFERENCE_TAGS}" >> $GITHUB_OUTPUT
           echo "model_tags=${MODEL_TAGS}" >> $GITHUB_OUTPUT
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -85,7 +94,9 @@ jobs:
           python-version: '3.11'
 
       - name: Create ECR Repository if not found
-        run: ./github/scripts/create_ecr_repo_if_not_exists.sh marqoai
+        run: |
+          chmod +x ./.github/scripts/create_ecrs_if_not_exist.sh
+          ./.github/scripts/create_ecrs_if_not_exist.sh marqoai
 
       - name: Build and push api image
         id: build-and-push-api
