@@ -8,6 +8,7 @@ from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, C
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
+from marqo.tensor_search.models.collapse_model import CollapseModel
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.tensor_search.models.search import VectorisedJobPointer, JHash
 from marqo.vespa.models import QueryResult
@@ -554,7 +555,7 @@ class TestTensorSearchValidation(MarqoTestCase):
                         index_name=index.name,
                         text="test query",
                         search_method=SearchMethod.HYBRID,
-                        collapse_field_name="variant_id"
+                        collapse=CollapseModel(name="variant_id")
                     )
 
                 self.assertIn(expected_error, str(cm.exception))

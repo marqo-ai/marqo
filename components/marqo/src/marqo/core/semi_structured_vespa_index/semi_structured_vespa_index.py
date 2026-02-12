@@ -24,6 +24,7 @@ from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
+from marqo.tensor_search.models.collapse_model import CollapseModel
 
 
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
@@ -84,9 +85,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             marqo_query.attributes_to_retrieve.append(common.VESPA_FIELD_ID)
 
             # Add collapse field if provided, this is critical for collapsing search result
-            if (isinstance(marqo_query, MarqoHybridQuery) and marqo_query.collapse_field_name
-                    and marqo_query.collapse_field_name not in marqo_query.attributes_to_retrieve):
-                marqo_query.attributes_to_retrieve.append(marqo_query.collapse_field_name)
+            if (isinstance(marqo_query, MarqoHybridQuery) and marqo_query.collapse
+                    and marqo_query.collapse.name not in marqo_query.attributes_to_retrieve):
+                marqo_query.attributes_to_retrieve.append(marqo_query.collapse.name)
 
             # add chunk field names for tensor fields
             marqo_query.attributes_to_retrieve.extend(
@@ -119,8 +120,15 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         self._add_relevance_cutoff_and_sort_by_params(marqo_query, query)
 
         # add the collapse_field to query
-        if marqo_query.collapse_field_name:
-            query.update(self._generate_collapse_query_params(marqo_query.collapse_field_name))
+        if marqo_query.collapse:
+            query.update(self._generate_collapse_query_params(marqo_query.collapse))
+
+            if marqo_query.collapse.sort_by and marqo_query.collapse.sort_by.should_execute_sort():
+                query['marqo__ranking.lexical.lexical'] = "collapse_to_sort_value"
+                query["query_features"]["marqo__collapse_sort_weights"] = marqo_query.collapse.sort_by.generate_vespa_sort_by_query_input()
+                query["hits"] = marqo_query.collapse.sort_by.COLLAPSE_SORT_BY_QUERY_LIMIT
+                if marqo_query.collapse.sort_by.num_threads_per_search is not None:
+                    query["ranking.matching.numThreadsPerSearch"] = marqo_query.collapse.sort_by.num_threads_per_search
 
         if marqo_query.recency_parameters:
             # Add recency parameters to query input
@@ -132,7 +140,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # add lexical specific hybrid parameters
         if marqo_query.hybrid_parameters.secondPhaseModifier:
-            if marqo_query.collapse_field_name:
+            if marqo_query.collapse:
+                if marqo_query.collapse.sort_by and marqo_query.collapse.sort_by.should_execute_sort():
+                    raise InternalError( # pragma: no cover
+                        "Cannot use second phase modifiers with collapse sort by as they both modify the lexical ranking profile. "
+                        "secondPhaseModifiers should set to None when doing collapse sort by search "
+                    )
                 query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS + '_diversity'
             else:
                 query["marqo__ranking.lexical.lexical"] = common.RANK_PROFILE_HYBRID_BM25_SECOND_PHASE_MODIFIERS
@@ -177,9 +190,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         return result
 
-    def _generate_collapse_query_params(self, collapse_field_name: str):
-        params = {
-            'collapsefield': collapse_field_name,
+    def _generate_collapse_query_params(self, collapse: CollapseModel):
+        params: Dict[str, Any] = {
+            'collapsefield': collapse.name,
             'collapsesize': 1,  # currently fixed to 1, will support multiple if needed in the future
 
             # use a different rank profile to ensure diversity in the result returned to Vespa container
@@ -196,7 +209,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # default summary, which defies the purpose of using a minimal summary for collapsing. Disabling
             # `FieldFiller` will force the searcher to use `collapse-minimal-summary` for collapsing queries.
             params['FieldFiller.disable'] = True
-
         return params
 
     def _add_relevance_cutoff_and_sort_by_params(self, marqo_query, query):
@@ -256,17 +268,21 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         elif marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor:
             base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}'
 
+        collapse_field_name = marqo_query.collapse.name if marqo_query.collapse else None
+
         if marqo_query.track_total_hits is not None:
             # 0 is byte representation of letter "t"
-            if marqo_query.collapse_field_name:
-                total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({marqo_query.collapse_field_name}) output(count())))"
+            if marqo_query.collapse:
+                total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(group({collapse_field_name}) output(count())))"
             else:
                 total_hit_query = f"all(group({self._TOTAL_HITS_GROUP_CONST}) each(output(count())))"
             facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', total_hit_query))
 
         if marqo_query.facets is not None:
-            facets_term = self._get_facets_term(marqo_query.facets,
-                                                collapse_field_name=marqo_query.collapse_field_name)
+            facets_term = self._get_facets_term(
+                marqo_query.facets,
+                collapse_field_name=collapse_field_name
+            )
 
             if facets_term is not None:
                 facet_queries.append(facets_query_skeleton % (f'{base_yql}{filter_term}', facets_term))
@@ -285,8 +301,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                         new_filter_term = f' AND {new_filter_term}'
                     else:
                         new_filter_term = ''
-                    new_facets_term = self._get_facets_term(marqo_query.facets, facet_parameters.exclude_terms,
-                                                            collapse_field_name=marqo_query.collapse_field_name)
+                    new_facets_term = self._get_facets_term(
+                        marqo_query.facets, facet_parameters.exclude_terms,
+                        collapse_field_name=collapse_field_name
+                    )
 
                     query_yql = f'{base_yql}{new_filter_term}'
 
