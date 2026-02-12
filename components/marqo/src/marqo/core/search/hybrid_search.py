@@ -7,35 +7,150 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
+from marqo.core.models import MarqoIndex
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex, \
     IndexType
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
-from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
-from marqo.core.models.interpolation_method import InterpolationMethod
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import (
     SearchMethod
 )
-from marqo.core.models import MarqoIndex
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists, CustomVectorQuery
+from marqo.tensor_search.models.collapse_model import CollapseModel
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
+from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
+from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
-from marqo.vespa.exceptions import VespaStatusError
-from marqo.tensor_search.models.sort_by_model import SortByModel
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
-from marqo.tensor_search.enums import EnvVars
+from marqo.vespa.exceptions import VespaStatusError
+
+
+def should_use_collapse_search(
+        collapse: Optional[CollapseModel] = None,
+        main_query_sort_by: Optional[SortByModel] = None
+) -> bool:
+    """
+    Determine whether to use collapse search based on the collapse parameters, and sort_by parameters.
+    """
+    if not collapse:
+        return False
+
+    if not collapse.sort_by:
+        return False
+
+    if not main_query_sort_by:
+        return True
+
+    if not collapse.sort_by.disable_if_main_sort_by_fields:
+        return True
+
+    main_query_sort_by_fields = {field.field_name for field in main_query_sort_by.fields}
+
+    if not main_query_sort_by_fields.isdisjoint(collapse.sort_by.disable_if_main_sort_by_fields):
+        return False  # There is an intersection
+    return True
 
 
 class HybridSearch:
     def search(
+            self,
+            config: Config, marqo_index: MarqoIndex, query: Optional[Union[None, str, CustomVectorQuery]],
+            result_count: int = 5, offset: int = 0, rerank_depth: Optional[int] = None,
+            ef_search: Optional[int] = None, approximate: bool = True,
+            approximate_threshold: Optional[float] = None,
+            searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
+            attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
+            media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
+            score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
+            highlights: bool = False, text_query_prefix: Optional[str] = None,
+            hybrid_parameters: HybridParameters = None,
+            facets: Optional[FacetsParameters] = None,
+            track_total_hits: Optional[bool] = None,
+            language: Optional[str] = None,
+            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
+            sort_by: Optional[SortByModel] = None,
+            interpolation_method: Optional[InterpolationMethod] = None,
+            collapse: Optional[CollapseModel] = None,
+            recency_parameters: Optional[RecencyParameters] = None
+    ):
+        if should_use_collapse_search(collapse=collapse, main_query_sort_by=sort_by):
+            # Deliberately use a late import to avoid circular imports
+            from marqo.core.search.collapse_search import CollapseSearch
+            return CollapseSearch(
+                config=config,
+                marqo_index=marqo_index,
+                query=query,
+                result_count=result_count,
+                offset=offset,
+                rerank_depth=rerank_depth,
+                ef_search=ef_search,
+                approximate=approximate,
+                approximate_threshold=approximate_threshold,
+                searchable_attributes=searchable_attributes,
+                filter_string=filter_string,
+                device=device,
+                attributes_to_retrieve=attributes_to_retrieve,
+                boost=boost,
+                media_download_headers=media_download_headers,
+                context=context,
+                score_modifiers=score_modifiers,
+                model_auth=model_auth,
+                highlights=highlights,
+                text_query_prefix=text_query_prefix,
+                hybrid_parameters=hybrid_parameters,
+                facets=facets,
+                track_total_hits=track_total_hits,
+                language=language,
+                relevance_cutoff=relevance_cutoff,
+                sort_by=sort_by,
+                interpolation_method=interpolation_method,
+                collapse=collapse,
+                recency_parameters=recency_parameters
+            ).search()
+        else:
+            return self.execute_search(
+                config=config,
+                marqo_index=marqo_index,
+                query=query,
+                result_count=result_count,
+                offset=offset,
+                rerank_depth=rerank_depth,
+                ef_search=ef_search,
+                approximate=approximate,
+                approximate_threshold=approximate_threshold,
+                searchable_attributes=searchable_attributes,
+                filter_string=filter_string,
+                device=device,
+                attributes_to_retrieve=attributes_to_retrieve,
+                boost=boost,
+                media_download_headers=media_download_headers,
+                context=context,
+                score_modifiers=score_modifiers,
+                model_auth=model_auth,
+                highlights=highlights,
+                text_query_prefix=text_query_prefix,
+                hybrid_parameters=hybrid_parameters,
+                facets=facets,
+                track_total_hits=track_total_hits,
+                language=language,
+                relevance_cutoff=relevance_cutoff,
+                sort_by=sort_by,
+                interpolation_method=interpolation_method,
+                collapse=collapse,
+                recency_parameters=recency_parameters
+            )
+
+    def execute_search(
             self, config: Config, marqo_index: MarqoIndex, query: Optional[Union[None, str, CustomVectorQuery]],
             result_count: int = 5, offset: int = 0, rerank_depth: Optional[int] = None,
             ef_search: Optional[int] = None, approximate: bool = True,
@@ -52,11 +167,11 @@ class HybridSearch:
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
-            collapse_field_name: Optional[str] = None,
-            recency_parameters: Optional[RecencyParameters] = None
+            collapse: Optional[CollapseModel] = None,
+            recency_parameters: Optional[RecencyParameters] = None,
+            telemetry_prefix: Optional[str] = None,
     ) -> Dict:
         """
-
             Args:
                 config:
                 marqo_index: index object fetched by calling function
@@ -84,7 +199,7 @@ class HybridSearch:
                 relevance_cutoff: RelevanceCutoffModel object to specify relevance cutoff for the search.
                 sort_by: SortByModel object to specify sorting for the search. If not provided, no sorting will be applied.
                 interpolation_method: InterpolationMethod object to specify the interpolation method for hybrid search.
-                collapse_field_name:  field name to collapse the search result on.
+                collapse: A CollapseModel object to specify collapsing of search results.
                 recency_parameters: parameters for recency boosting
             Returns:
 
@@ -100,13 +215,18 @@ class HybridSearch:
                     },
                 ]
             """
+        # Use default hybrid settings if not provided
+        if hybrid_parameters is None:
+            hybrid_parameters = HybridParameters()
+
+        if telemetry_prefix is None:
+            telemetry_prefix = "search.hybrid"
 
         # # SEARCH TIMER-LOGGER (pre-processing)
         if boost is not None:
             raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
 
-        RequestMetricsStore.for_request().start("search.hybrid.processing_before_vespa")
-
+        RequestMetricsStore.for_request().start(f"{telemetry_prefix}.processing_before_vespa")
         index_name = marqo_index.name
 
         # Version checks (different for structured and unstructured)
@@ -134,10 +254,6 @@ class HybridSearch:
                 f"This index was created with Marqo {marqo_index_version}."
             )
 
-        # Use default hybrid settings if not provided
-        if hybrid_parameters is None:
-            hybrid_parameters = HybridParameters()
-
         # TODO: Remove when unstructured searchable attributes are supported
         if (isinstance(marqo_index, UnstructuredMarqoIndex) and
                 not isinstance(marqo_index, SemiStructuredMarqoIndex) and
@@ -157,7 +273,8 @@ class HybridSearch:
                 f"trackTotalHits is only supported for unstructured indexes"
             )
 
-        if query is not None and (hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
+        if query is not None and (
+                hybrid_parameters.queryLexical is not None or hybrid_parameters.queryTensor is not None):
             raise ValueError(
                 "'q' cannot be provided for HYBRID search when hybridParameters.queryTensor or "
                 "'hybridParameters.queryLexical' is provided"
@@ -221,6 +338,20 @@ class HybridSearch:
                 raise core_exceptions.UnsupportedFeatureError(
                     f"'secondPhaseModifier' is supported for unstructured indexes created "
                     f"with Marqo {constants.MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION} or later. "
+                    f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
+                )
+
+        if collapse and collapse.sort_by:
+            if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"'collapse.sortBy' is only supported for unstructured indexes created "
+                    f"with Marqo {constants.MARQO_COLLAPSE_SORT_BY_MINIMUM_VERSION} or later "
+                )
+
+            if not marqo_index.index_supports_collapse_sort_by:
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"'collapse.sortBy' is supported for unstructured indexes created "
+                    f"with Marqo {constants.MARQO_COLLAPSE_SORT_BY_MINIMUM_VERSION} or later. "
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
                 )
 
@@ -305,8 +436,9 @@ class HybridSearch:
                 or
                 hybrid_parameters.rankingMethod in [RankingMethod.Tensor, RankingMethod.RRF]
         ):
-            with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
-                qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device, interpolation_method)
+            with RequestMetricsStore.for_request().time(f"{telemetry_prefix}.vector_inference_full_pipeline"):
+                qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device,
+                                                                                  interpolation_method)
             vectorised_text = list(qidx_to_vectors.values())[0]
         else:
             vectorised_text = None
@@ -344,19 +476,19 @@ class HybridSearch:
             language=language,
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
-            collapse_field_name=collapse_field_name,
+            collapse=collapse,
             recency_parameters=recency_parameters
         )
 
         vespa_index = vespa_index_factory(marqo_index)
         vespa_query = vespa_index.to_vespa_query(marqo_query)
 
-        total_preprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.processing_before_vespa")
+        total_preprocess_time = RequestMetricsStore.for_request().stop(f"{telemetry_prefix}.processing_before_vespa")
         logger.debug(
             f"search (hybrid) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
 
         # SEARCH TIMER-LOGGER (roundtrip)
-        with RequestMetricsStore.for_request().time("search.hybrid.vespa",
+        with RequestMetricsStore.for_request().time(f"{telemetry_prefix}.vespa",
                                                     lambda t: logger.debug(f"Vespa search: took {t:.3f}ms")
                                                     ):
             try:
@@ -379,7 +511,7 @@ class HybridSearch:
             )
 
         # SEARCH TIMER-LOGGER (post-processing)
-        RequestMetricsStore.for_request().start("search.hybrid.postprocess")
+        RequestMetricsStore.for_request().start(f"{telemetry_prefix}.postprocess")
         gathered_results = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
         total_results = len(gathered_results["hits"])
         if facets is not None or track_total_hits is not None:
@@ -394,8 +526,7 @@ class HybridSearch:
                 gathered_results["totalHits"] = 0
 
         gathered_results = self._max_value_check_for_total_hits(gathered_results)
-
-        total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
+        total_postprocess_time = RequestMetricsStore.for_request().stop(f"{telemetry_prefix}.postprocess")
         logger.debug(
             f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
             f"{total_results} results from Vespa."
@@ -403,7 +534,7 @@ class HybridSearch:
 
         # Collect metadata for sort by
         if sort_by is not None:
-            if responses.root.fields.marqo_fields is None or responses.root.fields.marqo_fields.sort_candidates is None: # pragma: no cover
+            if responses.root.fields.marqo_fields is None or responses.root.fields.marqo_fields.sort_candidates is None:  # pragma: no cover
                 raise core_exceptions.InternalError(
                     f"'sortBy' feature is enabled, but Vespa did not return sortCandidates in the response "
                 )
@@ -412,8 +543,8 @@ class HybridSearch:
         # Collect metadata for relevance cutoff
         if relevance_cutoff is not None:
             if responses.root.fields.marqo_fields is None \
-                or responses.root.fields.marqo_fields.relevant_candidates is None \
-                or responses.root.fields.marqo_fields.probe_candidates is None: # pragma: no cover
+                    or responses.root.fields.marqo_fields.relevant_candidates is None \
+                    or responses.root.fields.marqo_fields.probe_candidates is None:  # pragma: no cover
                 raise core_exceptions.InternalError(
                     f"'relevanceCutoff' feature is enabled, but Vespa did not return relevantCandidates or "
                     f"probeCandidates in the response "

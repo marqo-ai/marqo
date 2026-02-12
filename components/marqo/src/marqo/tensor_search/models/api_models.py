@@ -22,16 +22,13 @@ from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+from marqo.tensor_search.models.collapse_model import CollapseModel
 
 class BaseMarqoModel(BaseModel):
     class Config:
         extra: str = "forbid"
 
     pass
-
-
-class SearchCollapseField(ImmutableStrictBaseModel):
-    name: str
 
 
 class CustomVectorQuery(ImmutableStrictBaseModel):
@@ -74,7 +71,7 @@ class SearchQuery(BaseMarqoModel):
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
-    collapse_fields: Optional[List[SearchCollapseField]] = Field(default=None, alias="collapseFields")
+    collapse_fields: Optional[List[CollapseModel]] = Field(default=None, alias="collapseFields")
     recencyParameters: Optional[RecencyParameters] = None
 
     # By default, we retrieve 3 times more candidates than the limit to ensure we have enough results to sort.
@@ -469,8 +466,8 @@ class SearchQuery(BaseMarqoModel):
             raise ValueError(f"collapseFields can only be provided for 'HYBRID' search. "
                              f"Search method is {search_method}.")
         return values
-        
-    @root_validator(pre=False) 
+
+    @root_validator(pre=False)
     def validate_single_collapse_field(cls, values):
         """Validate exactly one collapse field is provided"""
         collapse_fields = values.get('collapse_fields')

@@ -5,6 +5,7 @@ import semver
 import tarfile
 import tempfile
 import textwrap
+import time
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -88,7 +89,7 @@ class ServicesXml:
         bootstrapping (when a new version of Marqo is deployed).
         - Manual rollback will replace the entire services.xml file with the previous version. This means the changes
         to the preserved elements will also be reverted.
-        
+
         Preserved elements:
         - <nodes>...</nodes>: container nodes configuration
         - <config name="com.yahoo.document.restapi.document-operation-executor">...</config>: doc operation executors
@@ -108,22 +109,22 @@ class ServicesXml:
     def _should_preserve_container_element(self, element):
         """
         Determines if a container element should be preserved during cleanup.
-        
+
         Args:
             element: XML element to check
-            
+
         Returns:
             bool: True if element should be preserved, False if it should be removed
         """
         # Always preserve nodes element
         if element.tag == 'nodes':
             return True
-            
+
         # Preserve document-operation-executor config
-        if (element.tag == 'config' and 
-            element.get('name') == 'com.yahoo.document.restapi.document-operation-executor'):
+        if (element.tag == 'config' and
+                element.get('name') == 'com.yahoo.document.restapi.document-operation-executor'):
             return True
-            
+
         return False
 
     def _config_search(self):
@@ -132,7 +133,7 @@ class ServicesXml:
         chain.set('id', 'marqo')
         chain.set('inherits', 'vespa')
         self._add_component(chain, 'searcher', 'ai.marqo.search.HybridSearcher')
-        
+
     def _config_index_setting_components(self):
         container_elements = self._ensure_only_one('container')
 
@@ -166,8 +167,10 @@ class ServicesXml:
                 normalized.append(child)
             return normalized
 
-        elements_self = sorted([ET.tostring(normalize(elem), encoding='unicode') for elem in self._root.findall(xml_path)])
-        elements_other = sorted([ET.tostring(normalize(elem), encoding='unicode') for elem in other._root.findall(xml_path)])
+        elements_self = sorted(
+            [ET.tostring(normalize(elem), encoding='unicode') for elem in self._root.findall(xml_path)])
+        elements_other = sorted(
+            [ET.tostring(normalize(elem), encoding='unicode') for elem in other._root.findall(xml_path)])
 
         return len(elements_self) == len(elements_other) and all(x == y for x, y in zip(elements_self, elements_other))
 
@@ -257,7 +260,7 @@ class IndexSettingStore:
         if index_setting_name in self._index_settings_history:
             self._index_settings_history[index_setting_name].insert(0, self._index_settings[index_setting_name])
             self._index_settings_history[index_setting_name] = self._index_settings_history[index_setting_name][
-                                                               :self._HISTORY_VERSION_LIMIT]
+                :self._HISTORY_VERSION_LIMIT]
         else:
             self._index_settings_history[index_setting_name] = [self._index_settings[index_setting_name]]
 
@@ -278,6 +281,7 @@ class MarqoConfigStore:
         ...
     }
     """
+
     def __init__(self, marqo_config_json: str) -> None:
         self._config = MarqoConfig.parse_obj(json.loads(marqo_config_json)) if marqo_config_json else None
 
@@ -375,6 +379,7 @@ class VespaApplicationStore(ABC):
     All Marqo index related operations need to change and redeploy VespaApplicationPackage. There are several ways to
     handle the change and deployment of the application. This class extracted an interface for low-level operations.
     """
+
     def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int):
         self._deploy_timeout = deploy_timeout
         self._wait_for_convergence_timeout = wait_for_convergence_timeout
@@ -460,6 +465,7 @@ class VespaApplicationFileStore(VespaApplicationStore):
     more details. This is the only viable option to deploy changes of binary files before Vespa version 8.382.22.
     We implement this approach to support bootstrapping and rollback for Vespa version prior to 8.382.22.
     """
+
     def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int,
                  check_for_application_convergence: bool = True):
         super().__init__(vespa_client, deploy_timeout, wait_for_convergence_timeout)
@@ -520,6 +526,7 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
     See https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#create-session for more details.
     However, this approach does not support binary files for Vespa version prior to 8.382.22.
     """
+
     def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int,
                  check_for_application_convergence: bool = True):
         super().__init__(vespa_client, deploy_timeout, wait_for_convergence_timeout)
@@ -692,7 +699,8 @@ class VespaApplicationPackage:
 
         marqo_config = MarqoConfigStore(old_backup.read_text_file(self._MARQO_CONFIG_FILE)).get()
         if marqo_config is not None and marqo_config.version != marqo_version:
-            raise ApplicationRollbackError(f"Cannot rollback to {marqo_config.version}, current Marqo version is {marqo_version}")
+            raise ApplicationRollbackError(
+                f"Cannot rollback to {marqo_config.version}, current Marqo version is {marqo_version}")
 
         logger.info(f'Rolling the vector store back from {vespa_app_version} to {marqo_version}')
 
@@ -751,7 +759,7 @@ class VespaApplicationPackage:
         self._deploy()
 
     def update_index_setting_and_schema(self, index: MarqoIndex, schema: str,
-                                         prepare_only: bool = False) -> Optional[Dict]:
+                                        prepare_only: bool = False) -> Optional[Dict]:
         """
         Update index settings and schema in Vespa.
 
@@ -771,7 +779,8 @@ class VespaApplicationPackage:
         self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
         self._index_setting_store.save_index_setting(index.copy(update={
             'version': version,
-            'schema_template_version': marqo_version.get_version()
+            'schema_template_version': marqo_version.get_version(),
+            'updated_at': int(time.time())
         }))
         self._persist_index_settings()
 
@@ -892,7 +901,7 @@ class VespaApplicationPackage:
         components_jar_file = 'marqo-custom-searchers-deploy.jar'
 
         logger.debug(f'Copying components jar file {components_jar_file}')
-        with open(self._COMPONENTS_JAR_FOLDER/components_jar_file, 'rb') as f:
+        with open(self._COMPONENTS_JAR_FOLDER / components_jar_file, 'rb') as f:
             self._store.save_file(f.read(), 'components', components_jar_file)
 
     def _add_schema_removal_override(self) -> None:

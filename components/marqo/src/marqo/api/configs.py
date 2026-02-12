@@ -28,6 +28,8 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED: 100,
         EnvVars.MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED: 100,
         EnvVars.MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT: 5,  # index operations acquire this distributed lock with a timeout
+        EnvVars.MARQO_VESPA_CONVERGENCE_TIMEOUT: 120,
+        EnvVars.MARQO_ENABLE_ADD_DOCUMENTS_CONVERGENCE_CHECK: "TRUE",
         EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT: 15,
         EnvVars.ZOOKEEPER_HOSTS: None,
 
@@ -70,7 +72,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_REMOTE_INFERENCE_URL: "http://localhost:8884",
         EnvVars.MARQO_INFERENCE_POOL_SIZE: 20,  # Please adjust this based on the throttling config
         EnvVars.MARQO_INFERENCE_TIMEOUT: 300,   # 300s to support inference of large batch of media files
-
+        
         EnvVars.MARQO_API_INFERENCE_CACHE_SIZE: 0,
         EnvVars.MARQO_API_INFERENCE_CACHE_TYPE: "LRU",
 

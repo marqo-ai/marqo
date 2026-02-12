@@ -5,6 +5,7 @@ from marqo.client import Client
 from tests.marqo_test import MarqoTestCase
 from marqo.errors import MarqoWebError
 
+
 class TestCollapseFields(MarqoTestCase):
     unstructured_text_index_name = "unstructured_index_text" + str(uuid.uuid4()).replace('-', '')
 
@@ -95,7 +96,8 @@ class TestCollapseFields(MarqoTestCase):
         # TODO please note that this is not working due to a side effect that partial update treats all string fields
         #  as lexical fields. Ideally, partial updates should treat collapse differently to avoid confusing error msg.
         self.assertIn("parent_id of type str does not exist in the original document. "
-                      "Marqo does not support adding new lexical fields in partial updates", update_res['items'][0]['error'])
+                      "Marqo does not support adding new lexical fields in partial updates",
+                      update_res['items'][0]['error'])
 
         doc = self.client.index(index_name).get_document(document_id="valid1")
 
@@ -348,7 +350,6 @@ class TestCollapseFields(MarqoTestCase):
             self.assertLessEqual(hit["price"], 3)
             self.assertIn(hit["color"], ("red", "yellow"))
 
-
     def test_relevance_cutoff(self):
         """Test that relevance cutoff param works with search with collapse field"""
         # 30 documents designed for "machine learning artificial intelligence algorithms" query
@@ -387,78 +388,78 @@ class TestCollapseFields(MarqoTestCase):
 
             # === MEDIUM RELEVANCE (10 docs) - Contains EXACTLY 3 of the 5 query words ===
             # (e.g., {machine, learning, algorithms} or {artificial, intelligence, learning}, etc.)
-            {"_id": "m1",  "parent_id": "group_3",
+            {"_id": "m1", "parent_id": "group_3",
              "content": "Machine learning algorithms process financial time series for forecasting market trends.",
              "sort_value": 64},
-            {"_id": "m2",  "parent_id": "group_3",
+            {"_id": "m2", "parent_id": "group_3",
              "content": "Artificial intelligence algorithms underpin recommendation engines in e-commerce platforms.",
              "sort_value": 6.7},
-            {"_id": "m3",  "parent_id": "group_3",
+            {"_id": "m3", "parent_id": "group_3",
              "content": "Artificial intelligence learning models adapt to new user behaviors in real time.",
              "sort_value": 4.3},
-            {"_id": "m4",  "parent_id": "group_3",
+            {"_id": "m4", "parent_id": "group_3",
              "content": "Machine and artificial intelligence technologies converge to create autonomous robotic systems.",
              "sort_value": 7.1},
-            {"_id": "m5",  "parent_id": "group_4",
+            {"_id": "m5", "parent_id": "group_4",
              "content": "Machine learning artificial neural networks mimic animal brain structures.",
              "sort_value": 6.2},
-            {"_id": "m6",  "parent_id": "group_4",
+            {"_id": "m6", "parent_id": "group_4",
              "content": "Advanced machine learning algorithms accelerate computational biology research.",
              "sort_value": 5.9},
-            {"_id": "m7",  "parent_id": "group_4",
+            {"_id": "m7", "parent_id": "group_4",
              "content": "Distributed artificial intelligence systems leverage algorithms for parallel decision making.",
              "sort_value": 4.8},
-            {"_id": "m8",  "parent_id": "group_4",
+            {"_id": "m8", "parent_id": "group_4",
              "content": "Deep learning frameworks support neural architectures and optimization algorithms.",
              "sort_value": 7.5},
-            {"_id": "m9",  "parent_id": "group_5",
+            {"_id": "m9", "parent_id": "group_5",
              "content": "Evolutionary algorithms integrate with machine frameworks for adaptive problem solving.",
              "sort_value": 6.0},
-            {"_id": "m10",  "parent_id": "group_5",
+            {"_id": "m10", "parent_id": "group_5",
              "content": "Artificial learning simulations test intelligence benchmarks under controlled conditions.",
              "sort_value": 4.1},
 
             # === LOW RELEVANCE ===
             # 5 docs with exactly 1 query word, matching the word counts of l1–l5
-            {"_id": "l1",  "parent_id": "group_6",
+            {"_id": "l1", "parent_id": "group_6",
              "content": "Engineers use machine tools for precise cutting.",
              "sort_value": 65},
 
-            {"_id": "l2",  "parent_id": "group_6",
+            {"_id": "l2", "parent_id": "group_6",
              "content": "Innovators encourage collaborative learning environments to foster team growth.",
              "sort_value": 2.7},  # 9 words, contains "learning"
 
-            {"_id": "l3",  "parent_id": "group_6",
+            {"_id": "l3", "parent_id": "group_6",
              "content": "Manufacturers produce artificial components designed precisely for specialized industrial applications.",
              "sort_value": 1.4},  # 10 words, contains "artificial"
 
-            {"_id": "l4",  "parent_id": "group_6",
+            {"_id": "l4", "parent_id": "group_6",
              "content": "Local units value human intelligence during critical decision making.",
              "sort_value": 100},  # 9 words, contains "intelligence"
 
-            {"_id": "l5",  "parent_id": "group_6",
+            {"_id": "l5", "parent_id": "group_6",
              "content": "Researchers propose algorithms optimized specifically to accelerate image processing tasks.",
              "sort_value": 60},  # 10 words, contains "algorithms"
 
             # === Irrelevant ===
             # 5 docs with 0 words from the query
-            {"_id": "l6",  "parent_id": "group_7",
+            {"_id": "l6", "parent_id": "group_7",
              "content": "Bright morning sunlight streamed through the quiet study room.",
              "sort_value": 2.1},
 
-            {"_id": "l7",  "parent_id": "group_7",
+            {"_id": "l7", "parent_id": "group_7",
              "content": "Surprising weather patterns emerged across the town.",
              "sort_value": 70},
 
-            {"_id": "l8",  "parent_id": "group_7",
+            {"_id": "l8", "parent_id": "group_7",
              "content": "Vibrant wildflowers adorned the rolling hills during summer.",
              "sort_value": 1.9},
 
-            {"_id": "l9",  "parent_id": "group_7",
+            {"_id": "l9", "parent_id": "group_7",
              "content": "Chilly autumn breeze painted golden leaves across streets.",
              "sort_value": 24},
 
-            {"_id": "l10",  "parent_id": "group_7",
+            {"_id": "l10", "parent_id": "group_7",
              "content": "The ancient manuscript revealed hidden stories from forgotten civilizations.",
              "sort_value": 5.6}
 
@@ -498,8 +499,9 @@ class TestCollapseFields(MarqoTestCase):
 
     def test_score_modifiers(self):
         """Test that score modifiers work with search with collapse field"""
-        docs = [{"_id": f"doc{g}{i:02}", "rating": i+1, "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
-                for i in range(5) for g in range(5)]
+        docs = [
+            {"_id": f"doc{g}{i:02}", "rating": i + 1, "title": f"Test document {g}{i:02}", "parent_id": f"group_{g}"}
+            for i in range(5) for g in range(5)]
 
         index_name = self.unstructured_text_index_name
 
@@ -575,3 +577,287 @@ class TestCollapseFields(MarqoTestCase):
         # Verify the search returns all docs in one group
         self.assertEqual(5, len(lexical_res["hits"]))
         self.assertEqual(set([f"doc1{i:02}" for i in range(5)]), set([hit['_id'] for hit in lexical_res["hits"]]))
+
+
+class TestCollapseSortBy(MarqoTestCase):
+    unstructured_text_index_name = "unstructured_index_text_sortby" + str(uuid.uuid4()).replace('-', '')
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.client = Client(**cls.client_settings)
+        cls.create_indexes([
+            {
+                "indexName": cls.unstructured_text_index_name,
+                "type": "unstructured",
+                "model": "hf/all-MiniLM-L6-v2",
+                "collapseFields": [
+                    {"name": "category", "minGroups": 2}
+                ]
+            },
+        ])
+
+        cls.indexes_to_delete = [cls.unstructured_text_index_name]
+
+    def _add_shoe_documents(self):
+        """Add sample shoe documents across two category groups with varying prices."""
+        docs = [
+            # Category A - 5 variants with different prices
+            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 120.0, "cost": 95.0,
+             "brand": "nike"},
+            {"_id": "shoe_a2", "title": "Running Shoe Beta", "category": "shoes_a", "price": 89.99, "cost": 70.0,
+             "brand": "adidas"},
+            {"_id": "shoe_a3", "title": "Running Shoe Gamma", "category": "shoes_a", "price": 150.0, "cost": 110.0,
+             "brand": "nike"},
+            {"_id": "shoe_a4", "title": "Running Shoe Delta", "category": "shoes_a", "price": 65.0, "cost": 50.0},
+            {"_id": "shoe_a5", "title": "Running Shoe Epsilon", "category": "shoes_a", "price": 200.0, "cost": 160.0,
+             "brand": "puma"},
+            # Category B - 5 variants with different prices
+            {"_id": "shoe_b1", "title": "Hiking Boot Alpha", "category": "shoes_b", "price": 180.0, "cost": 140.0,
+             "brand": "merrell"},
+            {"_id": "shoe_b2", "title": "Hiking Boot Beta", "category": "shoes_b", "price": 75.0, "cost": 55.0,
+             "brand": "columbia"},
+            {"_id": "shoe_b3", "title": "Hiking Boot Gamma", "category": "shoes_b", "price": 220.0, "cost": 170.0,
+             "brand": "merrell"},
+            {"_id": "shoe_b4", "title": "Hiking Boot Delta", "category": "shoes_b", "price": 99.0, "cost": 78.0},
+            {"_id": "shoe_b5", "title": "Hiking Boot Epsilon", "category": "shoes_b", "price": 55.0, "cost": 40.0,
+             "brand": "columbia"},
+        ]
+        self.client.index(self.unstructured_text_index_name).add_documents(
+            docs, tensor_fields=["title"]
+        )
+
+    # ---- Collapse sort by basic functionality ----
+
+    def test_collapse_sort_by_price_asc(self):
+        """Collapse with sortBy price asc returns the cheapest variant per category.
+        Query "alpha shoe" matches shoe_a1 and shoe_b1 as relevance representatives.
+        sortBy price asc replaces them with the cheapest: shoe_a4 (65.0) and shoe_b5 (55.0).
+        _originalId preserves the original relevance representatives."""
+        self._add_shoe_documents()
+
+        res = self.client.index(self.unstructured_text_index_name).search(
+            q="alpha shoe",
+            search_method="HYBRID",
+            hybrid_parameters={
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+            },
+            collapse_fields=[{"name": "category", "sortBy": {"fields": [{"fieldName": "price", "order": "asc"}]}}],
+            limit=10
+        )
+
+        # sortBy price asc picks cheapest per group, _originalId tracks the relevance-phase representative
+        self.assertEqual(["shoe_a4", "shoe_b5"], [hit["_id"] for hit in res["hits"]])
+        self.assertEqual(["shoe_a1", "shoe_b1"], [hit["_originalId"] for hit in res["hits"]])
+
+    def test_collapse_sort_by_price_desc(self):
+        """Collapse with sortBy price desc returns the most expensive variant per category.
+        Query "shoe beta" matches shoe_a2 and shoe_b2 as relevance representatives.
+        sortBy price desc replaces them with the most expensive: shoe_a5 (200.0) and shoe_b3 (220.0)."""
+        self._add_shoe_documents()
+
+        res = self.client.index(self.unstructured_text_index_name).search(
+            q="shoe beta",
+            search_method="HYBRID",
+            hybrid_parameters={
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+            },
+            collapse_fields=[{"name": "category", "sortBy": {"fields": [{"fieldName": "price", "order": "desc"}]}}],
+            limit=10
+        )
+
+        # sortBy price desc picks most expensive per group
+        self.assertEqual(["shoe_a5", "shoe_b3"], [hit["_id"] for hit in res["hits"]])
+        self.assertEqual(["shoe_a2", "shoe_b2"], [hit["_originalId"] for hit in res["hits"]])
+
+    def test_collapse_sort_by_with_filter(self):
+        """Collapse sortBy combined with a filter.
+        Filter price:[100 TO *] excludes cheap variants. Query "shoe gamma" matches shoe_a3 and shoe_b3
+        as relevance representatives. sortBy price asc replaces them with the cheapest remaining:
+        shoe_a1 (120.0) and shoe_b1 (180.0)."""
+        self._add_shoe_documents()
+
+        res = self.client.index(self.unstructured_text_index_name).search(
+            q="shoe gamma",
+            search_method="HYBRID",
+            hybrid_parameters={
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+            },
+            collapse_fields=[{"name": "category", "sortBy": {"fields": [{"fieldName": "price", "order": "asc"}]}}],
+            filter_string="price:[100 TO *]",
+            limit=10
+        )
+
+        # Filter narrows candidates to price >= 100; sortBy picks cheapest among those
+        self.assertEqual(["shoe_a1", "shoe_b1"], [hit["_id"] for hit in res["hits"]])
+        self.assertEqual(["shoe_a3", "shoe_b3"], [hit["_originalId"] for hit in res["hits"]])
+
+    # ---- Missing sort by field handling ----
+    def test_collapse_sort_by_with_some_docs_missing_sort_field(self):
+        """Collapse sortBy behavior when some documents are missing the sort field.
+        shoes_a: a1-a3 have price, a4-a5 do not.
+        shoes_b: b1 and b5 have no price, b2-b4 have price.
+        Tests three sub-scenarios for how the sort-by phase handles missing fields."""
+        docs = [
+            # shoes_a: a1-a3 have price, a4-a5 do not
+            {"_id": "shoe_a1", "title": "Running Shoe Alpha", "category": "shoes_a", "price": 120.0, "cost": 95.0,
+             "brand": "nike"},
+            {"_id": "shoe_a2", "title": "Running Shoe Beta", "category": "shoes_a", "price": 89.99, "cost": 70.0,
+             "brand": "adidas"},
+            {"_id": "shoe_a3", "title": "Running Shoe Gamma", "category": "shoes_a", "price": 150.0, "cost": 110.0,
+             "brand": "nike"},
+            {"_id": "shoe_a4", "title": "Running Shoe Delta", "category": "shoes_a"},
+            {"_id": "shoe_a5", "title": "Running Shoe Epsilon", "category": "shoes_a"},
+            # shoes_b: b1 and b5 have no price, b2-b4 have price
+            {"_id": "shoe_b1", "title": "Hiking Boot Alpha", "category": "shoes_b", "brand": "merrell"},
+            {"_id": "shoe_b2", "title": "Hiking Boot Beta", "category": "shoes_b", "price": 75.0, "cost": 55.0,
+             "brand": "columbia"},
+            {"_id": "shoe_b3", "title": "Hiking Boot Gamma", "category": "shoes_b", "price": 220.0, "cost": 170.0,
+             "brand": "merrell"},
+            {"_id": "shoe_b4", "title": "Hiking Boot Delta", "category": "shoes_b", "price": 99.0, "cost": 78.0},
+            {"_id": "shoe_b5", "title": "Hiking Boot Epsilon", "category": "shoes_b", "brand": "columbia"},
+        ]
+
+        self.client.index(self.unstructured_text_index_name).add_documents(
+            docs, tensor_fields=["title"]
+        )
+        with self.subTest("shoes_a representative has price, shoes_b representative does not"):
+            # "shoe alpha" -> shoes_a rep is shoe_a1 (has price), shoes_b rep is shoe_b1 (no price)
+            # shoes_a: sortBy runs, picks cheapest -> shoe_a2 (89.99), _originalId = shoe_a1
+            # shoes_b: rep lacks price, sortBy skipped, stays as shoe_b1, no _originalId
+            res = self.client.index(self.unstructured_text_index_name).search(
+                q="shoe alpha",
+                search_method="HYBRID",
+                hybrid_parameters={
+                    "retrievalMethod": "disjunction",
+                    "rankingMethod": "rrf",
+                },
+                collapse_fields=[{"name": "category", "sortBy": {"fields": [{"fieldName": "price", "order": "asc"}]}}],
+                limit=10
+            )
+
+            self.assertEqual(["shoe_a2", "shoe_b1"], [hit["_id"] for hit in res["hits"]])
+            self.assertEqual(["shoe_a1", None], [hit.get("_originalId") for hit in res["hits"]])
+
+        with self.subTest("Both representatives are missing the price field"):
+            # "shoe epislon" -> shoes_a rep is shoe_a5 (no price), shoes_b rep is shoe_b5 (no price)
+            # Both reps lack price, sortBy skipped for both, no _originalId
+            res = self.client.index(self.unstructured_text_index_name).search(
+                q="shoe epislon",
+                search_method="HYBRID",
+                hybrid_parameters={
+                    "retrievalMethod": "disjunction",
+                    "rankingMethod": "rrf",
+                },
+                collapse_fields=[{"name": "category", "sortBy": {"fields": [{"fieldName": "price", "order": "asc"}]}}],
+                limit=10
+            )
+
+            self.assertEqual(["shoe_a5", "shoe_b5"], [hit["_id"] for hit in res["hits"]])
+            self.assertEqual([None, None], [hit.get("_originalId") for hit in res["hits"]])
+
+        with self.subTest("Both representatives missing price, but alwaysFetchVariants=True forces sort-by phase"):
+            # Same query "shoe epislon" -> same reps (shoe_a5, shoe_b5), both lack price
+            # alwaysFetchVariants=True forces the sort-by phase regardless of missing field
+            # shoes_a: sortBy picks cheapest with price -> shoe_a2 (89.99), _originalId = shoe_a5
+            # shoes_b: sortBy picks cheapest with price -> shoe_b2 (75.0), _originalId = shoe_b5
+            res = self.client.index(self.unstructured_text_index_name).search(
+                q="shoe epislon",
+                search_method="HYBRID",
+                hybrid_parameters={
+                    "retrievalMethod": "disjunction",
+                    "rankingMethod": "rrf",
+                },
+                collapse_fields=[{"name": "category", "sortBy": {
+                    "fields": [{"fieldName": "price", "order": "asc"}],
+                    "alwaysFetchVariants": True,
+                }}],
+                limit=10
+            )
+
+            self.assertEqual(["shoe_a2", "shoe_b2"], [hit["_id"] for hit in res["hits"]])
+            self.assertEqual(["shoe_a5", "shoe_b5"], [hit.get("_originalId") for hit in res["hits"]])
+
+    def test_collapse_without_sort_by_has_no_original_id(self):
+        """When collapse is used without sortBy, hits should NOT have _originalId."""
+        self._add_shoe_documents()
+
+        res = self.client.index(self.unstructured_text_index_name).search(
+            q="shoe Alpha",
+            search_method="HYBRID",
+            hybrid_parameters={
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+                "alpha": 0,
+            },
+            collapse_fields=[{"name": "category"}],
+            limit=10
+        )
+
+        for hit in res["hits"]:
+            self.assertNotIn("_originalId", hit)
+
+    # ---- Collapse sort by with main sort by ----
+    def test_collapse_sort_by_with_main_sort_by(self):
+        """Main sortBy controls group ordering; collapse sortBy picks the within-group representative.
+        Main sortBy price desc determines group order (shoes_b first since max price 220 > 200).
+        Collapse sortBy cost asc picks the cheapest-cost variant per group:
+        shoes_b -> shoe_b5 (cost=40), shoes_a -> shoe_a4 (cost=50)."""
+        self._add_shoe_documents()
+
+        res = self.client.index(self.unstructured_text_index_name).search(
+            q="shoe alpha",
+            search_method="HYBRID",
+            hybrid_parameters={
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+            },
+            collapse_fields=[{"name": "category", "sortBy": {"fields": [{"fieldName": "cost", "order": "asc"}]}}],
+            sort_by={
+                "fields": [{"fieldName": "price", "order": "desc"}],
+                "minSortCandidates": 10,
+            },
+            limit=10
+        )
+        # Main sortBy price desc: shoes_b (max 220) before shoes_a (max 200)
+        # Collapse sortBy cost asc: shoe_b5 (cost=40), shoe_a4 (cost=50)
+        # _originalId tracks the relevance-phase representatives (shoe_b1, shoe_a1)
+        self.assertEqual(["shoe_b5", "shoe_a4"], [hit["_id"] for hit in res["hits"]])
+        self.assertEqual(["shoe_b1", "shoe_a1"], [hit.get("_originalId") for hit in res["hits"]])
+
+    # ---- disableIfMainSortByFields ----
+    def test_collapse_sort_by_disabled_when_main_sort_by_matches_disable_list(self):
+        """disableIfMainSortByFields prunes collapse sortBy when the main sortBy field is in the set.
+        Main sortBy is "price", which is in disableIfMainSortByFields=["price"], so collapse sortBy
+        on "cost" is pruned. Without the sort-by phase, representatives are relevance-based.
+        No _originalId is set since no replacement occurs."""
+        self._add_shoe_documents()
+
+        res = self.client.index(self.unstructured_text_index_name).search(
+            q="shoe alpha",
+            search_method="HYBRID",
+            hybrid_parameters={
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "rrf",
+            },
+            collapse_fields=[
+                {
+                    "name": "category",
+                    "sortBy": {
+                        "fields": [{"fieldName": "cost", "order": "asc"}],
+                        "disableIfMainSortByFields": ["price"]  # "price" matches main sortBy field
+                    },
+                }
+            ],
+            sort_by={
+                "fields": [{"fieldName": "price", "order": "desc"}],
+                "minSortCandidates": 10,
+            },
+            limit=10
+        )
+        # Collapse sortBy pruned -> relevance-based representatives, no _originalId
+        self.assertEqual(["shoe_b1", "shoe_a1"], [hit["_id"] for hit in res["hits"]])
+        self.assertEqual([None, None], [hit.get("_originalId") for hit in res["hits"]])

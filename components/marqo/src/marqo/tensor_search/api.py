@@ -145,7 +145,6 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.OperationConflictError, api_exceptions.OperationConflictError, None, None),
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
         (core_exceptions.ZeroMagnitudeVectorError, api_exceptions.BadRequestError, None, None),
-        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
         (core_exceptions.UnsupportedFeatureError, api_exceptions.BadRequestError, None, None),
         (core_exceptions.InternalError, api_exceptions.InternalError, None, None),
         (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None, None),
@@ -157,6 +156,13 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
             vespa_exceptions.VespaTimeoutError,
             api_exceptions.VectorStoreTimeoutError,
             "Vector store request timed out. Try your request again later.",
+            None
+        ),
+        (
+            vespa_exceptions.VespaNotConvergedError,
+            # we return 409 in this case since it is likely due to another process triggered a Vespa app deployment
+            api_exceptions.OperationConflictError,
+            "Marqo vector store has not converged. Please retry your request again later.",
             None
         ),
 
@@ -471,7 +477,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 relevance_cutoff=search_query.relevance_cutoff,
                 sort_by=search_query.sort_by,
                 interpolation_method=search_query.interpolationMethod,
-                collapse_field_name=search_query.collapse_fields[0].name if search_query.collapse_fields else None,
+                collapse=search_query.collapse_fields[0] if search_query.collapse_fields else None,
                 recency_parameters=search_query.recencyParameters
             )
             return ORJSONResponse(result)
@@ -605,10 +611,10 @@ def get_document_by_id(index_name: str, document_id: str,
     Gets a document using its ID. Please refer to
     [Get document API](https://docs.marqo.ai/latest/reference/api/documents/get-one-document/) for details.
     """
-    return tensor_search.get_document_by_id(
+    return ORJSONResponse(tensor_search.get_document_by_id(
         config=marqo_config, index_name=index_name, document_id=document_id,
         show_vectors=expose_facets
-    )
+    ))
 
 
 @app.get("/indexes/{index_name}/documents")
@@ -624,7 +630,7 @@ def get_documents_by_ids_via_get(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
         show_vectors=expose_facets
     )
-    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+    return ORJSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/documents/get-batch")
@@ -646,7 +652,7 @@ def get_documents_by_ids_via_post(
         config=marqo_config, index_name=index_name, document_ids=get_batch_documents_request.document_ids,
         show_vectors=expose_facets
     )
-    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+    return ORJSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/documents/delete-batch")

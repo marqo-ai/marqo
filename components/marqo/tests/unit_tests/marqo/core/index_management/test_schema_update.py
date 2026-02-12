@@ -268,6 +268,30 @@ class TestVespaApplicationPackagePrepareOnly(MarqoTestCase):
         self.mock_vespa_client.activate.assert_called_once()
         self.mock_vespa_client.wait_for_application_convergence.assert_called_once()
 
+    @patch('marqo.core.index_management.vespa_application_package.time')
+    def test_update_index_setting_and_schema_sets_updated_at(self, mock_time):
+        """Test that update_index_setting_and_schema sets updated_at to current time."""
+        mock_time.time.return_value = 1700000000.0
+
+        test_index = self.semi_structured_marqo_index(
+            name="test_index",
+            schema_name="test_schema",
+            version=1,
+            updated_at=1000  # old value
+        )
+        test_schema = "schema test_schema { document test_schema {} }"
+
+        prepare_response = {
+            'activate': 'http://activate_url',
+            'configChangeActions': {}
+        }
+        self.mock_vespa_client.prepare.return_value = prepare_response
+
+        self.vespa_app.update_index_setting_and_schema(test_index, test_schema)
+
+        saved_index = self.vespa_app._index_setting_store.save_index_setting.call_args[0][0]
+        self.assertEqual(saved_index.updated_at, 1700000000)
+
 
 if __name__ == '__main__':
     unittest.main()
