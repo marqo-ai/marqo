@@ -1,3 +1,4 @@
+[OBSOLETE. Refer to custom_score_rerank_plan_final.md]
 Stakeholder: @Jesse Clark 
 
 Author: @Joshua Kim 
@@ -551,3 +552,5 @@ Fill in any action items and next steps derived from the review.
 - Deliver: End of next week (feb 13). Develop on 2.24 release branch
 - Refresher
     - Every string field is assumed to be lexically searchable in an index when added
+    - Every lexically searchable field has its own bm25 index in vespa
+    - Every tensor field has its own HNSW graph in vespa
