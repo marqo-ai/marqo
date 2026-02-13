@@ -590,12 +590,12 @@ class StructuredVespaIndex(VespaIndex):
                 custom_score_rerank.get(add_key, {}).keys()
             )
 
+        # rank() only when BM25 rerankers are present; never add nearestNeighbor ranking terms
         if (
             custom_score_keys
             and marqo_query.hybrid_parameters.rankingMethod == RankingMethod.RRF
         ):
             bm25_fields = self._get_fields_to_bm25_rerank_by(custom_score_keys)
-            closeness_fields = self._get_fields_to_closeness_rerank_by(custom_score_keys)
             extra_terms: List[str] = []
             if bm25_fields:
                 bm25_term = self._get_lexical_search_term(
@@ -605,14 +605,6 @@ class StructuredVespaIndex(VespaIndex):
                 )
                 if bm25_term != "":
                     extra_terms.append(bm25_term)
-            if closeness_fields:
-                extra_terms.extend(
-                    self._get_individual_field_tensor_search_terms(
-                        marqo_query,
-                        searchable_attributes=closeness_fields,
-                        _is_ranking_term=True,
-                    )
-                )
             extra_terms = [t for t in extra_terms if t != ""]
             if extra_terms:
                 lexical_term = f'rank({lexical_term}, {", ".join(extra_terms)})'
@@ -664,6 +656,15 @@ class StructuredVespaIndex(VespaIndex):
 
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
+
+        # Tell the custom searcher to fill summaryfeatures and use them for reranking
+        if custom_score_keys:
+            has_bm25 = bool(self._get_fields_to_bm25_rerank_by(custom_score_keys))
+            has_closeness = bool(self._get_fields_to_closeness_rerank_by(custom_score_keys))
+            if has_closeness:
+                query["marqo__hasRankingVector"] = True
+            if has_bm25:
+                query["marqo__hasRankingLexical"] = True
 
         return query
 

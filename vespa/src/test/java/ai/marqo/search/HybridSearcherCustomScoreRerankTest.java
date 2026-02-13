@@ -166,51 +166,62 @@ class HybridSearcherCustomScoreRerankTest {
     @Nested
     class ExtractCustomScoreForHitTest {
 
+        /** Custom score reranking uses only summary-features; pass summaryFeatures with bm25(marqo__lexical_<field>). */
         @Test
         void extracts_bm25_single_field() {
-            FeatureData mf = mock(FeatureData.class);
-            when(mf.getDouble("bm25(marqo__lexical_title)")).thenReturn(2.5);
-            Set<String> keys = Set.of("bm25(marqo__lexical_title)");
+            FeatureData summaryFeatures = mock(FeatureData.class);
+            when(summaryFeatures.getDouble("bm25(marqo__lexical_title)")).thenReturn(2.5);
+            Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
                     HybridSearcher.parseCustomScoreKey("bm25_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
-                                    mf, "bm25_field_title", parsed, keys))
+                                    null, "bm25_field_title", parsed, keys, summaryFeatures))
                     .isEqualTo(2.5);
         }
 
+        /** Custom score uses only summary-features; pass summaryFeatures with ranking_closeness_metric_<field>. */
         @Test
         void extracts_closeness_single_field() {
-            FeatureData mf = mock(FeatureData.class);
-            when(mf.getDouble("closeness(field,marqo__embeddings_title)")).thenReturn(0.9);
-            Set<String> keys = Set.of("closeness(field,marqo__embeddings_title)");
+            FeatureData summaryFeatures = mock(FeatureData.class);
+            when(summaryFeatures.getDouble("ranking_closeness_metric_title")).thenReturn(0.9);
+            Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
                     HybridSearcher.parseCustomScoreKey("closeness_retrieval_vector_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
-                                    mf, "closeness_retrieval_vector_field_title", parsed, keys))
+                                    null,
+                                    "closeness_retrieval_vector_field_title",
+                                    parsed,
+                                    keys,
+                                    summaryFeatures))
                     .isEqualTo(0.9);
         }
 
+        /** BM25 aggregate: sum over all bm25(marqo__lexical_*) in summary-features. */
         @Test
         void aggregates_bm25_sum() {
-            FeatureData mf = mock(FeatureData.class);
-            when(mf.getDouble("bm25(marqo__lexical_a)")).thenReturn(1.0);
-            when(mf.getDouble("bm25(marqo__lexical_b)")).thenReturn(2.0);
-            Set<String> keys = Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)");
+            FeatureData summaryFeatures = mock(FeatureData.class);
+            when(summaryFeatures.getDouble("bm25(marqo__lexical_a)")).thenReturn(1.0);
+            when(summaryFeatures.getDouble("bm25(marqo__lexical_b)")).thenReturn(2.0);
+            when(summaryFeatures.featureNames())
+                    .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
+            Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
                     HybridSearcher.parseCustomScoreKey("bm25_sum");
-            assertThat(HybridSearcher.extractCustomScoreForHit(mf, "bm25_sum", parsed, keys))
+            assertThat(
+                            HybridSearcher.extractCustomScoreForHit(
+                                    null, "bm25_sum", parsed, keys, summaryFeatures))
                     .isEqualTo(3.0);
         }
 
         @Test
-        void returns_null_for_null_match_features() {
+        void returns_null_when_summary_features_null() {
             HybridSearcher.CustomScoreKeyParsed parsed =
                     HybridSearcher.parseCustomScoreKey("bm25_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
-                                    null, "bm25_field_title", parsed, Set.of()))
+                                    null, "bm25_field_title", parsed, Set.of(), null))
                     .isNull();
         }
     }

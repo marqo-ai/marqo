@@ -105,6 +105,10 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+
+            # Custom Score Global Reranking
+            query(marqo__custom_score_mult_weights_global) tensor<double>(p{})
+            query(marqo__custom_score_add_weights_global) tensor<double>(p{})
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============

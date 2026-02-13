@@ -44,6 +44,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModelV2):
     raw_tensor_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE)
     raw_lexical_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE)
     recency_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_RECENCY_SCORE)
+    pre_rerank_score: Optional[float] = Field(default=None, alias=common.VESPA_DOC_PRE_RERANK_SCORE)
 
     @field_validator('int_fields', 'float_fields')
     def check_numeric_fields(cls, v):
@@ -405,6 +406,10 @@ class SemiStructuredVespaDocument(MarqoBaseModelV2):
         # Recency score from Vespa field (set by Java HybridSearcher)
         if self.fixed_fields.recency_score is not None:
             marqo_document[index_constants.MARQO_DOC_RECENCY_SCORE] = self.fixed_fields.recency_score
+
+        # Pre-rerank score (RRF score before custom/global modifiers; set by Java when custom score reranking is used)
+        if self.fixed_fields.pre_rerank_score is not None:
+            marqo_document[index_constants.MARQO_DOC_PRE_RERANK_SCORE] = self.fixed_fields.pre_rerank_score
 
         return marqo_document
 

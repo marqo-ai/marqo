@@ -367,16 +367,33 @@ schema {{ index.schema_name }} {
             sort_field_value_2
             recency_score
 
-            # For custom score reranking
-            {%- for tensor_field in index.tensor_fields %}
-            closeness(field, {{ tensor_field.embeddings_field_name }})
-            {%- endfor %}
-            {%- for lexical_field in index.lexical_fields %}
-            bm25({{ lexical_field.lexical_field_name }})
-            {%- endfor %}
-
             {% if collapse_field %}collapse_field_hash{% endif %}
         }
+
+        {# Per-field ranking score (similarity to marqo__query_embedding), normalized to [0,1] where 1=closest. Named by field so searcher can look up ranking_closeness_metric_<field_name>. Geodegrees not supported. #}
+        {% if index.tensor_fields and index.distance_metric.value != 'geodegrees' -%}
+        {% for field in index.tensor_fields %}
+        function ranking_closeness_metric_{{ field.name }}() {
+            {%- if index.distance_metric.value in ['angular', 'prenormalized-angular'] %}
+            expression: (1.0 + cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)) / 2.0
+            {%- elif index.distance_metric.value == 'euclidean' %}
+            expression: 1.0 / (1.0 + euclidean_distance(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x))
+            {%- elif index.distance_metric.value == 'dotproduct' %}
+            expression: reduce(attribute({{ field.embeddings_field_name }}) * query(marqo__query_embedding), sum, x)
+            {%- elif index.distance_metric.value == 'hamming' %}
+            expression: 1.0 - (hamming(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding)) / (8.0 * {{ dimension }}))
+            {%- endif %}
+        }
+        {% endfor %}
+        summary-features {
+        {% for field in index.tensor_fields %}
+            ranking_closeness_metric_{{ field.name }}
+        {% endfor %}
+        {% for lexical_field in index.lexical_fields %}
+            bm25({{ lexical_field.lexical_field_name }})
+        {% endfor %}
+        }
+        {% endif -%}
     }
 
     {% if index.lexical_fields -%}
@@ -564,6 +581,11 @@ schema {{ index.schema_name }} {
         summary {{ field.chunk_field_name }} type array<string> {}
         summary {{ field.embeddings_field_name }} type tensor<float>(p{}, x[{{ dimension }}]) {}
         {%- endfor %}
+    }
+
+    {# Minimal summary used when filling to compute ranking_score_fieldN and bm25 for custom score rerank #}
+    document-summary summaryfeatures {
+        summary marqo__id type string {}
     }
 
     {% if collapse_field -%}

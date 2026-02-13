@@ -75,6 +75,9 @@ public class HybridSearcher extends Searcher {
 
     private static final String MARQO_METADATA_FIELDS = "marqo__fields";
 
+    /** Hit field for the score before applying custom/global modifiers (RRF score). Exposed as _pre_rerank_score in API. */
+    private static final String MARQO_PRE_RERANK_SCORE = "marqo__pre_rerank_score";
+
     @VisibleForTesting
     @JsonInclude(Include.NON_NULL)
     record MarqoMetadataFields(
@@ -330,6 +333,15 @@ public class HybridSearcher extends Searcher {
         } else {
             throw new RuntimeException(
                     "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
+        }
+
+        // Fill summary-features before reranking when custom score uses ranking vector or BM25
+        boolean hasRankingVector = query.properties().getBoolean("marqo__hasRankingVector", false);
+        boolean hasRankingLexical =
+                query.properties().getBoolean("marqo__hasRankingLexical", false);
+        if (hasRankingVector || hasRankingLexical) {
+            Result resultToFill = new Result(query, hitsForPostProcessing);
+            execution.fill(resultToFill, "summaryfeatures");
         }
 
         // Determine post-processing mode based on query parameters
@@ -1591,9 +1603,8 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Extracts the custom score value for one key from a hit's match features. For single-field
-     * keys returns the corresponding bm25 or closeness value; for aggregate keys returns sum/max/avg
-     * of all matching features. Returns null if the score cannot be determined.
+     * Extracts the custom score value for one key from a hit. Used by tests; in production
+     * custom score reranking uses only summary-features, so summaryFeatures must be provided.
      */
     @VisibleForTesting
     static Double extractCustomScoreForHit(
@@ -1601,54 +1612,161 @@ public class HybridSearcher extends Searcher {
             String key,
             CustomScoreKeyParsed parsed,
             Set<String> matchFeatureKeys) {
-        if (matchFeatures == null || parsed == null) {
+        return extractCustomScoreForHit(matchFeatures, key, parsed, matchFeatureKeys, null);
+    }
+
+    /**
+     * Extracts the custom score value for one key. Custom score reranking uses only
+     * summary-features (no fallback to match-features). For closeness_retrieval_vector the
+     * summary feature name is ranking_closeness_metric_&lt;field_name&gt;. For bm25 we use
+     * bm25(marqo__lexical_&lt;field&gt;) per lexical field; aggregate = sum/max/avg over those.
+     */
+    @VisibleForTesting
+    static Double extractCustomScoreForHit(
+            FeatureData matchFeatures,
+            String key,
+            CustomScoreKeyParsed parsed,
+            Set<String> matchFeatureKeys,
+            FeatureData summaryFeatures) {
+        return extractCustomScoreForHit(
+                matchFeatures, key, parsed, matchFeatureKeys, summaryFeatures, null, null);
+    }
+
+    /**
+     * Same as 5-arg but with optional logger and keyForLog for 4.5 logging (aggregation and read).
+     */
+    static Double extractCustomScoreForHit(
+            FeatureData matchFeatures,
+            String key,
+            CustomScoreKeyParsed parsed,
+            Set<String> matchFeatureKeys,
+            FeatureData summaryFeatures,
+            Logger logger,
+            String keyForLog) {
+        if (parsed == null) {
             return null;
         }
         if ("bm25".equals(parsed.scoreType)) {
+            if (summaryFeatures == null) return null;
             if (parsed.aggregateType != null) {
-                return aggregateBm25FromMatchFeatures(
-                        matchFeatures, parsed.aggregateType, matchFeatureKeys);
+                return aggregateBm25FromSummaryFeatures(
+                        summaryFeatures, parsed.aggregateType, logger, keyForLog);
             }
-            String featName = findBm25MatchFeatureName(matchFeatureKeys, parsed.fieldName);
-            return featName != null ? matchFeatures.getDouble(featName) : null;
+            String featNameBm25 = bm25SummaryFeatureName(parsed.fieldName);
+            Double scoreBm25 =
+                    featNameBm25 != null ? getFeatureDouble(summaryFeatures, featNameBm25) : null;
+            if (logger != null && keyForLog != null && scoreBm25 != null) {
+                logger.info(
+                        "[CustomScoreRerank] read from summary-features key="
+                                + keyForLog
+                                + " featureName="
+                                + featNameBm25
+                                + " value="
+                                + scoreBm25);
+            }
+            return scoreBm25;
         }
         if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
+            if (summaryFeatures == null) return null;
             if (parsed.aggregateType != null) {
-                return aggregateClosenessFromMatchFeatures(
-                        matchFeatures, parsed.aggregateType, matchFeatureKeys);
+                return aggregateClosenessFromSummaryFeatures(
+                        summaryFeatures, parsed.aggregateType, logger, keyForLog);
             }
-            String featName = findClosenessMatchFeatureName(matchFeatureKeys, parsed.fieldName);
-            return featName != null ? matchFeatures.getDouble(featName) : null;
+            String featNameCloseness = "ranking_closeness_metric_" + parsed.fieldName;
+            Double scoreCloseness = getFeatureDouble(summaryFeatures, featNameCloseness);
+            if (logger != null && keyForLog != null && scoreCloseness != null) {
+                logger.info(
+                        "[CustomScoreRerank] read from summary-features key="
+                                + keyForLog
+                                + " featureName="
+                                + featNameCloseness
+                                + " value="
+                                + scoreCloseness);
+            }
+            return scoreCloseness;
         }
         return null;
     }
 
-    private static Double aggregateBm25FromMatchFeatures(
-            FeatureData matchFeatures, String aggregateType, Set<String> matchFeatureKeys) {
-        List<Double> values = new ArrayList<>();
-        for (String k : matchFeatureKeys) {
-            if (k.startsWith("bm25(") && k.endsWith(")")) {
-                Double v = matchFeatures.getDouble(k);
-                if (v != null && !Double.isNaN(v)) {
-                    values.add(v);
-                }
-            }
+    /** Summary feature name for single-field BM25: bm25(marqo__lexical_&lt;fieldName&gt;). One per lexical field; no bm25(marqo__ranking_strings). */
+    private static String bm25SummaryFeatureName(String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return null;
         }
-        return aggregateValues(values, aggregateType);
+        return "bm25(marqo__lexical_" + fieldName + ")";
     }
 
-    private static Double aggregateClosenessFromMatchFeatures(
-            FeatureData matchFeatures, String aggregateType, Set<String> matchFeatureKeys) {
+    /**
+     * Gets a double from FeatureData; rank features may be scalar or tensor (e.g. tensor(float)(p{})).
+     * For tensors, returns the sum of all cells (single cell = that value).
+     */
+    private static Double getFeatureDouble(FeatureData data, String name) {
+        if (data == null || name == null) return null;
+        try {
+            return data.getDouble(name);
+        } catch (IllegalStateException e) {
+            Tensor t = data.getTensor(name);
+            if (t == null) return null;
+            double sum = 0;
+            for (Iterator<Cell> it = t.cellIterator(); it.hasNext(); ) {
+                sum += it.next().getValue();
+            }
+            return Double.isFinite(sum) ? sum : null;
+        }
+    }
+
+    private static Double aggregateClosenessFromSummaryFeatures(
+            FeatureData summaryFeatures, String aggregateType, Logger logger, String keyForLog) {
         List<Double> values = new ArrayList<>();
-        for (String k : matchFeatureKeys) {
-            if (k.startsWith("closeness(field,") && k.endsWith(")")) {
-                Double v = matchFeatures.getDouble(k);
+        String prefix = "ranking_closeness_metric_";
+        for (String name : summaryFeatures.featureNames()) {
+            if (name.startsWith(prefix)) {
+                Double v = getFeatureDouble(summaryFeatures, name);
                 if (v != null && !Double.isNaN(v)) {
                     values.add(v);
                 }
             }
         }
-        return aggregateValues(values, aggregateType);
+        Double result = aggregateValues(values, aggregateType);
+        if (logger != null && keyForLog != null && result != null) {
+            logger.info(
+                    "[CustomScoreRerank] aggregation key="
+                            + keyForLog
+                            + " aggregateType="
+                            + aggregateType
+                            + " closenessValues="
+                            + values
+                            + " result="
+                            + result);
+        }
+        return result;
+    }
+
+    /** Aggregate BM25 from per-lexical-field summary features bm25(marqo__lexical_*). No bm25(marqo__ranking_strings). */
+    private static Double aggregateBm25FromSummaryFeatures(
+            FeatureData summaryFeatures, String aggregateType, Logger logger, String keyForLog) {
+        List<Double> values = new ArrayList<>();
+        for (String name : summaryFeatures.featureNames()) {
+            if (name.startsWith("bm25(") && name.endsWith(")")) {
+                Double d = getFeatureDouble(summaryFeatures, name);
+                if (d != null && !Double.isNaN(d)) {
+                    values.add(d);
+                }
+            }
+        }
+        Double result = aggregateValues(values, aggregateType);
+        if (logger != null && keyForLog != null && result != null) {
+            logger.info(
+                    "[CustomScoreRerank] aggregation key="
+                            + keyForLog
+                            + " aggregateType="
+                            + aggregateType
+                            + " bm25Values="
+                            + values
+                            + " result="
+                            + result);
+        }
+        return result;
     }
 
     private static Double aggregateValues(List<Double> values, String aggregateType) {
@@ -1680,16 +1798,28 @@ public class HybridSearcher extends Searcher {
     /**
      * Returns weight * normalizedScore for one custom-score cell, or null if the score is missing
      * or the key is invalid. BM25 scores are min-max normalized when min/max are available.
+     * Custom score values are read only from summaryFeatures.
+     * When logger is non-null, logs read (in extractCustomScoreForHit) and apply modifier here.
      */
     private Double getWeightedNormalizedScoreForCell(
             Cell cell,
             FeatureData hitMatchFeatures,
             Set<String> matchFeatureKeys,
-            Map<String, double[]> bm25MinMaxPerKey) {
+            Map<String, double[]> bm25MinMaxPerKey,
+            FeatureData summaryFeatures,
+            Logger logger) {
         String key = cell.getKey().label(0);
         CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
         if (parsed == null) return null;
-        Double score = extractCustomScoreForHit(hitMatchFeatures, key, parsed, matchFeatureKeys);
+        Double score =
+                extractCustomScoreForHit(
+                        hitMatchFeatures,
+                        key,
+                        parsed,
+                        matchFeatureKeys,
+                        summaryFeatures,
+                        logger,
+                        key);
         if (score == null || Double.isNaN(score)) return null;
         double weight = cell.getValue().doubleValue();
         double normalizedScore = score;
@@ -1699,13 +1829,28 @@ public class HybridSearcher extends Searcher {
                 normalizedScore = minMaxNormalize(score, minMax[0], minMax[1]);
             }
         }
-        return weight * normalizedScore;
+        double modifierValue = weight * normalizedScore;
+        if (logger != null) {
+            logger.info(
+                    "[CustomScoreRerank] apply modifier key="
+                            + key
+                            + " weight="
+                            + weight
+                            + " scoreValue="
+                            + score
+                            + " normalizedScore="
+                            + normalizedScore
+                            + " modifierValue="
+                            + modifierValue);
+        }
+        return modifierValue;
     }
 
     /**
      * Applies custom score rerank weights to add and mult modifiers: for each key in add weights,
      * adds (weight * score) to addModifier; for each key in mult weights, multiplies multModifier
      * by (weight * normalizedScore). BM25 scores are normalized with the provided min/max map.
+     * For closeness_retrieval_vector, uses summaryFeatures when provided.
      */
     private void applyCustomScoreContributions(
             Double addModifier,
@@ -1717,7 +1862,8 @@ public class HybridSearcher extends Searcher {
             Map<String, double[]> bm25MinMaxPerKey,
             double[] outAdd,
             double[] outMult,
-            boolean verbose) {
+            boolean verbose,
+            FeatureData summaryFeatures) {
         double add = addModifier != null ? addModifier : 0.0;
         double mult = multModifier != null ? multModifier : 1.0;
 
@@ -1725,7 +1871,12 @@ public class HybridSearcher extends Searcher {
             for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
                 Double contrib =
                         getWeightedNormalizedScoreForCell(
-                                it.next(), hitMatchFeatures, matchFeatureKeys, bm25MinMaxPerKey);
+                                it.next(),
+                                hitMatchFeatures,
+                                matchFeatureKeys,
+                                bm25MinMaxPerKey,
+                                summaryFeatures,
+                                logger);
                 if (contrib != null) add += contrib;
             }
         }
@@ -1734,7 +1885,12 @@ public class HybridSearcher extends Searcher {
             for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
                 Double contrib =
                         getWeightedNormalizedScoreForCell(
-                                it.next(), hitMatchFeatures, matchFeatureKeys, bm25MinMaxPerKey);
+                                it.next(),
+                                hitMatchFeatures,
+                                matchFeatureKeys,
+                                bm25MinMaxPerKey,
+                                summaryFeatures,
+                                logger);
                 if (contrib != null) mult *= contrib;
             }
         }
@@ -1779,11 +1935,11 @@ public class HybridSearcher extends Searcher {
             double min = Double.POSITIVE_INFINITY;
             double max = Double.NEGATIVE_INFINITY;
             for (Hit hit : hits) {
-                FeatureData mf = (FeatureData) hit.getField("matchfeatures");
-                if (mf == null) continue;
-                Set<String> keys = getMatchFeatureKeys(mf);
-                if (keys.isEmpty()) keys = allMatchFeatureKeys;
-                Double v = extractCustomScoreForHit(mf, key, parsed, keys);
+                FeatureData summaryFeatures = (FeatureData) hit.getField("summaryfeatures");
+                if (summaryFeatures == null) continue;
+                Double v =
+                        extractCustomScoreForHit(
+                                null, key, parsed, Collections.emptySet(), summaryFeatures);
                 if (v != null && !Double.isNaN(v)) {
                     min = Math.min(min, v);
                     max = Math.max(max, v);
@@ -1827,6 +1983,48 @@ public class HybridSearcher extends Searcher {
                         + (customMultWeights == null ? "null" : "size=" + customMultWeights.size())
                         + " hasCustomScores="
                         + hasCustomScores);
+        if (hasCustomScores && customAddWeights != null && !customAddWeights.isEmpty()) {
+            for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
+                Cell cell = it.next();
+                String key = cell.getKey().label(0);
+                double weight = cell.getValue().doubleValue();
+                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+                if (parsed != null) {
+                    logger.info(
+                            "[CustomScoreRerank] unpack add_to_score key="
+                                    + key
+                                    + " scoreType="
+                                    + parsed.scoreType
+                                    + " field="
+                                    + (parsed.fieldName != null ? parsed.fieldName : "n/a")
+                                    + " aggregateType="
+                                    + (parsed.aggregateType != null ? parsed.aggregateType : "n/a")
+                                    + " weight="
+                                    + weight);
+                }
+            }
+        }
+        if (hasCustomScores && customMultWeights != null && !customMultWeights.isEmpty()) {
+            for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
+                Cell cell = it.next();
+                String key = cell.getKey().label(0);
+                double weight = cell.getValue().doubleValue();
+                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+                if (parsed != null) {
+                    logger.info(
+                            "[CustomScoreRerank] unpack multiply_score_by key="
+                                    + key
+                                    + " scoreType="
+                                    + parsed.scoreType
+                                    + " field="
+                                    + (parsed.fieldName != null ? parsed.fieldName : "n/a")
+                                    + " aggregateType="
+                                    + (parsed.aggregateType != null ? parsed.aggregateType : "n/a")
+                                    + " weight="
+                                    + weight);
+                }
+            }
+        }
 
         Set<String> allMatchFeatureKeys = new HashSet<>();
         Map<String, double[]> bm25MinMaxPerKey = new HashMap<>();
@@ -1872,6 +2070,7 @@ public class HybridSearcher extends Searcher {
                         if (hitMatchFeatureKeys.isEmpty()) {
                             hitMatchFeatureKeys = allMatchFeatureKeys;
                         }
+                        FeatureData summaryFeatures = (FeatureData) hit.getField("summaryfeatures");
                         double[] outAdd = new double[1];
                         double[] outMult = new double[1];
                         applyCustomScoreContributions(
@@ -1884,7 +2083,8 @@ public class HybridSearcher extends Searcher {
                                 bm25MinMaxPerKey,
                                 outAdd,
                                 outMult,
-                                verbose);
+                                verbose,
+                                summaryFeatures);
                         effectiveAdd = outAdd[0];
                         effectiveMult = outMult[0];
                         if (hitIndex == 0) {
@@ -1900,6 +2100,9 @@ public class HybridSearcher extends Searcher {
                     }
 
                     original_score = hit.getRelevance().getScore();
+                    if (hasCustomScores) {
+                        hit.setField(MARQO_PRE_RERANK_SCORE, original_score);
+                    }
                     double baseScore = original_score * effectiveMult + effectiveAdd;
 
                     if (!applyRecency) {
