@@ -277,6 +277,81 @@ class TestOpenCLIPModel(unittest.TestCase):
         # Verify tokenizer loading with architecture
         mock_open_clip.get_tokenizer.assert_called_once_with("ViT-B-32")
 
+    @patch(
+        "inference_orchestrator.services.triton_inference.embedding_models.open_clip.open_clip_model.open_clip"
+    )
+    def test_load_uses_effective_name_from_triton_model_name(self, mock_open_clip):
+        """Test that loading uses tritonModelName (via effective_name) when set.
+
+        During migration, the Vespa-stored properties keep the old 'name' for cache key stability
+        and add 'tritonModelName' with the new value for the inference orchestrator.
+        """
+        mock_model = MagicMock()
+        mock_preprocess = MagicMock()
+        mock_tokenizer = MagicMock()
+        mock_open_clip.create_model_and_transforms.return_value = (
+            mock_model,
+            None,
+            mock_preprocess,
+        )
+        mock_open_clip.get_tokenizer.return_value = mock_tokenizer
+
+        # Properties with old name but new tritonModelName
+        properties_with_triton_name = self.valid_hf_model_properties.copy()
+        properties_with_triton_name["name"] = "ViT-B-16-SigLIP"  # Old name
+        properties_with_triton_name["tritonModelName"] = "hf-hub:timm/ViT-B-16-SigLIP"  # New name
+
+        model = OpenCLIPModel(
+            model_properties=properties_with_triton_name,
+            model_management_client=self.mock_model_management_client,
+            triton_client=self.mock_triton_client,
+        )
+
+        model.load()
+
+        # Verify create_model_and_transforms used the tritonModelName (effective_name)
+        call_kwargs = mock_open_clip.create_model_and_transforms.call_args[1]
+        self.assertEqual("hf-hub:timm/ViT-B-16-SigLIP", call_kwargs["model_name"])
+
+        # Verify tokenizer used the tritonModelName (effective_name)
+        mock_open_clip.get_tokenizer.assert_called_once()
+
+    @patch(
+        "inference_orchestrator.services.triton_inference.embedding_models.open_clip.open_clip_model.open_clip"
+    )
+    def test_load_openclip_registry_uses_effective_name_from_triton_model_name(self, mock_open_clip):
+        """Test that loading from open_clip registry uses tritonModelName when set."""
+        mock_model = MagicMock()
+        mock_preprocess = MagicMock()
+        mock_tokenizer = MagicMock()
+        mock_open_clip.create_model_and_transforms.return_value = (
+            mock_model,
+            None,
+            mock_preprocess,
+        )
+        mock_open_clip.get_tokenizer.return_value = mock_tokenizer
+
+        # Properties with old name but new tritonModelName pointing to open_clip registry
+        properties_with_triton_name = self.valid_openclip_model_properties.copy()
+        properties_with_triton_name["name"] = "old-name"
+        properties_with_triton_name["tritonModelName"] = "open_clip/ViT-L-14/laion2b_s32b_b82k"
+
+        model = OpenCLIPModel(
+            model_properties=properties_with_triton_name,
+            model_management_client=self.mock_model_management_client,
+            triton_client=self.mock_triton_client,
+        )
+
+        model.load()
+
+        # Verify architecture and pretrained were extracted from tritonModelName
+        call_kwargs = mock_open_clip.create_model_and_transforms.call_args[1]
+        self.assertEqual("ViT-L-14", call_kwargs["model_name"])
+        self.assertEqual("laion2b_s32b_b82k", call_kwargs["pretrained"])
+
+        # Verify tokenizer used the architecture from tritonModelName
+        mock_open_clip.get_tokenizer.assert_called_once_with("ViT-L-14")
+
     def test_load_with_invalid_prefix_raises_error(self):
         """Test that loading model with invalid prefix raises error."""
         invalid_properties = self.valid_hf_model_properties.copy()

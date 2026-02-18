@@ -63,6 +63,10 @@ class OpenCLIPModelProperties(BaseModelProperties):
 
     Attributes:
         name: The name of the model. It will be used to load the image preprocessor/tokenizer.
+        triton_model_name: An optional override name used by the inference orchestrator for loading
+            tokenizers/preprocessors. When set, effective_name returns this value instead of name.
+            This supports safe migration where the Vespa-stored 'name' must remain unchanged for
+            old pod cache key stability, while the new orchestrator needs a different name.
         type: The type of the model. It should be 'open_clip'.
         tokenizer: The name of the tokenizer. It is optional.
         image_preprocessor: The image preprocessor used by the model. It should be one of the values in the
@@ -76,6 +80,7 @@ class OpenCLIPModelProperties(BaseModelProperties):
     """
 
     name: str
+    triton_model_name: Optional[str] = Field(default=None, alias="tritonModelName")
     tokenizer: Optional[str] = None
     image_preprocessor: ImagePreprocessor = Field(
         default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor"
@@ -116,6 +121,11 @@ class OpenCLIPModelProperties(BaseModelProperties):
             self.triton_image_encoder_properties.input[0].data_type
         )
         return self
+
+    @property
+    def effective_name(self) -> str:
+        """Return tritonModelName if set, otherwise fall back to name."""
+        return self.triton_model_name if self.triton_model_name is not None else self.name
 
     @property
     def text_input_numpy_type(self) -> dtype:

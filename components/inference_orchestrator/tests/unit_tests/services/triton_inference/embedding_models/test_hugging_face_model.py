@@ -233,6 +233,38 @@ class TestHuggingFaceModel(unittest.TestCase):
         # Verify pooling function is CLS
         self.assertEqual(model._cls_pool_func, model._pooling_func)
 
+    @patch(
+        "inference_orchestrator.services.triton_inference.embedding_models.hugging_face.hugging_face_model.AutoTokenizer"
+    )
+    def test_load_uses_effective_name_from_triton_model_name(self, mock_auto_tokenizer):
+        """Test that loading uses tritonModelName (via effective_name) when set.
+
+        During migration, the Vespa-stored properties keep the old 'name' for cache key stability
+        and add 'tritonModelName' with the new value for the inference orchestrator.
+        """
+        mock_tokenizer = MagicMock()
+        mock_auto_tokenizer.from_pretrained.return_value = mock_tokenizer
+
+        # Properties with old name but new tritonModelName
+        properties_with_triton_name = self.valid_model_properties.copy()
+        properties_with_triton_name["name"] = "old-model-name"
+        properties_with_triton_name["tritonModelName"] = "sentence-transformers/all-MiniLM-L6-v2"
+
+        model = HuggingFaceModel(
+            model_properties=properties_with_triton_name,
+            model_management_client=self.mock_model_management_client,
+            triton_client=self.mock_triton_client,
+        )
+
+        model.load()
+
+        # Verify AutoTokenizer.from_pretrained used the tritonModelName (effective_name)
+        call_args = mock_auto_tokenizer.from_pretrained.call_args[0]
+        self.assertEqual("sentence-transformers/all-MiniLM-L6-v2", call_args[0])
+
+        # Verify the original name is preserved
+        self.assertEqual("old-model-name", model.model_properties.name)
+
     def test_check_loaded_components_raises_error_if_tokenizer_not_loaded(self):
         """Test that _check_loaded_components raises error if tokenizer is None."""
         model = HuggingFaceModel(

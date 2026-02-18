@@ -55,6 +55,10 @@ class HuggingFaceModelProperties(BaseModelProperties):
         name: The name of the model. This will be used as the repo_id in the Hugging Face model hub.
             This attribute is neglected if 'url' or 'model_location' is provided.
             We are not raising an error right now as that would be a breaking change.
+        triton_model_name: An optional override name used by the inference orchestrator for loading
+            tokenizers. When set, effective_name returns this value instead of name.
+            This supports safe migration where the Vespa-stored 'name' must remain unchanged for
+            old pod cache key stability, while the new orchestrator needs a different name.
         tokens: The token length of the model. It is default to 128.
         type: The type of the model. It should be "hf".
         note: A note about the model. It is optional.
@@ -62,6 +66,12 @@ class HuggingFaceModelProperties(BaseModelProperties):
     """
 
     name: str
+    triton_model_name: Optional[str] = Field(default=None, alias="tritonModelName")
+
+    @property
+    def effective_name(self) -> str:
+        """Return tritonModelName if set, otherwise fall back to name."""
+        return self.triton_model_name if self.triton_model_name is not None else self.name
     tokens: int = 128
     note: Optional[str] = None
     pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
