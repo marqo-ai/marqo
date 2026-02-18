@@ -352,6 +352,58 @@ class TestOpenCLIPModel(unittest.TestCase):
         # Verify tokenizer used the architecture from tritonModelName
         mock_open_clip.get_tokenizer.assert_called_once_with("ViT-L-14")
 
+    @patch(
+        "inference_orchestrator.services.triton_inference.embedding_models.open_clip.open_clip_model.open_clip"
+    )
+    def test_load_tokenizer_from_checkpoint_uses_effective_name(self, mock_open_clip):
+        """Test that _load_tokenizer_from_checkpoint uses effective_name for tokenizer loading.
+
+        Tests both HF hub prefix and non-HF prefix paths, with and without tritonModelName.
+        """
+        mock_tokenizer = MagicMock()
+        mock_open_clip.get_tokenizer.return_value = mock_tokenizer
+
+        test_cases = [
+            (
+                "hf-hub name without tritonModelName",
+                {"name": "hf-hub:org/model"},
+                "hf-hub:org/model",
+            ),
+            (
+                "hf-hub name via tritonModelName",
+                {"name": "old-name", "tritonModelName": "hf-hub:org/new-model"},
+                "hf-hub:org/new-model",
+            ),
+            (
+                "non-hf name without tritonModelName",
+                {"name": "ViT-B/32"},
+                "ViT-B-32",  # '/' replaced with '-'
+            ),
+            (
+                "non-hf name via tritonModelName",
+                {"name": "old-name", "tritonModelName": "ViT-L/14"},
+                "ViT-L-14",  # '/' replaced with '-'
+            ),
+        ]
+
+        for test_name, name_overrides, expected_tokenizer_arg in test_cases:
+            with self.subTest(msg=test_name):
+                mock_open_clip.get_tokenizer.reset_mock()
+
+                props = self.valid_hf_model_properties.copy()
+                props.update(name_overrides)
+
+                model = OpenCLIPModel(
+                    model_properties=props,
+                    model_management_client=self.mock_model_management_client,
+                    triton_client=self.mock_triton_client,
+                )
+
+                result = model._load_tokenizer_from_checkpoint()
+
+                mock_open_clip.get_tokenizer.assert_called_once_with(expected_tokenizer_arg)
+                self.assertIs(mock_tokenizer, result)
+
     def test_load_with_invalid_prefix_raises_error(self):
         """Test that loading model with invalid prefix raises error."""
         invalid_properties = self.valid_hf_model_properties.copy()
