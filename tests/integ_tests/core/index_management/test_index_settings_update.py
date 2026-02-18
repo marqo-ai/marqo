@@ -6,7 +6,6 @@ from marqo import version
 from marqo.core.exceptions import IndexNotFoundError, InvalidModelPropertiesError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import Model
-from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
@@ -29,25 +28,14 @@ class TestIndexSettingsUpdate(MarqoTestCase):
         # Bootstrap vespa to ensure it's ready
         self.index_management.bootstrap_vespa()
 
-    def _create_semi_structured_index(self, index_name: str, model: Model) -> None:
-        """Helper to create a semi-structured index."""
-        request = UnstructuredMarqoIndexRequest(
-            name=index_name,
-            model=model,
-            treat_urls_and_pointers_as_images=False,
-            treat_urls_and_pointers_as_media=False,
-            filter_string_max_length=100,
-        )
-        self.index_management.create_index(request)
-
     def test_update_model_properties_e2e(self):
         """Test updating model properties on an existing index end-to-end."""
         index_name = f"test_update_props_{int(time.time())}"
 
         try:
             # Create index with a custom model
-            self._create_semi_structured_index(
-                index_name,
+            request = self.unstructured_marqo_index_request(
+                name=index_name,
                 model=Model(
                     name='my-custom-model',
                     properties={
@@ -59,6 +47,7 @@ class TestIndexSettingsUpdate(MarqoTestCase):
                     custom=True
                 )
             )
+            self.index_management.create_index(request)
 
             # Verify index exists
             index = self.index_management.get_index(index_name)
@@ -100,18 +89,20 @@ class TestIndexSettingsUpdate(MarqoTestCase):
         index_name = f"test_dim_change_{int(time.time())}"
 
         try:
-            self._create_semi_structured_index(
-                index_name,
+            request = self.unstructured_marqo_index_request(
+                name=index_name,
                 model=Model(
                     name='my-custom-model',
                     properties={
                         "dimensions": 384,
                         "type": "open_clip",
+                        "name": "ViT-B-16",
                         "url": "https://example.com/model.pt",
                     },
                     custom=True
                 )
             )
+            self.index_management.create_index(request)
 
             with self.assertRaises(InvalidModelPropertiesError):
                 self.index_management.update_index_settings_by_settings_dict(
@@ -119,6 +110,7 @@ class TestIndexSettingsUpdate(MarqoTestCase):
                     {"modelProperties": {
                         "dimensions": 768,  # Changed!
                         "type": "open_clip",
+                        "name": "ViT-B-16",
                         "url": "https://example.com/model.pt",
                     }}
                 )
