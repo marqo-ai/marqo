@@ -425,6 +425,25 @@ def apply_latest_schema_template(index_name: str, force: bool = False, dry_run: 
     return JSONResponse(content=result, status_code=200)
 
 
+@app.patch("/indexes/{index_name}/index-settings")
+@utils.enable_ops_api()
+def update_index_settings(index_name: str, settings_dict: dict,
+                          marqo_config: config.Config = Depends(get_config)):
+    """
+    Update index settings for an existing index. Currently only supports updating modelProperties.
+    This is an internal/ops API gated by MARQO_ENABLE_OPS_API=true.
+    """
+    from marqo.api.models.update_index_settings import UpdateIndexSettingsBodyParams
+    body = parse_request_object(UpdateIndexSettingsBodyParams, settings_dict)
+    marqo_config.index_management.update_index_settings_by_settings_dict(
+        index_name, body.dict(by_alias=True)
+    )
+    return JSONResponse(
+        content={"message": "Index settings update is successful."},
+        status_code=200
+    )
+
+
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """

@@ -78,6 +78,10 @@ class UnsupportedFeatureError(InvalidArgumentError):
     pass
 
 
+class InvalidModelPropertiesError(InvalidArgumentError):
+    pass
+
+
 class ZeroMagnitudeVectorError(InvalidArgumentError):
     pass
 

@@ -10,7 +10,7 @@ import marqo.vespa.vespa_client
 from marqo import version, marqo_docs
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
+from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, InvalidModelPropertiesError
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError, UnsupportedFeatureError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
@@ -33,6 +33,7 @@ class IndexManagement:
     _MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION = semver.VersionInfo.parse('8.396.18')
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
+    _ALLOWED_MODIFIED_SETTINGS = {"modelProperties"}
 
     def __init__(self,
                  vespa_client: VespaClient,
@@ -409,6 +410,85 @@ class IndexManagement:
                 result["reason"] = "Schema updated successfully"
 
             return result
+
+    def update_index_settings_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
+        """
+        Update index settings for an existing index. Currently only supports updating modelProperties.
+
+        Args:
+            index_name: Name of the index to update
+            settings_dict: Dictionary of settings to update. Only 'modelProperties' is allowed.
+
+        Raises:
+            IndexNotFoundError: If the index does not exist
+            InternalError: If settings_dict contains disallowed keys
+            InvalidModelPropertiesError: If updated model properties are invalid
+        """
+        # Validate that only allowed keys are being modified
+        disallowed_keys = set(settings_dict.keys()) - self._ALLOWED_MODIFIED_SETTINGS
+        if disallowed_keys:
+            raise InternalError(
+                f"The following settings cannot be modified: {disallowed_keys}. "
+                f"Only {self._ALLOWED_MODIFIED_SETTINGS} can be modified."
+            )
+
+        with self._vespa_deployment_lock():
+            index = self.get_index(index_name)
+
+            if "modelProperties" in settings_dict:
+                updated_model_properties = settings_dict["modelProperties"]
+                current_properties = index.model.get_properties()
+                self.validate_updated_model_properties(current_properties, updated_model_properties)
+                updated_index = self._updated_index_with_model_properties(index, updated_model_properties)
+                self._get_vespa_application().update_index_setting(updated_index)
+
+    @staticmethod
+    def validate_updated_model_properties(current: dict, updated: dict) -> None:
+        """
+        Validate that the updated model properties are compatible with the current ones.
+        Ensures dimensions and type are unchanged, and no keys are removed.
+
+        Args:
+            current: Current model properties
+            updated: Updated model properties
+
+        Raises:
+            InvalidModelPropertiesError: If validation fails
+        """
+        if current.get("dimensions") != updated.get("dimensions"):
+            raise InvalidModelPropertiesError(
+                f"Cannot change model dimensions. "
+                f"Current: {current.get('dimensions')}, Updated: {updated.get('dimensions')}"
+            )
+
+        if current.get("type") != updated.get("type"):
+            raise InvalidModelPropertiesError(
+                f"Cannot change model type. "
+                f"Current: {current.get('type')}, Updated: {updated.get('type')}"
+            )
+
+        removed_keys = set(current.keys()) - set(updated.keys())
+        if removed_keys:
+            raise InvalidModelPropertiesError(
+                f"Cannot remove keys from model properties: {removed_keys}"
+            )
+
+    def _updated_index_with_model_properties(self, index: MarqoIndex, model_properties: dict) -> MarqoIndex:
+        """
+        Create a copy of the index with updated model properties and custom=True.
+
+        Args:
+            index: The existing index
+            model_properties: New model properties
+
+        Returns:
+            Updated MarqoIndex copy
+        """
+        updated_model = index.model.copy(update={
+            'properties': model_properties,
+            'custom': True
+        })
+        return index.copy(update={'model': updated_model})
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
