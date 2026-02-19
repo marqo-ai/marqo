@@ -5,7 +5,12 @@ import unittest
 from marqo import version
 from marqo.core.exceptions import IndexNotFoundError, InvalidModelPropertiesError
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import Model
+from marqo.inference.native_inference.load_model import (
+    get_available_models, _create_model_cache_key
+)
+from marqo.tensor_search import tensor_search
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
@@ -246,6 +251,124 @@ class TestIndexSettingsUpdate(MarqoTestCase):
             # Version should NOT have changed
             index_after = self.index_management.get_index(index_name)
             self.assertEqual(index_before.version, index_after.version)
+        finally:
+            try:
+                self.index_management.delete_index_by_name(index_name)
+            except Exception:
+                pass
+
+    def test_change_name_reloads_model(self):
+        """Test that changing 'name' in model properties causes a new model cache entry."""
+        index_name = f"test_cache_reload_{int(time.time())}"
+        model_name = "my-custom-model"
+        original_properties = {"name": "random/small", "dimensions": 32, "type": "random"}
+
+        try:
+            request = self.unstructured_marqo_index_request(
+                name=index_name,
+                model=Model(name=model_name, properties=original_properties, custom=True)
+            )
+            self.index_management.create_index(request)
+
+            # Add a document and search to trigger model loading
+            self.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=index_name,
+                    docs=[{"_id": "1", "text_field": "hello world"}],
+                    tensor_fields=["text_field"],
+                    device="cpu"
+                )
+            )
+            tensor_search.search(
+                config=self.config, index_name=index_name, text="hello", device="cpu"
+            )
+
+            # Verify original cache key exists
+            original_key = _create_model_cache_key(model_name, "cpu", original_properties)
+            self.assertIn(original_key, get_available_models(),
+                          "Original model cache key should exist after first search")
+
+            # Update: change properties['name'] from random/small to random/large
+            new_properties = {**original_properties, "name": "random/large"}
+            result = self.index_management.update_index_settings_by_settings_dict(
+                index_name, {"modelProperties": new_properties}, force=True
+            )
+            self.assertTrue(result["updated"])
+
+            # Search again to trigger model loading with new properties
+            tensor_search.search(
+                config=self.config, index_name=index_name, text="hello", device="cpu"
+            )
+
+            # Verify new cache key is different and exists
+            new_key = _create_model_cache_key(model_name, "cpu", new_properties)
+            self.assertNotEqual(original_key, new_key,
+                                "Cache key should change when properties['name'] changes")
+            self.assertIn(new_key, get_available_models(),
+                          "New model cache key should exist after search with updated properties")
+        finally:
+            try:
+                self.index_management.delete_index_by_name(index_name)
+            except Exception:
+                pass
+
+    def test_add_triton_model_name_does_not_reload_model(self):
+        """Test that adding tritonModelName does NOT create a new model cache entry."""
+        index_name = f"test_cache_no_reload_{int(time.time())}"
+        model_name = "my-custom-model-2"
+        original_properties = {"name": "random/small", "dimensions": 32, "type": "random"}
+
+        try:
+            request = self.unstructured_marqo_index_request(
+                name=index_name,
+                model=Model(name=model_name, properties=original_properties, custom=True)
+            )
+            self.index_management.create_index(request)
+
+            # Add a document and search to trigger model loading
+            self.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=index_name,
+                    docs=[{"_id": "1", "text_field": "hello world"}],
+                    tensor_fields=["text_field"],
+                    device="cpu"
+                )
+            )
+            tensor_search.search(
+                config=self.config, index_name=index_name, text="hello", device="cpu"
+            )
+
+            # Verify original cache key exists
+            original_key = _create_model_cache_key(model_name, "cpu", original_properties)
+            self.assertIn(original_key, get_available_models(),
+                          "Original model cache key should exist after first search")
+            keys_before = set(k for k in get_available_models().keys()
+                              if k.startswith(model_name))
+
+            # Update: add tritonModelName (not part of cache key formula)
+            new_properties = {**original_properties, "tritonModelName": "some-triton-model"}
+            result = self.index_management.update_index_settings_by_settings_dict(
+                index_name, {"modelProperties": new_properties}
+            )
+            self.assertTrue(result["updated"])
+
+            # Search again with updated properties
+            tensor_search.search(
+                config=self.config, index_name=index_name, text="hello", device="cpu"
+            )
+
+            # Cache key should be identical since tritonModelName is not in the key
+            new_key = _create_model_cache_key(model_name, "cpu", new_properties)
+            self.assertEqual(original_key, new_key,
+                             "Cache key should NOT change when only tritonModelName is added")
+            self.assertIn(original_key, get_available_models(),
+                          "Same cache key should still exist")
+            keys_after = set(k for k in get_available_models().keys()
+                             if k.startswith(model_name))
+            self.assertEqual(keys_before, keys_after,
+                             "No new cache keys should be added for this model")
         finally:
             try:
                 self.index_management.delete_index_by_name(index_name)
