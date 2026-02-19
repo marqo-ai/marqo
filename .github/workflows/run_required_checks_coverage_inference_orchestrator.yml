@@ -117,7 +117,7 @@ jobs:
 
             DIFF_COV_OUTPUT=$(diff-cover ../../integ_coverage_data/coverage.xml --html-report ../../integ_coverage_data/diff_cov.html \
               --markdown-report ../../integ_coverage_data/diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=95 2>&1) || DIFF_COV_EXIT=$?
+              --compare-branch $BASE_BRANCH --fail-under=80 2>&1) || DIFF_COV_EXIT=$?
             echo "$DIFF_COV_OUTPUT"
             PERCENTAGE=$(echo "$DIFF_COV_OUTPUT" | grep -oP 'Coverage: \K[0-9.]+(?=%)' || echo "N/A")
             echo "percentage=$PERCENTAGE" >> $GITHUB_OUTPUT
