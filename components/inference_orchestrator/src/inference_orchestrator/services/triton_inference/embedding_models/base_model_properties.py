@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import Field, field_validator
 
@@ -24,12 +24,24 @@ class BaseModelProperties(AppImmutableBaseModel):
     The base class for all model properties classes.
 
     Attributes:
+        name: The name of the model.
+        triton_model_name: An optional override name used by the inference orchestrator for loading
+            tokenizers/preprocessors. When set, effective_name returns this value instead of name.
+            This supports safe migration where the Vespa-stored 'name' must remain unchanged for
+            old pod cache key stability, while the new orchestrator needs a different name.
         dimensions: The dimensions of the model.
         type: The type of the model
     """
 
+    name: str
+    triton_model_name: Optional[str] = Field(default=None, alias="tritonModelName")
     dimensions: int = Field(..., ge=1)
     type: Literal["open_clip", "hf", "random"]
+
+    @property
+    def effective_name(self) -> str:
+        """Return tritonModelName if set, otherwise fall back to name."""
+        return self.triton_model_name if self.triton_model_name is not None else self.name
 
 
 class ModelInput(AppImmutableBaseModel):
