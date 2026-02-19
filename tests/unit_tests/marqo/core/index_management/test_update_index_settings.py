@@ -32,110 +32,110 @@ class TestUpdateIndexSettings(MarqoTestCase):
         self.index_management._vespa_deployment_lock = Mock(return_value=mock_deployment_lock)
         return mock_vespa_app, mock_deployment_lock
 
-    def test_update_model_properties_semi_structured_non_custom(self):
-        """Test successful update for semi-structured index with non-custom model."""
-        existing_index = self.semi_structured_marqo_index(
-            name="test_index",
-            model=Model(name='hf/e5-small'),
-            version=1
-        )
-        # Non-custom model: properties come from registry
-        existing_index.model.properties = {
-            "dimensions": 384,
-            "type": "hf",
-            "name": "hf/e5-small",
-        }
-        existing_index.model.custom = False
-
-        mock_vespa_app, _ = self._setup_mocks(existing_index)
-
-        new_properties = {
-            "dimensions": 384,
-            "type": "hf",
-            "name": "hf/e5-small",
-            "url": "https://new-url.com/model.pt",
-        }
-
-        self.index_management.update_index_settings_by_settings_dict(
-            "test_index", {"modelProperties": new_properties}
-        )
-
-        mock_vespa_app.update_index_setting.assert_called_once()
-        updated_index = mock_vespa_app.update_index_setting.call_args[0][0]
-        self.assertEqual(updated_index.model.properties, new_properties)
-        self.assertTrue(updated_index.model.custom)
-
-    def test_update_model_properties_semi_structured_custom(self):
-        """Test successful update for semi-structured index with custom model."""
-        existing_index = self.semi_structured_marqo_index(
-            name="test_index",
-            model=Model(
-                name='my-custom-model',
-                properties={
-                    "dimensions": 768,
-                    "type": "open_clip",
-                    "name": "ViT-B-16",
+    @patch("marqo.tensor_search.index_meta_cache.get_index")
+    def test_update_model_properties_by_index_type_and_custom_flag(self, mock_cache_get_index):
+        """Test successful update for different index types and custom flags."""
+        cases = [
+            ("semi_structured_non_custom", self.semi_structured_marqo_index(
+                name="test_index", model=Model(name='hf/e5-small'), version=1
+            ), False, {"dimensions": 384, "type": "hf", "name": "hf/e5-small"}),
+            ("semi_structured_custom", self.semi_structured_marqo_index(
+                name="test_index",
+                model=Model(name='my-custom-model', properties={
+                    "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
                     "url": "https://old-url.com/model.pt",
-                },
-                custom=True
-            ),
-            version=1
-        )
-
-        mock_vespa_app, _ = self._setup_mocks(existing_index)
-
-        new_properties = {
-            "dimensions": 768,
-            "type": "open_clip",
-            "name": "ViT-B-16",
-            "url": "https://new-url.com/model.pt",
-        }
-
-        self.index_management.update_index_settings_by_settings_dict(
-            "test_index", {"modelProperties": new_properties}
-        )
-
-        mock_vespa_app.update_index_setting.assert_called_once()
-        updated_index = mock_vespa_app.update_index_setting.call_args[0][0]
-        self.assertEqual(updated_index.model.properties, new_properties)
-        self.assertTrue(updated_index.model.custom)
-
-    def test_update_model_properties_structured_index(self):
-        """Test successful update for structured index."""
-        existing_index = self.structured_marqo_index(
-            name="test_index",
-            schema_name="marqo__test_index",
-            model=Model(
-                name='my-custom-model',
-                properties={
-                    "dimensions": 768,
-                    "type": "open_clip",
-                    "name": "ViT-B-16",
+                }, custom=True),
+                version=1
+            ), True, {"dimensions": 768, "type": "open_clip", "name": "ViT-B-16"}),
+            ("structured_custom", self.structured_marqo_index(
+                name="test_index", schema_name="marqo__test_index",
+                model=Model(name='my-custom-model', properties={
+                    "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
                     "url": "https://old-url.com/model.pt",
-                },
-                custom=True
-            ),
-        )
+                }, custom=True),
+            ), True, {"dimensions": 768, "type": "open_clip", "name": "ViT-B-16"}),
+            ("structured_non_custom", self.structured_marqo_index(
+                name="test_index", schema_name="marqo__test_index",
+                model=Model(name='hf/e5-small'),
+            ), False, {"dimensions": 384, "type": "hf", "name": "hf/e5-small"}),
+        ]
 
-        mock_vespa_app, _ = self._setup_mocks(existing_index)
+        for label, existing_index, is_custom, base_props in cases:
+            with self.subTest(label):
+                if not is_custom:
+                    existing_index.model.properties = base_props.copy()
+                    existing_index.model.custom = False
 
-        new_properties = {
-            "dimensions": 768,
-            "type": "open_clip",
-            "name": "ViT-B-16",
-            "url": "https://new-url.com/model.pt",
-        }
+                mock_vespa_app, _ = self._setup_mocks(existing_index)
 
-        self.index_management.update_index_settings_by_settings_dict(
-            "test_index", {"modelProperties": new_properties}
-        )
+                new_properties = {**base_props, "url": "https://new-url.com/model.pt"}
 
-        mock_vespa_app.update_index_setting.assert_called_once()
-        updated_index = mock_vespa_app.update_index_setting.call_args[0][0]
-        self.assertEqual(updated_index.model.properties, new_properties)
-        self.assertTrue(updated_index.model.custom)
+                result = self.index_management.update_index_settings_by_settings_dict(
+                    "test_index", {"modelProperties": new_properties}
+                )
 
-    def test_non_existent_index_raises_index_not_found(self):
+                self.assertTrue(result["updated"])
+                self.assertFalse(result["error"])
+                mock_vespa_app.update_index_setting.assert_called_once()
+                updated_index = mock_vespa_app.update_index_setting.call_args[0][0]
+                self.assertEqual(updated_index.model.properties, new_properties)
+                self.assertTrue(updated_index.model.custom)
+
+    def test_update_index_settings_validation_errors(self):
+        """Test that validation errors are returned in result dict."""
+        cases = [
+            ("dimension_change", {
+                "dimensions": 384, "type": "open_clip", "name": "ViT-B-16",
+                "url": "https://new-url.com/model.pt",
+            }, "dimensions"),
+            ("type_change", {
+                "dimensions": 768, "type": "hf", "name": "ViT-B-16",
+                "url": "https://new-url.com/model.pt",
+            }, "type"),
+            ("key_removal", {
+                "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
+                # "url" key removed
+            }, "remove"),
+        ]
+
+        for label, new_props, expected_in_reason in cases:
+            with self.subTest(label):
+                existing_index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    model=Model(name='my-custom-model', properties={
+                        "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
+                        "url": "https://old-url.com/model.pt",
+                    }, custom=True),
+                    version=1
+                )
+                mock_vespa_app, _ = self._setup_mocks(existing_index)
+
+                result = self.index_management.update_index_settings_by_settings_dict(
+                    "test_index", {"modelProperties": new_props}
+                )
+
+                self.assertTrue(result["error"])
+                self.assertFalse(result["updated"])
+                self.assertIn(expected_in_reason, result["reason"].lower())
+                mock_vespa_app.update_index_setting.assert_not_called()
+
+    def test_update_index_settings_disallowed_settings(self):
+        """Test that disallowed settings keys raise InternalError."""
+        cases = [
+            ("single_disallowed", {"someOtherSetting": "value"}, "someOtherSetting"),
+            ("multiple_disallowed", {"foo": 1, "bar": 2}, "foo"),
+            ("mixed_allowed_disallowed", {"modelProperties": {"dimensions": 384}, "extra": "x"}, "extra"),
+        ]
+
+        for label, settings_dict, expected_key in cases:
+            with self.subTest(label):
+                with self.assertRaises(InternalError) as ctx:
+                    self.index_management.update_index_settings_by_settings_dict(
+                        "test_index", settings_dict
+                    )
+                self.assertIn(expected_key, str(ctx.exception))
+
+    def test_update_index_settings_non_existent_index(self):
         """Test that updating a non-existent index raises IndexNotFoundError."""
         mock_deployment_lock = MagicMock()
         self.index_management.get_index = Mock(
@@ -148,134 +148,112 @@ class TestUpdateIndexSettings(MarqoTestCase):
                 "test_index", {"modelProperties": {"dimensions": 384, "type": "hf"}}
             )
 
-    def test_dimension_change_raises_invalid_model_properties(self):
-        """Test that changing dimensions raises InvalidModelPropertiesError."""
+    def test_update_index_settings_no_changes(self):
+        """Test no-op when properties haven't changed."""
         existing_index = self.semi_structured_marqo_index(
             name="test_index",
-            model=Model(
-                name='my-custom-model',
-                properties={
-                    "dimensions": 768,
-                    "type": "open_clip",
-                    "name": "ViT-B-16",
-                    "url": "https://old-url.com/model.pt",
-                },
-                custom=True
-            ),
+            model=Model(name='my-custom-model', properties={
+                "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
+                "url": "https://example.com/model.pt",
+            }, custom=True),
             version=1
         )
+        mock_vespa_app, _ = self._setup_mocks(existing_index)
 
-        self._setup_mocks(existing_index)
+        result = self.index_management.update_index_settings_by_settings_dict(
+            "test_index",
+            {"modelProperties": {
+                "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
+                "url": "https://example.com/model.pt",
+            }}
+        )
 
-        with self.assertRaises(InvalidModelPropertiesError) as ctx:
-            self.index_management.update_index_settings_by_settings_dict(
-                "test_index",
-                {"modelProperties": {
-                    "dimensions": 384,  # changed!
-                    "type": "open_clip",
-                    "name": "ViT-B-16",
-                    "url": "https://new-url.com/model.pt",
-                }}
-            )
-        self.assertIn("dimensions", str(ctx.exception))
+        self.assertFalse(result["updated"])
+        self.assertFalse(result["error"])
+        self.assertIn("No changes", result["reason"])
+        mock_vespa_app.update_index_setting.assert_not_called()
 
-    def test_type_change_raises_invalid_model_properties(self):
-        """Test that changing type raises InvalidModelPropertiesError."""
+    @patch("marqo.tensor_search.index_meta_cache.get_index")
+    def test_dry_run_and_force_combinations(self, mock_cache_get_index):
+        """Test all combinations of dry_run, force, and valid/invalid updates."""
+        valid_props = {
+            "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
+            "url": "https://new-url.com/model.pt",
+        }
+        invalid_props = {
+            "dimensions": 384,  # changed dimension
+            "type": "open_clip", "name": "ViT-B-16",
+            "url": "https://new-url.com/model.pt",
+        }
+
+        cases = [
+            # (label, dry_run, force, props, expected_updated, expected_error, should_deploy)
+            ("dry_run_valid", True, False, valid_props, False, False, False),
+            ("dry_run_invalid", True, False, invalid_props, False, True, False),
+            ("dry_run_force_valid", True, True, valid_props, False, False, False),
+            ("dry_run_force_invalid", True, True, invalid_props, False, True, False),
+            ("no_dry_run_no_force_valid", False, False, valid_props, True, False, True),
+            ("no_dry_run_no_force_invalid", False, False, invalid_props, False, True, False),
+            ("force_valid", False, True, valid_props, True, False, True),
+            ("force_invalid", False, True, invalid_props, True, True, True),
+        ]
+
+        for label, dry_run, force, props, exp_updated, exp_error, should_deploy in cases:
+            with self.subTest(label):
+                existing_index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    model=Model(name='my-custom-model', properties={
+                        "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
+                        "url": "https://old-url.com/model.pt",
+                    }, custom=True),
+                    version=1
+                )
+                mock_vespa_app, _ = self._setup_mocks(existing_index)
+
+                result = self.index_management.update_index_settings_by_settings_dict(
+                    "test_index", {"modelProperties": props},
+                    force=force, dry_run=dry_run
+                )
+
+                self.assertEqual(result["updated"], exp_updated, f"updated mismatch for {label}")
+                self.assertEqual(result["error"], exp_error, f"error mismatch for {label}")
+                if should_deploy:
+                    mock_vespa_app.update_index_setting.assert_called_once()
+                else:
+                    mock_vespa_app.update_index_setting.assert_not_called()
+
+    @patch("marqo.tensor_search.index_meta_cache.get_index")
+    def test_result_contains_diff_and_settings(self, mock_cache_get_index):
+        """Verify result dict structure and diff content."""
         existing_index = self.semi_structured_marqo_index(
             name="test_index",
-            model=Model(
-                name='my-custom-model',
-                properties={
-                    "dimensions": 768,
-                    "type": "open_clip",
-                    "name": "ViT-B-16",
-                    "url": "https://old-url.com/model.pt",
-                },
-                custom=True
-            ),
+            model=Model(name='my-custom-model', properties={
+                "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
+                "url": "https://old-url.com/model.pt",
+            }, custom=True),
             version=1
         )
+        mock_vespa_app, _ = self._setup_mocks(existing_index)
 
-        self._setup_mocks(existing_index)
-
-        with self.assertRaises(InvalidModelPropertiesError) as ctx:
-            self.index_management.update_index_settings_by_settings_dict(
-                "test_index",
-                {"modelProperties": {
-                    "dimensions": 768,
-                    "type": "hf",  # changed!
-                    "name": "ViT-B-16",
-                    "url": "https://new-url.com/model.pt",
-                }}
-            )
-        self.assertIn("type", str(ctx.exception))
-
-    def test_key_removal_raises_invalid_model_properties(self):
-        """Test that removing keys raises InvalidModelPropertiesError."""
-        existing_index = self.semi_structured_marqo_index(
-            name="test_index",
-            model=Model(
-                name='my-custom-model',
-                properties={
-                    "dimensions": 768,
-                    "type": "open_clip",
-                    "name": "ViT-B-16",
-                    "url": "https://old-url.com/model.pt",
-                },
-                custom=True
-            ),
-            version=1
+        new_properties = {
+            "dimensions": 768, "type": "open_clip", "name": "ViT-B-16",
+            "url": "https://new-url.com/model.pt",
+        }
+        result = self.index_management.update_index_settings_by_settings_dict(
+            "test_index", {"modelProperties": new_properties}
         )
 
-        self._setup_mocks(existing_index)
+        # Check all expected keys exist
+        for key in ("updated", "error", "oldSettings", "newSettings", "settingsDiff", "reason"):
+            self.assertIn(key, result)
 
-        with self.assertRaises(InvalidModelPropertiesError) as ctx:
-            self.index_management.update_index_settings_by_settings_dict(
-                "test_index",
-                {"modelProperties": {
-                    "dimensions": 768,
-                    "type": "open_clip",
-                    "name": "ViT-B-16",
-                    # "url" key removed!
-                }}
-            )
-        self.assertIn("remove", str(ctx.exception).lower())
+        # Check settings content
+        self.assertEqual(result["oldSettings"]["modelProperties"]["url"], "https://old-url.com/model.pt")
+        self.assertEqual(result["newSettings"]["modelProperties"]["url"], "https://new-url.com/model.pt")
 
-    def test_disallowed_settings_key_raises_internal_error(self):
-        """Test that disallowed settings keys raise InternalError."""
-        with self.assertRaises(InternalError) as ctx:
-            self.index_management.update_index_settings_by_settings_dict(
-                "test_index",
-                {"modelProperties": {"dimensions": 384}, "someOtherSetting": "value"}
-            )
-        self.assertIn("someOtherSetting", str(ctx.exception))
-
-    def test_validate_updated_model_properties_success(self):
-        """Test that valid updates pass validation."""
-        current = {"dimensions": 768, "type": "open_clip", "url": "https://old.com"}
-        updated = {"dimensions": 768, "type": "open_clip", "url": "https://new.com", "extra_key": "value"}
-
-        # Should not raise
-        IndexManagement.validate_updated_model_properties(current, updated)
-
-    def test_updated_index_sets_custom_true(self):
-        """Test that _updated_index_with_model_properties sets custom=True."""
-        existing_index = self.semi_structured_marqo_index(
-            name="test_index",
-            model=Model(name='hf/e5-small'),
-            version=1
-        )
-        existing_index.model.custom = False
-
-        new_properties = {"dimensions": 384, "type": "hf"}
-        updated = self.index_management._updated_index_with_model_properties(
-            existing_index, new_properties
-        )
-
-        self.assertTrue(updated.model.custom)
-        self.assertEqual(updated.model.properties, new_properties)
-        # Original should be unchanged
-        self.assertFalse(existing_index.model.custom)
+        # Check diff contains the URLs
+        self.assertIn("old-url", result["settingsDiff"])
+        self.assertIn("new-url", result["settingsDiff"])
 
 
 class TestUpdateIndexSettingsBodyParams(unittest.TestCase):
@@ -432,7 +410,12 @@ class TestUpdateIndexSettingsApiEndpoint(unittest.TestCase):
 
         mock_config = Mock()
         mock_index_mgmt = Mock()
-        mock_index_mgmt.update_index_settings_by_settings_dict = Mock(return_value=None)
+        self._mock_result = {
+            "updated": True, "error": False,
+            "oldSettings": {}, "newSettings": {},
+            "settingsDiff": "", "reason": "Settings updated successfully"
+        }
+        mock_index_mgmt.update_index_settings_by_settings_dict = Mock(return_value=self._mock_result)
         mock_config.index_management = mock_index_mgmt
         self.mock_config = mock_config
         self.mock_index_mgmt = mock_index_mgmt
@@ -452,10 +435,11 @@ class TestUpdateIndexSettingsApiEndpoint(unittest.TestCase):
         )
 
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json(), {"message": "Index settings update is successful."})
+        self.assertEqual(resp.json(), self._mock_result)
         self.mock_index_mgmt.update_index_settings_by_settings_dict.assert_called_once_with(
             "my_index",
-            {"modelProperties": {"dimensions": 384, "type": "hf", "name": "hf/e5-small"}}
+            {"modelProperties": {"dimensions": 384, "type": "hf", "name": "hf/e5-small"}},
+            force=False, dry_run=False
         )
 
     @patch.dict("os.environ", {"MARQO_ENABLE_OPS_API": "true"})

@@ -1,6 +1,6 @@
+import json
 from contextlib import contextmanager
-from typing import List, Tuple, Dict
-from typing import Optional
+from typing import List, Tuple, Dict, Any, Optional
 import difflib
 
 import semver
@@ -411,18 +411,25 @@ class IndexManagement:
 
             return result
 
-    def update_index_settings_by_settings_dict(self, index_name: str, settings_dict: dict) -> None:
+    def update_index_settings_by_settings_dict(
+        self, index_name: str, settings_dict: dict,
+        force: bool = False, dry_run: bool = False
+    ) -> Dict[str, Any]:
         """
         Update index settings for an existing index. Currently only supports updating modelProperties.
 
         Args:
             index_name: Name of the index to update
             settings_dict: Dictionary of settings to update. Only 'modelProperties' is allowed.
+            force: If True, deploy even if validation fails
+            dry_run: If True, return diff without deploying
+
+        Returns:
+            Dict with keys: updated, error, oldSettings, newSettings, settingsDiff, reason
 
         Raises:
             IndexNotFoundError: If the index does not exist
             InternalError: If settings_dict contains disallowed keys
-            InvalidModelPropertiesError: If updated model properties are invalid
         """
         # Validate that only allowed keys are being modified
         disallowed_keys = set(settings_dict.keys()) - self._ALLOWED_MODIFIED_SETTINGS
@@ -438,9 +445,73 @@ class IndexManagement:
             if "modelProperties" in settings_dict:
                 updated_model_properties = settings_dict["modelProperties"]
                 current_properties = index.model.get_properties()
-                self.validate_updated_model_properties(current_properties, updated_model_properties)
+
+                old_settings = {"modelProperties": current_properties}
+                new_settings = {"modelProperties": updated_model_properties}
+
+                # Check if settings actually changed
+                if old_settings == new_settings:
+                    return {
+                        "updated": False,
+                        "error": False,
+                        "oldSettings": old_settings,
+                        "newSettings": new_settings,
+                        "settingsDiff": "",
+                        "reason": "No changes detected"
+                    }
+
+                # Generate diff
+                old_json = json.dumps(old_settings, indent=2, sort_keys=True).splitlines(keepends=True)
+                new_json = json.dumps(new_settings, indent=2, sort_keys=True).splitlines(keepends=True)
+                settings_diff = "".join(difflib.unified_diff(
+                    old_json, new_json,
+                    fromfile="current", tofile="updated"
+                ))
+
+                result = {
+                    "updated": False,
+                    "error": False,
+                    "oldSettings": old_settings,
+                    "newSettings": new_settings,
+                    "settingsDiff": settings_diff,
+                    "reason": ""
+                }
+
+                # Validate
+                validation_error = None
+                try:
+                    self.validate_updated_model_properties(current_properties, updated_model_properties)
+                except InvalidModelPropertiesError as e:
+                    validation_error = e
+
+                if dry_run:
+                    if validation_error:
+                        result["error"] = True
+                        result["reason"] = f"Validation error (dry run): {validation_error}"
+                    else:
+                        result["reason"] = "Dry run: validation passed, no changes applied"
+                    return result
+
+                if validation_error and not force:
+                    result["error"] = True
+                    result["reason"] = f"Validation error: {validation_error}"
+                    return result
+
+                # Deploy: either validation passed or force=True
                 updated_index = self._updated_index_with_model_properties(index, updated_model_properties)
                 self._get_vespa_application().update_index_setting(updated_index)
+
+                # Refresh cache
+                from marqo.tensor_search import index_meta_cache
+                index_meta_cache.get_index(self, index_name, force_refresh=True)
+
+                result["updated"] = True
+                if validation_error and force:
+                    result["error"] = True
+                    result["reason"] = f"Force applied despite validation error: {validation_error}"
+                else:
+                    result["reason"] = "Settings updated successfully"
+                return result
 
     @staticmethod
     def validate_updated_model_properties(current: dict, updated: dict) -> None:

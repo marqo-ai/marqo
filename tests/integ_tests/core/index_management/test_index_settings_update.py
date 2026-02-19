@@ -60,9 +60,11 @@ class TestIndexSettingsUpdate(MarqoTestCase):
                 "name": "ViT-B-16",
                 "url": "https://new-url.com/model.pt",
             }
-            self.index_management.update_index_settings_by_settings_dict(
+            result = self.index_management.update_index_settings_by_settings_dict(
                 index_name, {"modelProperties": new_properties}
             )
+
+            self.assertTrue(result["updated"])
 
             # Verify update
             updated_index = self.index_management.get_index(index_name)
@@ -85,7 +87,7 @@ class TestIndexSettingsUpdate(MarqoTestCase):
             )
 
     def test_update_dimension_change_raises_error(self):
-        """Test that changing dimensions raises InvalidModelPropertiesError."""
+        """Test that changing dimensions returns an error result."""
         index_name = f"test_dim_change_{int(time.time())}"
 
         try:
@@ -104,16 +106,146 @@ class TestIndexSettingsUpdate(MarqoTestCase):
             )
             self.index_management.create_index(request)
 
-            with self.assertRaises(InvalidModelPropertiesError):
-                self.index_management.update_index_settings_by_settings_dict(
-                    index_name,
-                    {"modelProperties": {
-                        "dimensions": 768,  # Changed!
+            result = self.index_management.update_index_settings_by_settings_dict(
+                index_name,
+                {"modelProperties": {
+                    "dimensions": 768,  # Changed!
+                    "type": "open_clip",
+                    "name": "ViT-B-16",
+                    "url": "https://example.com/model.pt",
+                }}
+            )
+
+            self.assertTrue(result["error"])
+            self.assertFalse(result["updated"])
+        finally:
+            try:
+                self.index_management.delete_index_by_name(index_name)
+            except Exception:
+                pass
+
+    def test_dry_run_does_not_modify_index(self):
+        """Test that dry_run returns diff without changing index."""
+        index_name = f"test_dry_run_{int(time.time())}"
+
+        try:
+            request = self.unstructured_marqo_index_request(
+                name=index_name,
+                model=Model(
+                    name='my-custom-model',
+                    properties={
+                        "dimensions": 384,
                         "type": "open_clip",
                         "name": "ViT-B-16",
-                        "url": "https://example.com/model.pt",
-                    }}
+                        "url": "https://old-url.com/model.pt",
+                    },
+                    custom=True
                 )
+            )
+            self.index_management.create_index(request)
+
+            new_properties = {
+                "dimensions": 384,
+                "type": "open_clip",
+                "name": "ViT-B-16",
+                "url": "https://new-url.com/model.pt",
+            }
+            result = self.index_management.update_index_settings_by_settings_dict(
+                index_name, {"modelProperties": new_properties}, dry_run=True
+            )
+
+            self.assertFalse(result["updated"])
+            self.assertFalse(result["error"])
+            self.assertIn("old-url", result["settingsDiff"])
+            self.assertIn("new-url", result["settingsDiff"])
+
+            # Verify index was NOT modified
+            index = self.index_management.get_index(index_name)
+            self.assertEqual(index.model.properties["url"], "https://old-url.com/model.pt")
+        finally:
+            try:
+                self.index_management.delete_index_by_name(index_name)
+            except Exception:
+                pass
+
+    def test_force_applies_update(self):
+        """Test that force=True deploys despite validation errors."""
+        index_name = f"test_force_{int(time.time())}"
+
+        try:
+            request = self.unstructured_marqo_index_request(
+                name=index_name,
+                model=Model(
+                    name='my-custom-model',
+                    properties={
+                        "dimensions": 384,
+                        "type": "open_clip",
+                        "name": "ViT-B-16",
+                        "url": "https://old-url.com/model.pt",
+                    },
+                    custom=True
+                )
+            )
+            self.index_management.create_index(request)
+
+            # Change dimensions (normally invalid) with force=True
+            result = self.index_management.update_index_settings_by_settings_dict(
+                index_name,
+                {"modelProperties": {
+                    "dimensions": 768,  # Changed!
+                    "type": "open_clip",
+                    "name": "ViT-B-16",
+                    "url": "https://old-url.com/model.pt",
+                }},
+                force=True
+            )
+
+            self.assertTrue(result["updated"])
+            self.assertTrue(result["error"])  # Still flagged as error
+
+            # Verify index was modified despite validation error
+            updated_index = self.index_management.get_index(index_name)
+            self.assertEqual(updated_index.model.properties["dimensions"], 768)
+        finally:
+            try:
+                self.index_management.delete_index_by_name(index_name)
+            except Exception:
+                pass
+
+    def test_no_changes_returns_early(self):
+        """Test that identical settings return early without deploying."""
+        index_name = f"test_no_changes_{int(time.time())}"
+
+        try:
+            props = {
+                "dimensions": 384,
+                "type": "open_clip",
+                "name": "ViT-B-16",
+                "url": "https://example.com/model.pt",
+            }
+            request = self.unstructured_marqo_index_request(
+                name=index_name,
+                model=Model(
+                    name='my-custom-model',
+                    properties=props,
+                    custom=True
+                )
+            )
+            self.index_management.create_index(request)
+
+            index_before = self.index_management.get_index(index_name)
+
+            result = self.index_management.update_index_settings_by_settings_dict(
+                index_name, {"modelProperties": props}
+            )
+
+            self.assertFalse(result["updated"])
+            self.assertFalse(result["error"])
+            self.assertIn("No changes", result["reason"])
+
+            # Version should NOT have changed
+            index_after = self.index_management.get_index(index_name)
+            self.assertEqual(index_before.version, index_after.version)
         finally:
             try:
                 self.index_management.delete_index_by_name(index_name)
