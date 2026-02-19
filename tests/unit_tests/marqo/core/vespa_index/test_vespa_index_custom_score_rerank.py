@@ -1,6 +1,7 @@
 """Unit tests for custom score rerank logic in vespa_index (LLD A)."""
 import unittest
 from typing import List
+from unittest.mock import Mock
 
 from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
@@ -175,6 +176,137 @@ class TestConvertHybridGlobalScoreModifiersToTensors(unittest.TestCase):
         self.assertEqual(g_add, {"doc_field": 1.0})
         self.assertEqual(c_mult, {"bm25_sum": 0.5})
         self.assertEqual(c_add, {})
+
+
+class TestValidateCustomScoreModifierFieldsAggregates(unittest.TestCase):
+    """
+    _validate_custom_score_modifier_fields must raise InvalidArgumentError (400) when requesting
+    a BM25 aggregate (sum/max/avg) but the index has no lexically searchable fields, or when
+    requesting a closeness aggregate but the index has no tensor fields.
+    """
+
+    def _create_semi_structured_vespa_index_with_empty_lexical_and_tensor(self):
+        """SemiStructuredVespaIndex whose marqo_index has no lexical and no tensor fields."""
+        from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+        mock_index = Mock()
+        mock_index.lexically_searchable_fields_names = set()
+        mock_index.tensor_field_map = {}
+        mock_index.field_map = {}
+        mock_index.index_supports_partial_updates = False
+        return SemiStructuredVespaIndex(mock_index)
+
+    def test_bm25_aggregate_with_no_lexically_searchable_fields_raises(self):
+        """Requesting marqo__score_bm25_sum (or max/avg) with no lexical fields in index must raise 400."""
+        vespa_index = self._create_semi_structured_vespa_index_with_empty_lexical_and_tensor()
+        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        for agg in ("sum", "max", "avg"):
+            with self.subTest(aggregate=agg):
+                custom_score_keys = {f"{prefix}bm25_{agg}"}
+                with self.assertRaises(InvalidArgumentError) as ctx:
+                    vespa_index._validate_custom_score_modifier_fields(custom_score_keys)
+                self.assertIn("BM25 aggregate", str(ctx.exception))
+                self.assertIn("no lexically searchable fields", str(ctx.exception))
+
+    def test_closeness_aggregate_with_no_tensor_fields_raises(self):
+        """Requesting closeness_retrieval_vector sum/max/avg with no tensor fields in index must raise 400."""
+        vespa_index = self._create_semi_structured_vespa_index_with_empty_lexical_and_tensor()
+        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        for agg in ("sum", "max", "avg"):
+            with self.subTest(aggregate=agg):
+                custom_score_keys = {f"{prefix}closeness_retrieval_vector_{agg}"}
+                with self.assertRaises(InvalidArgumentError) as ctx:
+                    vespa_index._validate_custom_score_modifier_fields(custom_score_keys)
+                self.assertIn("closeness aggregate", str(ctx.exception))
+                self.assertIn("no tensor fields", str(ctx.exception))
+
+
+class TestValidateCustomScoreModifierFieldsSingleField(unittest.TestCase):
+    """_validate_custom_score_modifier_fields must raise for nonexistent or invalid single-field keys."""
+
+    def _create_semi_structured_vespa_index_with_lexical_and_tensor(self):
+        """SemiStructuredVespaIndex with title (lexical+tensor) and description (lexical only, no BM25)."""
+        from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+        from marqo.core.models.marqo_index import (
+            SemiStructuredMarqoIndex, Model, Field, FieldType, FieldFeature,
+            TensorField, HnswConfig, DistanceMetric, TextPreProcessing,
+            TextSplitMethod, ImagePreProcessing,
+        )
+        import time
+        lexical_fields = [
+            Field(
+                name="title",
+                type=FieldType.Text,
+                features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
+                lexical_field_name="marqo__lexical_title",
+                filter_field_name="title_filter",
+            ),
+            Field(
+                name="description",
+                type=FieldType.Text,
+                features=[FieldFeature.Filter],
+                lexical_field_name=None,
+                filter_field_name="description_filter",
+            ),
+        ]
+        tensor_fields = [
+            TensorField(
+                name="title",
+                embeddings_field_name="marqo__embeddings_title",
+                chunk_field_name="marqo__chunks_title",
+            ),
+        ]
+        marqo_index = SemiStructuredMarqoIndex(
+            name="test",
+            schema_name="test",
+            model=Model(name="test"),
+            normalize_embeddings=True,
+            distance_metric=DistanceMetric.Angular,
+            vector_numeric_type="float",
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            marqo_version="2.16.0",
+            created_at=time.time(),
+            updated_at=time.time(),
+            text_preprocessing=TextPreProcessing(
+                split_length=2, split_overlap=0, split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing=ImagePreProcessing(patch_method=None),
+            treat_urls_and_pointers_as_images=False,
+            treat_urls_and_pointers_as_media=False,
+            filter_string_max_length=50,
+            lexical_fields=lexical_fields,
+            tensor_fields=tensor_fields,
+            string_array_fields=[],
+        )
+        return SemiStructuredVespaIndex(marqo_index)
+
+    def test_bm25_field_nonexistent_raises(self):
+        """bm25_field_<name> for field not in index must raise InvalidArgumentError."""
+        vespa_index = self._create_semi_structured_vespa_index_with_lexical_and_tensor()
+        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        with self.assertRaises(InvalidArgumentError) as ctx:
+            vespa_index._validate_custom_score_modifier_fields({f"{prefix}bm25_field_nonexistent"})
+        self.assertIn("nonexistent", str(ctx.exception))
+        self.assertIn("not in the index", str(ctx.exception))
+
+    def test_bm25_field_not_lexically_searchable_raises(self):
+        """bm25_field_<name> for field without lexical search (e.g. description here) must raise."""
+        vespa_index = self._create_semi_structured_vespa_index_with_lexical_and_tensor()
+        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        with self.assertRaises(InvalidArgumentError) as ctx:
+            vespa_index._validate_custom_score_modifier_fields({f"{prefix}bm25_field_description"})
+        self.assertIn("not a lexically searchable field", str(ctx.exception))
+        self.assertIn("description", str(ctx.exception))
+
+    def test_closeness_field_nonexistent_raises(self):
+        """closeness_retrieval_vector_field_<name> for non-tensor field must raise InvalidArgumentError."""
+        vespa_index = self._create_semi_structured_vespa_index_with_lexical_and_tensor()
+        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        with self.assertRaises(InvalidArgumentError) as ctx:
+            vespa_index._validate_custom_score_modifier_fields(
+                {f"{prefix}closeness_retrieval_vector_field_nonexistent"}
+            )
+        self.assertIn("nonexistent", str(ctx.exception))
+        self.assertIn("not a tensor field", str(ctx.exception))
 
 
 if __name__ == "__main__":

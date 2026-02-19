@@ -14,6 +14,7 @@ from marqo.core.models.hybrid_parameters import (
 )
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.exceptions import InternalError
 
 
@@ -311,8 +312,8 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
         self.assertNotIn('targetHits', result)
         self.assertIn('hello', result)
 
-    def test_hybrid_query_with_custom_score_modifiers_includes_rank_in_yql(self):
-        """With custom score modifiers, lexical and tensor YQL should wrap in rank() with extra terms."""
+    def test_hybrid_query_with_custom_score_modifiers_raises_unsupported_on_structured(self):
+        """Custom score reranking is only supported for semi-structured indexes; structured must raise."""
         hybrid_parameters = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
@@ -335,15 +336,13 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
                 ),
             ],
         )
-        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
-        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
-        tensor_yql = vespa_query.get('marqo__yql.tensor', '')
-        self.assertIn('rank(', lexical_yql)
-        self.assertIn('rank(', tensor_yql)
-        self.assertIn('marqo__custom_score_add_weights_global', str(vespa_query.get('query_features', {})))
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            self.vespa_index.to_vespa_query(marqo_query)
+        self.assertIn("semi-structured", str(ctx.exception))
+        self.assertIn("not for structured", str(ctx.exception))
 
-    def test_hybrid_query_without_custom_score_modifiers_no_extra_rank_terms(self):
-        """Without custom score modifiers, YQL need not have rank() for custom scores (may still have rank for lexical/tensor combo)."""
+    def test_hybrid_query_without_custom_score_modifiers_no_custom_score_query_inputs(self):
+        """Without custom score modifiers, query_features must not contain custom score keys."""
         hybrid_parameters = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,

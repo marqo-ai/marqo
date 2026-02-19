@@ -6,8 +6,10 @@ import unittest
 from typing import List
 from unittest.mock import MagicMock
 
+from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod, WeakAndParameters
+from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import (
     Model, TextPreProcessing, TextSplitMethod,
     ImagePreProcessing, HnswConfig, DistanceMetric, Field, FieldType,
@@ -1311,6 +1313,238 @@ class TestSemiStructuredVespaIndexCollapseFieldAttributesToRetrieve(MarqoTestCas
 
                 self.assertNotIn("parent_id", vespa_query["yql"])
                 self.assertNotIn("parent_id", marqo_query.attributes_to_retrieve)
+
+
+class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
+    """Unit tests for custom score reranking: rank() construction, facets and relevance_cutoff unchanged."""
+
+    def setUp(self):
+        marqo_index = self._create_semi_structured_marqo_index(
+            name='test_index',
+            lexical_field_names=['title', 'description'],
+            tensor_field_names=['title', 'description'],
+        )
+        self.vespa_index = SemiStructuredVespaIndex(marqo_index)
+
+    def _create_semi_structured_marqo_index(
+        self,
+        name: str,
+        lexical_field_names: List[str],
+        tensor_field_names: List[str],
+        version: str = '2.16.0',
+        distance_metric=DistanceMetric.Angular,
+    ) -> SemiStructuredMarqoIndex:
+        lexical_fields = []
+        for field_name in lexical_field_names:
+            lexical_fields.append(
+                Field(
+                    name=field_name,
+                    type=FieldType.Text,
+                    features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
+                    lexical_field_name=f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{field_name}',
+                    filter_field_name=f'{field_name}_filter'
+                )
+            )
+        tensor_fields = []
+        for field_name in tensor_field_names:
+            tensor_fields.append(
+                TensorField(
+                    name=field_name,
+                    embeddings_field_name=f'{SemiStructuredVespaSchema.FIELD_EMBEDDING_PREFIX}{field_name}',
+                    chunk_field_name=f'{SemiStructuredVespaSchema.FIELD_CHUNKS_PREFIX}{field_name}'
+                )
+            )
+        return SemiStructuredMarqoIndex(
+            name=name,
+            schema_name=name,
+            model=Model(name='hf/all-MiniLM-L6-v2'),
+            normalize_embeddings=True,
+            distance_metric=distance_metric,
+            vector_numeric_type='float',
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            marqo_version=version,
+            created_at=time.time(),
+            updated_at=time.time(),
+            text_preprocessing=TextPreProcessing(
+                split_length=2, split_overlap=0, split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing=ImagePreProcessing(patch_method=None),
+            treat_urls_and_pointers_as_images=False,
+            treat_urls_and_pointers_as_media=False,
+            filter_string_max_length=50,
+            lexical_fields=lexical_fields,
+            tensor_fields=tensor_fields,
+            string_array_fields=[],
+        )
+
+    def _hybrid_query(self, score_modifiers=None, facets=None, relevance_cutoff=None):
+        return MarqoHybridQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0.5,
+                rrfK=60,
+            ),
+            score_modifiers=score_modifiers,
+            facets=facets,
+            relevance_cutoff=relevance_cutoff,
+        )
+
+    def test_hybrid_query_with_bm25_custom_score_includes_rank_in_yql(self):
+        """With BM25 custom score modifiers, lexical and tensor YQL must wrap in rank() with extra BM25 term."""
+        marqo_query = self._hybrid_query(
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        tensor_yql = vespa_query.get('marqo__yql.tensor', '')
+        self.assertIn('rank(', lexical_yql, msg='Lexical YQL must use rank() when BM25 custom score is present')
+        self.assertIn('rank(', tensor_yql, msg='Tensor YQL must use rank() when BM25 custom score is present')
+        query_features = vespa_query.get('query_features', {})
+        self.assertIn('marqo__custom_score_add_weights_global', str(query_features))
+
+    def test_hybrid_query_with_only_closeness_custom_score_no_extra_rank_term(self):
+        """With only closeness_retrieval_vector custom score (no BM25), no extra rank() term for BM25."""
+        marqo_query = self._hybrid_query(
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        tensor_yql = vespa_query.get('marqo__yql.tensor', '')
+        # rank() may still appear for lexical/tensor fusion (e.g. rank(tensor_term, lexical_term)), but we must not
+        # add an extra BM25 ranking term. So the lexical term itself should not be rank(..., extra_bm25).
+        # With only closeness, bm25_fields is empty so no extra_terms. So lexical_yql and tensor_yql
+        # are the same as without custom score (no second rank for bm25). So we only check that custom score
+        # query inputs are present and that we did not add a contains term for bm25 rerank.
+        query_features = vespa_query.get('query_features', {})
+        self.assertIn('marqo__custom_score_add_weights_global', str(query_features))
+        # Lexical YQL with Disjunction is just the retrieval lexical term (no rank with extra bm25).
+        self.assertIn('search', lexical_yql)
+        self.assertNotIn('rank(rank(', lexical_yql), 'No double rank for BM25 when only closeness is used'
+
+    def test_facets_query_unchanged_with_custom_score_modifiers(self):
+        """Facets YQL must be identical with and without custom score modifiers."""
+        facets = FacetsParameters(fields={"title": FieldFacetsConfiguration(type="string", maxResults=5)})
+        query_without = self._hybrid_query(facets=facets)
+        query_with = self._hybrid_query(
+            facets=facets,
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_without = self.vespa_index.to_vespa_query(query_without)
+        vespa_with = self.vespa_index.to_vespa_query(query_with)
+        self.assertIn('marqo__yql.facets', vespa_without)
+        self.assertIn('marqo__yql.facets', vespa_with)
+        self.assertEqual(
+            vespa_without['marqo__yql.facets'],
+            vespa_with['marqo__yql.facets'],
+            msg='Facets query must be unchanged by custom score modifiers',
+        )
+
+    def test_relevance_cutoff_params_unchanged_with_custom_score_modifiers(self):
+        """Relevance cutoff query params must be identical with and without custom score modifiers."""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters=RelativeMaxScoreParameters(relative_score_factor=0.5),
+            probe_depth=100,
+        )
+        query_without = self._hybrid_query(relevance_cutoff=relevance_cutoff)
+        query_with = self._hybrid_query(
+            relevance_cutoff=relevance_cutoff,
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_without = self.vespa_index.to_vespa_query(query_without)
+        vespa_with = self.vespa_index.to_vespa_query(query_with)
+        for key in ('marqo__hybrid.relevanceCutoff.method', 'marqo__hybrid.relevanceCutoff.probeDepth',
+                    'marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor'):
+            if key in vespa_without:
+                self.assertIn(key, vespa_with, msg=f'{key} should be present when relevance_cutoff is set')
+                self.assertEqual(
+                    vespa_without[key], vespa_with[key],
+                    msg=f'Relevance cutoff param {key} must be unchanged by custom score modifiers',
+                )
+
+    def test_hybrid_query_with_closeness_sets_distance_metric_in_query(self):
+        """When closeness custom score is used, query must include marqo__custom_score_closeness_distance_metric with index's metric."""
+        marqo_query = self._hybrid_query(
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+        self.assertIn("marqo__custom_score_closeness_distance_metric", vespa_query)
+        self.assertEqual(
+            vespa_query["marqo__custom_score_closeness_distance_metric"],
+            self.vespa_index._marqo_index.distance_metric.value,
+            msg="Query must pass index distance metric so searcher can decide whether to min-max normalize (dotproduct only)",
+        )
+        self.assertEqual(vespa_query["marqo__custom_score_closeness_distance_metric"], "angular")
+
+    def test_hybrid_query_with_closeness_and_dotproduct_index_sets_dotproduct(self):
+        """When index uses dot product and closeness custom score, query must pass distance_metric 'dotproduct'."""
+        marqo_index = self._create_semi_structured_marqo_index(
+            name="test_dotproduct",
+            lexical_field_names=["title", "description"],
+            tensor_field_names=["title", "description"],
+            distance_metric=DistanceMetric.DotProduct,
+        )
+        vespa_index = SemiStructuredVespaIndex(marqo_index)
+        marqo_query = MarqoHybridQuery(
+            index_name=marqo_index.name,
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=["search"],
+            and_phrases=[],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0.5,
+                rrfK=60,
+            ),
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = vespa_index.to_vespa_query(marqo_query)
+        self.assertEqual(vespa_query["marqo__custom_score_closeness_distance_metric"], "dotproduct")
 
 
 if __name__ == '__main__':

@@ -207,7 +207,7 @@ summary-features {
 
 - Angular / Prenormalized-angular: `(1.0 + cosine_similarity(attribute(emb_field), query(marqo__query_embedding), x)) / 2.0`
 - Euclidean: `1.0 / (1.0 + euclidean_distance(attribute(emb_field), query(marqo__query_embedding), x))`
-- DotProduct: `reduce(attribute(emb_field) * query(marqo__query_embedding), sum, x)` (normalize in Java if needed)
+- DotProduct: `reduce(attribute(emb_field) * query(marqo__query_embedding), sum, x)` — raw in schema; **normalized in custom searcher** to [0,1] with 1=closest via min-max across hits **only when index distance metric is dot product** (Python sets `marqo__custom_score_closeness_distance_metric` to the index’s distance metric value; searcher checks for `"dotproduct"`; angular/euclidean/hamming are already [0,1] in the rank profile so are not min-max normalized in the searcher).
 - Hamming: `1.0 - (hamming(...) / (8.0 * dim))`
 
 ### 2.4 Document summary for fill
@@ -321,6 +321,138 @@ summary-features {
           - API validation: we should error out if both `sort_by` and `rankingQueryTensor` / `rankingContext` are defined.
         - with recency boost
           - Should work independently of this feature. Since it already works with existing global score modifier application, nothing should change.
+
+## Integration Test Structure
+Tests are only useful if they definitively show the core properties of the feature work. I will detail how integration tests should look in order to prove this.
+At its core, each test must show:
+(1) Custom score rerankers modified the final score, and by a certain amount. This means if the custom score 
+modifier is `marqo__score_bm25_field_my_field`, the doc with the highest BM25 score for `my_field` should end with a 
+higher score than a doc with a lower BM25 score for that field.
+(2) This score modification reliably and deterministically changes the order of results, based on how well they 
+match the custom score field/aggregate used.
+(3) The final _score will be different from the _pre_rerank_score, and you should know exactly by how much and why 
+based on the custom score modifier and the scores for each hit.
+
+## Instructions
+Our query will be `tuxedo`.
+Each integration test should use this index:
+ - model is "open_clip/ViT-B-16-SigLIP-512/webli". This is because we know they exact closeness of different terms 
+   to our goal term, which is `tuxedo`.
+ - We should have 4 fields to work with. lex_retrieval_field, lex_ranking_field, tens_retrieval_field, tens_ranking_field
+ - We define the documents such that RRF results are in deterministic order. Base order is deterministic, and so is 
+   order with custom score reranking.
+
+Closeness (prenormalized-angular) to term 'tuxedo' with model 'open_clip/ViT-B-16-SigLIP-512/webli'
+tuxedo -> 1.0
+black tuxedo -> 0.9290061705548538
+black tie -> 0.9105825129267998
+suit -> 0.901995477338818
+shorts -> 0.8311302085908341
+backpack -> 0.8264572877032847
+floral dress -> 0.825913938286213
+suede shoes -> 0.8106355248508749
+rainbow tie -> 0.7955299917394352
+unrelated -> 0.5882339267201514
+
+Doc order:
+(1) In BOTH tensor and lexical
+(2) In ONLY tensor (medium strength)
+(3) In ONLY lexical (medium strength)
+(4) In ONLY tensor (lower strength)
+(5) In ONLY lexical (lower strength)
+
+Base RRF order: 1,2,3,4,5
+add_to_score with bm25 lex_ranking_field will REVERSE the order: 5,4,3,2,1. 
+add_to_score with tensor_ranking_field to REVERSE the order: 5,4,3,2,1.
+For multiply_score_by, the doc in both lexical and tensor has original score too high, so no matter the multiplier, the customs cores can't make it fully reverse. But still test that it affects the scores.
+
+```python
+docs = [
+    {
+        # (1) In BOTH tensor and lexical
+        "_id": "doc1",
+        "lex_retrieval_field": "tuxedo tuxedo tuxedo",  # VERY HIGH lexical score
+        "tensor_retrieval_field": "tuxedo",             # VERY HIGH tensor score
+
+        "lex_ranking_field": "tuxedo",                  # lowest bm25 score for global reranking
+        "tensor_ranking_field": "unrelated"             # lowest closeness score for global reranking
+    },
+    {
+        # (2) In ONLY tensor (medium strength)
+        "_id": "doc2",
+        "lex_retrieval_field": "no match",               # no lexical match
+        "tensor_retrieval_field": "suit",                # MEDIUM tensor score
+
+        "lex_ranking_field": "tuxedo tuxedo",           # 2nd lowest bm25 score for global reranking
+        "tensor_ranking_field": "rainbow tie"           # 2nd lowest closeness score for global reranking
+    },
+    {
+        # (3) In ONLY lexical (medium strength)
+        "_id": "doc3",
+        "lex_retrieval_field": "tuxedo tuxedo",         # MEDIUM lexical score
+
+        "lex_ranking_field": "tuxedo tuxedo tuxedo",    # 3rd lowest bm25 score for global reranking
+        "tensor_ranking_field": "shorts"                # 3rd lowest closeness score for global reranking
+    },
+    {
+        # (4) In ONLY tensor (lower strength)
+        "_id": "doc4",
+        "lex_retrieval_field": "no match",              # no lexical match
+        "tensor_retrieval_field": "shorts",             # LOWER tensor score (but it's still clothes)
+
+        "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo", # 4th lowest bm25 score for global reranking
+        "tensor_ranking_field": "suit"                      # 4rd lowest closeness score for global reranking
+    },
+    {
+        # (5) In ONLY lexical (lower strength)
+        "_id": "doc5",
+        "lex_retrieval_field": "tuxedo",                # LOW lexical score
+
+        "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo tuxedo",  # highest bm25 score for global reranking
+        "tensor_ranking_field": "tuxedo"                            # closeness bm25 score for global reranking
+    },
+]
+
+tensor_fields=["tensor_retrieval_field", "tensor_ranking_field"]
+```
+
+Now for these results to be deterministic, we must set alpha only slightly above 0.5 to make sure the tensor results 
+will be 
+interleaved before lexical results, then we only make the retrieval fields searchable.
+```python
+# Search config for this to work
+hybrid_parameters = {
+    "alpha": 0.5001,   # To guarantee tensor results will always be slightly ahead in interleaving
+    "searchableAttributesTensor": ["tensor_retrieval_field"],
+    "searchableAttributesLexical": ["lex_retrieval_field"],
+}
+```
+
+Now if we want to test, we simply change what we put inside the `score_modifiers` parameter.
+For example, for `test_rrf_with_bm25_single_field_modifies_scores`, use this:
+```python
+score_modifiers = {
+    "add_to_score": [
+        {"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1},
+    ]
+}
+```
+For `test_rrf_with_closeness_retrieval_vector_single_field_modifies_scores` use this:
+```python
+score_modifiers = {
+    "add_to_score": [
+        {"field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field", "weight": 1},
+    ]
+}
+```
+With this method, you can test that it changes order AND changes the score in the same test. No need for separate tests.
+For multiply_score_by, it will be harder to change order, so you can check score for that one.
+
+## Comprehensive Testing
+1. Test all aggregate types. sum/max/avg.
+    - To get the base closeness and bm25 scores, 
+2. Test all distance metric types (angular, prenormalized-angular, euclidean, dotproduct, hamming) for closeness.
+  - For this, you would have to create separate indexes with different distance metrics, but you can use the same documents and queries.
 
 ---
 
