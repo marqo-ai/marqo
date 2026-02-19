@@ -241,7 +241,7 @@ class TestIndexSettingsUpdate(MarqoTestCase):
 
             self.assertFalse(result["updated"])
             self.assertFalse(result["error"])
-            self.assertIn("No changes", result["reason"])
+            self.assertEqual(result["reason"], "Settings are already up to date")
 
             # Version should NOT have changed
             index_after = self.index_management.get_index(index_name)
