@@ -1798,9 +1798,34 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
+     * Returns true when the index distance metric is dot product, so the searcher should
+     * min-max normalize closeness scores across hits. Other metrics are already [0,1] in the rank
+     * profile.
+     */
+    @VisibleForTesting
+    static boolean shouldMinMaxNormalizeCloseness(String distanceMetric) {
+        return "dotproduct".equals(distanceMetric);
+    }
+
+    /**
+     * Normalizes a closeness_retrieval_vector score to [0,1] with 1 = closest (max), using
+     * per-key min/max across hits. Used for dot product and other unbounded closeness metrics.
+     * If no min/max for key, returns score unchanged.
+     */
+    @VisibleForTesting
+    static double normalizeClosenessScoreForRerank(
+            double score, String key, Map<String, double[]> closenessMinMaxPerKey) {
+        if (closenessMinMaxPerKey == null) return score;
+        double[] minMax = closenessMinMaxPerKey.get(key);
+        if (minMax == null || minMax.length != 2) return score;
+        return minMaxNormalize(score, minMax[0], minMax[1]);
+    }
+
+    /**
      * Returns weight * normalizedScore for one custom-score cell, or null if the score is missing
      * or the key is invalid. BM25 scores are min-max normalized when min/max are available.
-     * Custom score values are read only from summaryFeatures.
+     * Closeness_retrieval_vector scores are min-max normalized so dot product (and others) end in
+     * [0,1] with 1 = closest. Custom score values are read only from summaryFeatures.
      * When logger is non-null, logs read (in extractCustomScoreForHit) and apply modifier here.
      */
     private Double getWeightedNormalizedScoreForCell(
@@ -1808,6 +1833,7 @@ public class HybridSearcher extends Searcher {
             FeatureData hitMatchFeatures,
             Set<String> matchFeatureKeys,
             Map<String, double[]> bm25MinMaxPerKey,
+            Map<String, double[]> closenessMinMaxPerKey,
             FeatureData summaryFeatures,
             Logger logger) {
         String key = cell.getKey().label(0);
@@ -1830,6 +1856,8 @@ public class HybridSearcher extends Searcher {
             if (minMax != null && minMax.length == 2) {
                 normalizedScore = minMaxNormalize(score, minMax[0], minMax[1]);
             }
+        } else if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
+            normalizedScore = normalizeClosenessScoreForRerank(score, key, closenessMinMaxPerKey);
         }
         double modifierValue = weight * normalizedScore;
         if (logger != null) {
@@ -1851,8 +1879,8 @@ public class HybridSearcher extends Searcher {
     /**
      * Applies custom score rerank weights to add and mult modifiers: for each key in add weights,
      * adds (weight * score) to addModifier; for each key in mult weights, multiplies multModifier
-     * by (weight * normalizedScore). BM25 scores are normalized with the provided min/max map.
-     * For closeness_retrieval_vector, uses summaryFeatures when provided.
+     * by (weight * normalizedScore). BM25 and closeness_retrieval_vector scores are min-max
+     * normalized when min/max maps are provided (closeness so dot product ends in [0,1], 1=closest).
      */
     private void applyCustomScoreContributions(
             Double addModifier,
@@ -1862,6 +1890,7 @@ public class HybridSearcher extends Searcher {
             Tensor customAddWeights,
             Tensor customMultWeights,
             Map<String, double[]> bm25MinMaxPerKey,
+            Map<String, double[]> closenessMinMaxPerKey,
             double[] outAdd,
             double[] outMult,
             boolean verbose,
@@ -1877,6 +1906,7 @@ public class HybridSearcher extends Searcher {
                                 hitMatchFeatures,
                                 matchFeatureKeys,
                                 bm25MinMaxPerKey,
+                                closenessMinMaxPerKey,
                                 summaryFeatures,
                                 logger);
                 if (contrib != null) add += contrib;
@@ -1891,6 +1921,7 @@ public class HybridSearcher extends Searcher {
                                 hitMatchFeatures,
                                 matchFeatureKeys,
                                 bm25MinMaxPerKey,
+                                closenessMinMaxPerKey,
                                 summaryFeatures,
                                 logger);
                 if (contrib != null) mult *= contrib;
@@ -1932,6 +1963,58 @@ public class HybridSearcher extends Searcher {
             }
         }
         for (String key : bm25Keys) {
+            CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+            if (parsed == null) continue;
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
+            for (Hit hit : hits) {
+                FeatureData summaryFeatures = (FeatureData) hit.getField("summaryfeatures");
+                if (summaryFeatures == null) continue;
+                Double v =
+                        extractCustomScoreForHit(
+                                null, key, parsed, Collections.emptySet(), summaryFeatures);
+                if (v != null && !Double.isNaN(v)) {
+                    min = Math.min(min, v);
+                    max = Math.max(max, v);
+                }
+            }
+            if (min <= max && Double.isFinite(min) && Double.isFinite(max)) {
+                result.put(key, new double[] {min, max});
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Compute per-key min and max closeness_retrieval_vector values across hits. Used to
+     * min-max normalize closeness scores (e.g. dot product) to [0,1] with 1 = closest.
+     */
+    @VisibleForTesting
+    Map<String, double[]> computeClosenessMinMaxPerKey(
+            HitGroup hits, Tensor customAddWeights, Tensor customMultWeights) {
+        Map<String, double[]> result = new HashMap<>();
+        Set<String> closenessKeys = new HashSet<>();
+        if (customAddWeights != null) {
+            for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
+                Cell cell = it.next();
+                String key = cell.getKey().label(0);
+                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+                if (parsed != null && "closeness_retrieval_vector".equals(parsed.scoreType)) {
+                    closenessKeys.add(key);
+                }
+            }
+        }
+        if (customMultWeights != null) {
+            for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
+                Cell cell = it.next();
+                String key = cell.getKey().label(0);
+                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+                if (parsed != null && "closeness_retrieval_vector".equals(parsed.scoreType)) {
+                    closenessKeys.add(key);
+                }
+            }
+        }
+        for (String key : closenessKeys) {
             CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
             if (parsed == null) continue;
             double min = Double.POSITIVE_INFINITY;
@@ -2030,6 +2113,7 @@ public class HybridSearcher extends Searcher {
 
         Set<String> allMatchFeatureKeys = new HashSet<>();
         Map<String, double[]> bm25MinMaxPerKey = new HashMap<>();
+        Map<String, double[]> closenessMinMaxPerKey = new HashMap<>();
         if (hasCustomScores) {
             Hit firstHit = hits.get(0);
             FeatureData firstMf = (FeatureData) firstHit.getField("matchfeatures");
@@ -2044,6 +2128,15 @@ public class HybridSearcher extends Searcher {
             bm25MinMaxPerKey =
                     computeBm25MinMaxPerKey(
                             hits, customAddWeights, customMultWeights, allMatchFeatureKeys);
+            // Min-max normalize closeness only for dot product; other metrics are already [0,1] in
+            // the rank profile
+            String closenessDistanceMetric =
+                    query.properties()
+                            .getString("marqo__custom_score_closeness_distance_metric", "");
+            if (shouldMinMaxNormalizeCloseness(closenessDistanceMetric)) {
+                closenessMinMaxPerKey =
+                        computeClosenessMinMaxPerKey(hits, customAddWeights, customMultWeights);
+            }
         }
 
         boolean applyRecency =
@@ -2083,6 +2176,7 @@ public class HybridSearcher extends Searcher {
                                 customAddWeights,
                                 customMultWeights,
                                 bm25MinMaxPerKey,
+                                closenessMinMaxPerKey,
                                 outAdd,
                                 outMult,
                                 verbose,
@@ -2102,9 +2196,8 @@ public class HybridSearcher extends Searcher {
                     }
 
                     original_score = hit.getRelevance().getScore();
-                    if (hasCustomScores) {
-                        hit.setField(MARQO_PRE_RERANK_SCORE, original_score);
-                    }
+                    // Expose pre-rerank score whenever we apply any global score modifiers
+                    hit.setField(MARQO_PRE_RERANK_SCORE, original_score);
                     double baseScore = original_score * effectiveMult + effectiveAdd;
 
                     if (!applyRecency) {

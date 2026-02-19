@@ -10,7 +10,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
-from marqo.exceptions import InternalError
+from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 
@@ -18,7 +18,12 @@ from marqo.tensor_search.enums import EnvVars
 class StructuredVespaIndex(VespaIndex):
     """
     An implementation of VespaIndex for structured indexes.
+    Custom score reranking (marqo__score_*) is only supported for semi-structured indexes.
     """
+
+    def _supports_custom_score_rerank(self) -> bool:
+        """Override in SemiStructuredVespaIndex to True. Structured indexes do not support custom score rerank."""
+        return False
 
     _MARQO_TO_PYTHON_TYPE_MAP = {
         FieldType.Text: str,
@@ -572,41 +577,43 @@ class StructuredVespaIndex(VespaIndex):
         if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS])
 
-        # Custom Score Rerank Modifiers (only send non-empty tensors; empty dict is interpreted as string by Vespa)
+        # Custom score rerank (marqo__score_*) is only supported for semi-structured indexes.
+        custom_score_keys: Set[str] = set()
         custom_score_rerank = hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)
-        if custom_score_rerank:
+        if custom_score_rerank and not self._supports_custom_score_rerank():
+            add_weights = custom_score_rerank.get(constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL) or {}
+            mult_weights = custom_score_rerank.get(constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL) or {}
+            if add_weights or mult_weights:
+                raise UnsupportedFeatureError(
+                    "Custom score reranking (marqo__score_*) is only supported for semi-structured indexes, "
+                    "not for structured indexes."
+                )
+        if self._supports_custom_score_rerank() and custom_score_rerank:
             for k, v in custom_score_rerank.items():
                 if v:
                     query_inputs[k] = v
-
-        # Add rank() terms for custom score match features when hybrid + RRF
-        custom_score_keys: Set[str] = set()
-        if custom_score_rerank:
             mult_key = constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL
             add_key = constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL
             custom_score_keys = set(custom_score_rerank.get(mult_key, {}).keys()) | set(
                 custom_score_rerank.get(add_key, {}).keys()
             )
-
-        # rank() only when BM25 rerankers are present; never add nearestNeighbor ranking terms
-        if (
-            custom_score_keys
-            and marqo_query.hybrid_parameters.rankingMethod == RankingMethod.RRF
-        ):
-            bm25_fields = self._get_fields_to_bm25_rerank_by(custom_score_keys)
-            extra_terms: List[str] = []
-            if bm25_fields:
-                bm25_term = self._get_lexical_search_term(
-                    marqo_query,
-                    _is_ranking_term=True,
-                    attributes_to_search=bm25_fields,
-                )
-                if bm25_term != "":
-                    extra_terms.append(bm25_term)
-            extra_terms = [t for t in extra_terms if t != ""]
-            if extra_terms:
-                lexical_term = f'rank({lexical_term}, {", ".join(extra_terms)})'
-                tensor_term = f'rank({tensor_term}, {", ".join(extra_terms)})'
+            if custom_score_keys:
+                self._validate_custom_score_modifier_fields(custom_score_keys)
+            if custom_score_keys and marqo_query.hybrid_parameters.rankingMethod == RankingMethod.RRF:
+                bm25_fields = self._get_fields_to_bm25_rerank_by(custom_score_keys)
+                extra_terms: List[str] = []
+                if bm25_fields:
+                    bm25_term = self._get_lexical_search_term(
+                        marqo_query,
+                        _is_ranking_term=True,
+                        attributes_to_search=bm25_fields,
+                    )
+                    if bm25_term != "":
+                        extra_terms.append(bm25_term)
+                extra_terms = [t for t in extra_terms if t != ""]
+                if extra_terms:
+                    lexical_term = f'rank({lexical_term}, {", ".join(extra_terms)})'
+                    tensor_term = f'rank({tensor_term}, {", ".join(extra_terms)})'
 
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
@@ -655,12 +662,16 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
 
-        # Tell the custom searcher to fill summaryfeatures and use them for reranking
-        if custom_score_keys:
+        # Tell the custom searcher to fill summaryfeatures and use them for reranking (semi-structured only)
+        if self._supports_custom_score_rerank() and custom_score_keys:
             has_bm25 = bool(self._get_fields_to_bm25_rerank_by(custom_score_keys))
             has_closeness = bool(self._get_fields_to_closeness_rerank_by(custom_score_keys))
             if has_closeness:
                 query["marqo__hasRankingVector"] = True
+                # Pass distance metric so searcher can min-max normalize only for dot product (others are already [0,1] in rank profile)
+                query["marqo__custom_score_closeness_distance_metric"] = (
+                    self._marqo_index.distance_metric.value
+                )
             if has_bm25:
                 query["marqo__hasRankingLexical"] = True
 
@@ -1062,6 +1073,68 @@ class StructuredVespaIndex(VespaIndex):
                 for field in searchable_attributes
             ]) + ")"
         return f'default contains "{phrase}"'
+
+    def _validate_custom_score_modifier_fields(self, custom_score_keys: Set[str]) -> None:
+        """
+        Validate that every custom score key that references a field uses a field that exists
+        in the index: bm25_field_<field> must be a lexically searchable field; closeness_retrieval_vector_field_<field>
+        must be a tensor field. For aggregates (sum/max/avg), the index must have at least one lexically searchable
+        field for BM25 aggregates and at least one tensor field for closeness aggregates. Raises InvalidArgumentError
+        if not.
+        """
+        prefix = constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        has_bm25_aggregate = False
+        has_closeness_aggregate = False
+        for key in custom_score_keys:
+            key_stripped = key[len(prefix):] if key.startswith(prefix) else key
+            parsed = VespaIndex.parse_custom_score_key(key_stripped)
+            if parsed is None:
+                continue
+            score_type, field_name, aggregate_type = parsed
+            if score_type == "bm25" and aggregate_type is not None:
+                has_bm25_aggregate = True
+            elif score_type == "closeness_retrieval_vector" and aggregate_type is not None:
+                has_closeness_aggregate = True
+        if has_bm25_aggregate and not self._marqo_index.lexically_searchable_fields_names:
+            raise InvalidArgumentError(
+                "Cannot use BM25 aggregate (marqo__score_bm25_sum, marqo__score_bm25_max, or marqo__score_bm25_avg) "
+                "when the index has no lexically searchable fields."
+            )
+        if has_closeness_aggregate and not self._marqo_index.tensor_field_map:
+            raise InvalidArgumentError(
+                "Cannot use closeness aggregate (marqo__score_closeness_retrieval_vector_sum, _max, or _avg) "
+                "when the index has no tensor fields."
+            )
+        for key in custom_score_keys:
+            key_stripped = key[len(prefix):] if key.startswith(prefix) else key
+            parsed = VespaIndex.parse_custom_score_key(key_stripped)
+            if parsed is None:
+                continue
+            score_type, field_name, aggregate_type = parsed
+            if aggregate_type is not None:
+                continue
+            if field_name is None:
+                continue
+            if score_type == "bm25":
+                if field_name not in self._marqo_index.field_map:
+                    raise InvalidArgumentError(
+                        f"Custom score modifier bm25_field_{field_name} references field '{field_name}' "
+                        f"which is not in the index. Lexically searchable fields for this index are: "
+                        f"{sorted(self._marqo_index.field_map.keys())}."
+                    )
+                lex = self._marqo_index.field_map[field_name].lexical_field_name
+                if lex is None:
+                    raise InvalidArgumentError(
+                        f"Custom score modifier bm25_field_{field_name} references field '{field_name}' "
+                        f"which is not a lexically searchable field (no BM25). Use a text field."
+                    )
+            elif score_type == "closeness_retrieval_vector":
+                if field_name not in self._marqo_index.tensor_field_map:
+                    raise InvalidArgumentError(
+                        f"Custom score modifier closeness_retrieval_vector_field_{field_name} references field "
+                        f"'{field_name}' which is not a tensor field in the index. Tensor fields are: "
+                        f"{sorted(self._marqo_index.tensor_field_map.keys())}."
+                    )
 
     def _get_fields_to_bm25_rerank_by(self, custom_score_keys: Set[str]) -> List[str]:
         """

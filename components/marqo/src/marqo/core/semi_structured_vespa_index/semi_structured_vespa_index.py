@@ -33,6 +33,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     TODO the multi-inheritance makes the implementation difficult to reason about. Consider refactor to composition
       instead. e.g. extract different logics to different query component builders, and combined the result.
     """
+
+    def _supports_custom_score_rerank(self) -> bool:
+        return True
+
     index_supports_partial_updates: bool = False
 
     def __init__(self, marqo_index: SemiStructuredMarqoIndex):
