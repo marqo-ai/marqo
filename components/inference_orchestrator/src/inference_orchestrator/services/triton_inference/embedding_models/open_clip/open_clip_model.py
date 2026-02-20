@@ -128,12 +128,12 @@ class OpenCLIPModel(AbstractEmbeddingModel):
 
     def _load_necessary_components(self) -> None:
         """Load the open_clip model and tokenizer."""
-        if self.model_properties.name.startswith(HF_HUB_PREFIX):
+        if self.model_properties.effective_name.startswith(HF_HUB_PREFIX):
             _, self.image_preprocessor = (
                 self._load_model_and_image_preprocessor_from_hf_repo()
             )
             self.tokenizer = self._load_tokenizer_from_hf_repo()
-        elif self.model_properties.name.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
+        elif self.model_properties.effective_name.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
             _, self.image_preprocessor = (
                 self._load_model_and_image_preprocessor_from_open_clip_repo()
             )
@@ -198,7 +198,7 @@ class OpenCLIPModel(AbstractEmbeddingModel):
         The hf_repo should be provided in the model properties, and it is a string starting with `hf-hub:`.
         """
         model, _, preprocess = open_clip.create_model_and_transforms(
-            model_name=self.model_properties.name,
+            model_name=self.model_properties.effective_name,
             device="cpu",
             cache_dir=ModelDownloadCache.open_clip_cache_path,
         )
@@ -211,8 +211,8 @@ class OpenCLIPModel(AbstractEmbeddingModel):
 
         The model name should be provided in the model properties, and it is a string starting with `open_clip/`.
         """
-        architecture = self.model_properties.name.split("/", 3)[1]
-        pretrained = self.model_properties.name.split("/", 3)[2]
+        architecture = self.model_properties.effective_name.split("/", 3)[1]
+        pretrained = self.model_properties.effective_name.split("/", 3)[2]
 
         model, _, preprocess = open_clip.create_model_and_transforms(
             model_name=architecture,
@@ -224,12 +224,12 @@ class OpenCLIPModel(AbstractEmbeddingModel):
 
     def _load_tokenizer_from_checkpoint(self) -> Callable:
         if not self.model_properties.tokenizer:
-            if self.model_properties.name.startswith(HF_HUB_PREFIX):
-                return open_clip.get_tokenizer(self.model_properties.name)
+            if self.model_properties.effective_name.startswith(HF_HUB_PREFIX):
+                return open_clip.get_tokenizer(self.model_properties.effective_name)
             else:
                 # Replace '/'with '-' to support old clip model name style
                 return open_clip.get_tokenizer(
-                    self.model_properties.name.replace("/", "-")
+                    self.model_properties.effective_name.replace("/", "-")
                 )
         else:
             logger.info("Custom HFTokenizer is provided. Loading...")
@@ -237,11 +237,11 @@ class OpenCLIPModel(AbstractEmbeddingModel):
 
     def _load_tokenizer_from_hf_repo(self) -> Callable:
         return open_clip.get_tokenizer(
-            self.model_properties.name, cache_dir=ModelDownloadCache.hf_cache_path
+            self.model_properties.effective_name, cache_dir=ModelDownloadCache.hf_cache_path
         )
 
     def _load_tokenizer_from_open_clip_repo(self) -> Callable:
-        return open_clip.get_tokenizer(self.model_properties.name.split("/", 3)[1])
+        return open_clip.get_tokenizer(self.model_properties.effective_name.split("/", 3)[1])
 
     def encode(
         self, inputs: List, modality: Modality, normalize: bool

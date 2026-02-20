@@ -409,6 +409,57 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
         with self.assertRaises(ValidationError):
             properties.tokens = 256  # type: ignore
 
+    def test_effective_name_returns_name_when_triton_model_name_absent(self):
+        """Test that effective_name falls back to name when tritonModelName is not set."""
+        properties = HuggingFaceModelProperties(
+            name="sentence-transformers/all-MiniLM-L6-v2",
+            type="hf",
+            dimensions=384,
+            pooling_method=PoolingMethod.Mean,
+            triton_text_encoder_properties=self.text_encoder_properties,
+        )
+
+        self.assertEqual("sentence-transformers/all-MiniLM-L6-v2", properties.effective_name)
+        self.assertIsNone(properties.triton_model_name)
+
+    def test_effective_name_returns_triton_model_name_when_set(self):
+        """Test that effective_name returns tritonModelName when it is set."""
+        properties = HuggingFaceModelProperties(
+            name="old-model-name",
+            type="hf",
+            dimensions=384,
+            pooling_method=PoolingMethod.Mean,
+            tritonModelName="sentence-transformers/all-MiniLM-L6-v2",
+            triton_text_encoder_properties=self.text_encoder_properties,
+        )
+
+        self.assertEqual("sentence-transformers/all-MiniLM-L6-v2", properties.effective_name)
+        self.assertEqual("old-model-name", properties.name)
+        self.assertEqual("sentence-transformers/all-MiniLM-L6-v2", properties.triton_model_name)
+
+    def test_effective_name_with_various_triton_model_names(self):
+        """Test effective_name with different tritonModelName values."""
+        test_cases = [
+            ("with triton_model_name", "old-name", "new-hf-name", "new-hf-name"),
+            ("None triton_model_name", "original-name", None, "original-name"),
+        ]
+
+        for test_name, name, triton_model_name, expected_effective in test_cases:
+            with self.subTest(msg=test_name):
+                kwargs = dict(
+                    name=name,
+                    type="hf",
+                    dimensions=384,
+                    pooling_method=PoolingMethod.Mean,
+                    triton_text_encoder_properties=self.text_encoder_properties,
+                )
+                if triton_model_name is not None:
+                    kwargs["tritonModelName"] = triton_model_name
+
+                properties = HuggingFaceModelProperties(**kwargs)
+
+                self.assertEqual(expected_effective, properties.effective_name)
+
     def test_field_aliases(self):
         """Test that field aliases work correctly."""
         properties = HuggingFaceModelProperties(

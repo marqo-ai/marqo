@@ -52,16 +52,12 @@ class HuggingFaceModelProperties(BaseModelProperties):
     A class to represent the properties of a Hugging Face model.
 
     Attributes:
-        name: The name of the model. This will be used as the repo_id in the Hugging Face model hub.
-            This attribute is neglected if 'url' or 'model_location' is provided.
-            We are not raising an error right now as that would be a breaking change.
         tokens: The token length of the model. It is default to 128.
         type: The type of the model. It should be "hf".
         note: A note about the model. It is optional.
         pooling_method: The pooling method for the model. It should be one of the values in the PoolingMethod enum.
     """
 
-    name: str
     tokens: int = 128
     note: Optional[str] = None
     pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
