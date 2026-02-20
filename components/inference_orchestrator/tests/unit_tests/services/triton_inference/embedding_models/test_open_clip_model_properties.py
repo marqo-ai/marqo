@@ -513,6 +513,58 @@ class TestOpenCLIPModelProperties(unittest.TestCase):
             self.image_encoder_properties, properties.triton_image_encoder_properties
         )
 
+    def test_effective_name_returns_name_when_triton_model_name_absent(self):
+        """Test that effective_name falls back to name when tritonModelName is not set."""
+        properties = OpenCLIPModelProperties(
+            name="ViT-B-32",
+            type="open_clip",
+            dimensions=512,
+            triton_text_encoder_properties=self.text_encoder_properties,
+            triton_image_encoder_properties=self.image_encoder_properties,
+        )
+
+        self.assertEqual("ViT-B-32", properties.effective_name)
+        self.assertIsNone(properties.triton_model_name)
+
+    def test_effective_name_returns_triton_model_name_when_set(self):
+        """Test that effective_name returns tritonModelName when it is set."""
+        properties = OpenCLIPModelProperties(
+            name="ViT-B-16-SigLIP",
+            type="open_clip",
+            dimensions=512,
+            tritonModelName="hf-hub:timm/ViT-B-16-SigLIP",
+            triton_text_encoder_properties=self.text_encoder_properties,
+            triton_image_encoder_properties=self.image_encoder_properties,
+        )
+
+        self.assertEqual("hf-hub:timm/ViT-B-16-SigLIP", properties.effective_name)
+        self.assertEqual("ViT-B-16-SigLIP", properties.name)
+        self.assertEqual("hf-hub:timm/ViT-B-16-SigLIP", properties.triton_model_name)
+
+    def test_effective_name_with_various_triton_model_names(self):
+        """Test effective_name with different tritonModelName values."""
+        test_cases = [
+            ("hf-hub prefix", "old-name", "hf-hub:org/model", "hf-hub:org/model"),
+            ("open_clip prefix", "old-name", "open_clip/ViT-B-32/openai", "open_clip/ViT-B-32/openai"),
+            ("None triton_model_name", "original-name", None, "original-name"),
+        ]
+
+        for test_name, name, triton_model_name, expected_effective in test_cases:
+            with self.subTest(msg=test_name):
+                kwargs = dict(
+                    name=name,
+                    type="open_clip",
+                    dimensions=512,
+                    triton_text_encoder_properties=self.text_encoder_properties,
+                    triton_image_encoder_properties=self.image_encoder_properties,
+                )
+                if triton_model_name is not None:
+                    kwargs["tritonModelName"] = triton_model_name
+
+                properties = OpenCLIPModelProperties(**kwargs)
+
+                self.assertEqual(expected_effective, properties.effective_name)
+
     def test_different_batch_sizes_for_encoders(self):
         """Test that text and image encoders can have different batch sizes."""
         text_props = TritonModelProperties(

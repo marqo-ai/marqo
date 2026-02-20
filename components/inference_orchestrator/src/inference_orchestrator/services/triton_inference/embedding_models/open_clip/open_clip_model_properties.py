@@ -62,7 +62,6 @@ class OpenCLIPModelProperties(BaseModelProperties):
     A class to represent the properties of an OpenCLIP model.
 
     Attributes:
-        name: The name of the model. It will be used to load the image preprocessor/tokenizer.
         type: The type of the model. It should be 'open_clip'.
         tokenizer: The name of the tokenizer. It is optional.
         image_preprocessor: The image preprocessor used by the model. It should be one of the values in the
@@ -75,7 +74,6 @@ class OpenCLIPModelProperties(BaseModelProperties):
         note: A note about the model. It is optional.
     """
 
-    name: str
     tokenizer: Optional[str] = None
     image_preprocessor: ImagePreprocessor = Field(
         default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor"
