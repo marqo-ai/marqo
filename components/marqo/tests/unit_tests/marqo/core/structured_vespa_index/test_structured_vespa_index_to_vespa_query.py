@@ -174,6 +174,55 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
             ['*'],
         )
 
+    def test_simplify_bm25_extra_fields_for_rank(self):
+        """_simplify_bm25_extra_fields_for_rank removes redundancy with main lexical term."""
+        # Empty bm25_fields -> no extra term
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank([], None),
+            [],
+        )
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank([], ['title']),
+            [],
+        )
+        # Main uses default (None): no extra term needed for lexical
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank(['title'], None),
+            [],
+        )
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank(['*'], None),
+            [],
+        )
+        # Main has specific fields; bm25 is default -> still need default for aggregate
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank(['*'], ['title']),
+            ['*'],
+        )
+        # Main has fields; bm25 same set -> no extra
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank(['title', 'description'], ['title', 'description']),
+            [],
+        )
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank(['description', 'title'], ['title', 'description']),
+            [],
+        )
+        # Main has subset; bm25 has extra -> only non-main fields
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank(['title', 'description'], ['title']),
+            ['description'],
+        )
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank(['title', 'description'], ['description']),
+            ['title'],
+        )
+        # No overlap: main has one field, bm25 has another -> keep bm25 field
+        self.assertEqual(
+            self.vespa_index._simplify_bm25_extra_fields_for_rank(['description'], ['title']),
+            ['description'],
+        )
+
     def test_get_fields_to_closeness_rerank_by(self):
         """_get_fields_to_closeness_rerank_by returns tensor fields or all for aggregate."""
         self.assertEqual(

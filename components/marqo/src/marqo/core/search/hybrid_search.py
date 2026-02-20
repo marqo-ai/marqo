@@ -254,6 +254,27 @@ class HybridSearch:
                 f"This index was created with Marqo {marqo_index_version}."
             )
 
+        # Custom score rerankers (marqo__score_*) require semi-structured index and schema version >= 2.26.0
+        _uses_custom_score_rerank = (
+            score_modifiers is not None
+            and any(
+                m.field.startswith(constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX)
+                for m in score_modifiers.to_marqo_score_modifiers()
+            )
+        )
+        if _uses_custom_score_rerank:
+            if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+                raise core_exceptions.UnsupportedFeatureError(
+                    "Custom score reranking (marqo__score_*) is only supported for semi-structured indexes. "
+                    "Structured indexes do not support this feature."
+                )
+            if not marqo_index.index_supports_custom_score_rerank:
+                raise core_exceptions.UnsupportedFeatureError(
+                    f"Custom score reranking is only supported for indexes whose Vespa schema version is "
+                    f"{str(constants.MARQO_CUSTOM_SCORE_RERANKERS_MINIMUM_VERSION)} or later. "
+                    f"This index has schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                )
+
         # TODO: Remove when unstructured searchable attributes are supported
         if (isinstance(marqo_index, UnstructuredMarqoIndex) and
                 not isinstance(marqo_index, SemiStructuredMarqoIndex) and

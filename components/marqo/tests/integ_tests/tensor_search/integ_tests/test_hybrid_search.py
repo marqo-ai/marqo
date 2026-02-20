@@ -11,6 +11,7 @@ import marqo.core.exceptions as core_exceptions
 import marqo.vespa.exceptions as vespa_exceptions
 from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
 from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -869,8 +870,8 @@ class TestHybridSearch(MarqoTestCase):
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_custom_score_rerank_single_bm25_field(self):
-        """Hybrid search with custom score rerank (single bm25 field) returns hits."""
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+        """Hybrid search with custom score rerank (single bm25 field) returns hits. Only semi-structured supports marqo__score_*."""
+        for index in [self.semi_structured_default_text_index]:
             with self.subTest(index=index.name):
                 self.add_documents(
                     config=self.config,
@@ -903,8 +904,8 @@ class TestHybridSearch(MarqoTestCase):
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_custom_score_rerank_invalid_key_raises(self):
-        """Hybrid search with invalid custom score key raises."""
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+        """Hybrid search with invalid custom score key raises. Only semi-structured supports custom score rerank."""
+        for index in [self.semi_structured_default_text_index]:
             with self.subTest(index=index.name):
                 self.add_documents(
                     config=self.config,
@@ -935,8 +936,8 @@ class TestHybridSearch(MarqoTestCase):
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_custom_score_rerank_with_regular_modifiers(self):
-        """Custom score rerank and regular global score modifiers can be used together."""
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+        """Custom score rerank and regular global score modifiers can be used together. Only semi-structured supports marqo__score_*."""
+        for index in [self.semi_structured_default_text_index]:
             with self.subTest(index=index.name):
                 self.add_documents(
                     config=self.config,
@@ -1028,8 +1029,8 @@ class TestHybridSearch(MarqoTestCase):
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_custom_score_rerank_with_pagination(self):
-        """Custom score rerank with limit/offset returns correct window."""
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+        """Custom score rerank with limit/offset returns correct window. Only semi-structured supports marqo__score_*."""
+        for index in [self.semi_structured_default_text_index]:
             with self.subTest(index=index.name):
                 self.add_documents(
                     config=self.config,

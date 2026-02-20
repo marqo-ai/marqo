@@ -339,6 +339,8 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_document[constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = value
             elif field == common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE:
                 marqo_document[constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = value
+            elif field == common.VESPA_DOC_PRE_RERANK_SCORE:
+                marqo_document[constants.MARQO_DOC_PRE_RERANK_SCORE] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
             elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS_2_8,
@@ -600,20 +602,33 @@ class StructuredVespaIndex(VespaIndex):
             if custom_score_keys:
                 self._validate_custom_score_modifier_fields(custom_score_keys)
             if custom_score_keys and marqo_query.hybrid_parameters.rankingMethod == RankingMethod.RRF:
+
+                # Calculate extra bm25 rank term for lexical retriever
                 bm25_fields = self._get_fields_to_bm25_rerank_by(custom_score_keys)
-                extra_terms: List[str] = []
-                if bm25_fields:
-                    bm25_term = self._get_lexical_search_term(
+                main_lexical_attrs = marqo_query.hybrid_parameters.searchableAttributesLexical
+                simplified_lexical = self._simplify_bm25_extra_fields_for_rank(bm25_fields, main_lexical_attrs)
+                simplified_tensor = bm25_fields  # tensor retriever has no main lexical term to dedupe against
+
+                extra_lexical_term = ""
+                if simplified_lexical:
+                    extra_lexical_term = self._get_lexical_search_term(
                         marqo_query,
                         _is_ranking_term=True,
-                        attributes_to_search=bm25_fields,
+                        attributes_to_search=simplified_lexical,
                     )
-                    if bm25_term != "":
-                        extra_terms.append(bm25_term)
-                extra_terms = [t for t in extra_terms if t != ""]
-                if extra_terms:
-                    lexical_term = f'rank({lexical_term}, {", ".join(extra_terms)})'
-                    tensor_term = f'rank({tensor_term}, {", ".join(extra_terms)})'
+                if extra_lexical_term:
+                    lexical_term = f'rank({lexical_term}, {extra_lexical_term})'
+
+                # Calculate extra bm25 rank term for tensor retriever
+                extra_tensor_term = ""
+                if bm25_fields:
+                    extra_tensor_term = self._get_lexical_search_term(
+                        marqo_query,
+                        _is_ranking_term=True,
+                        attributes_to_search=simplified_tensor,
+                    )
+                if extra_tensor_term:
+                    tensor_term = f'rank({tensor_term}, {extra_tensor_term})'
 
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
@@ -1163,6 +1178,33 @@ class StructuredVespaIndex(VespaIndex):
         if has_aggregate:
             return ["*"]
         return sorted(fields)
+
+    def _simplify_bm25_extra_fields_for_rank(
+        self,
+        bm25_fields: List[str],
+        main_lexical_searchable_attributes: Optional[List[str]],
+    ) -> List[str]:
+        """
+        Remove redundancy between the main lexical retriever term and the BM25 extra term(s) in rank().
+
+        Only applies to the lexical retriever (main term has contains). Rules:
+        - If main lexical uses default (main_lexical_searchable_attributes is None), no extra term needed.
+        - If main has specific fields, return bm25_fields minus those already in main (no duplicate field).
+        - bm25_fields may be ["*"] (default) or a list of field names.
+
+        Returns a list suitable for attributes_to_search in _get_lexical_search_term: [] (no extra),
+        ["*"], or list of field names. Caller uses this only for the lexical rank() extra term;
+        the tensor retriever uses bm25_fields as-is (no main contains term to dedupe against).
+        """
+        if not bm25_fields:
+            return []
+        if main_lexical_searchable_attributes is None:
+            return []
+        if bm25_fields == ["*"]:
+            return ["*"]
+        main_set = set(main_lexical_searchable_attributes)
+        remaining = [f for f in bm25_fields if f not in main_set]
+        return remaining
 
     def _get_fields_to_closeness_rerank_by(self, custom_score_keys: Set[str]) -> List[str]:
         """

@@ -12,7 +12,11 @@ or closeness tensor_ranking_field reverses order to (doc5..doc1). Each test show
 import os
 from unittest import mock
 
-from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX, MARQO_DOC_PRE_RERANK_SCORE
+from marqo.core.constants import (
+    MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX,
+    MARQO_CUSTOM_SCORE_RERANKERS_MINIMUM_VERSION,
+    MARQO_DOC_PRE_RERANK_SCORE,
+)
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
@@ -26,6 +30,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import (
     RelativeMaxScoreParameters,
 )
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
+from marqo.tensor_search.models.collapse_model import CollapseModel
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
@@ -182,12 +187,13 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
+        # TODO: Change hardcoded values. Original planned open_clip/ViT-B-16-SigLIP-512/webli is no longer there
         index_request = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-16-SigLIP-512/webli"),
+            model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
         )
         # Second index is never given documents; used for aggregate validation tests (no lexical/tensor fields).
         index_request_empty = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-16-SigLIP-512/webli"),
+            model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
         )
         cls.indexes = cls.create_indexes([index_request, index_request_empty])
         cls.index = cls.indexes[0]
@@ -212,6 +218,35 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 tensor_fields=TENSOR_FIELDS_PLAN,
             ),
         )
+
+    def test_custom_score_rerank_raises_when_schema_version_below_minimum(self):
+        """Custom score rerankers on an index with schema version < 2.26.0 raises UnsupportedFeatureError."""
+        import marqo.tensor_search.index_meta_cache as index_meta_cache
+        real_get_index = index_meta_cache.get_index
+
+        def get_index_old_schema(index_management, index_name, force_refresh=False):
+            idx = real_get_index(index_management, index_name, force_refresh)
+            if index_name == self.index.name:
+                idx = idx.copy(deep=True, update={"schema_template_version": "2.25.0"})
+                idx.clear_cache()  # recompute index_supports_* from new schema_template_version
+            return idx
+
+        with mock.patch("marqo.tensor_search.index_meta_cache.get_index", get_index_old_schema):
+            with self.assertRaises(UnsupportedFeatureError) as ctx:
+                tensor_search.search(
+                    config=self.config,
+                    index_name=self.index.name,
+                    text="x",
+                    search_method="HYBRID",
+                    hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                    score_modifiers=ScoreModifierLists(
+                        add_to_score=[{"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum", "weight": 1.0}]
+                    ),
+                    result_count=5,
+                )
+        msg = str(ctx.exception)
+        self.assertIn(str(MARQO_CUSTOM_SCORE_RERANKERS_MINIMUM_VERSION), msg)
+        self.assertIn("2.25.0", msg)
 
     def _assert_pre_rerank_score_matches_baseline(
         self, res_with_rerank, res_no_rerank, tolerance=1e-5
@@ -812,7 +847,7 @@ class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        model = Model(name="open_clip/ViT-B-16-SigLIP-512/webli")
+        model = Model(name="open_clip/ViT-B-16-SigLIP/webli")
         requests = [
             cls.unstructured_marqo_index_request(model=model, distance_metric=metric)
             for metric in cls.DISTANCE_METRICS
@@ -875,10 +910,10 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
         index_request = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-16-SigLIP-512/webli"),
+            model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
         )
         collapse_index_request = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-16-SigLIP-512/webli"),
+            model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
             collapse_fields=[CollapseField(name="parent_id", minGroups=2)],
         )
         cls.indexes = cls.create_indexes([index_request, collapse_index_request])
@@ -1155,6 +1190,79 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         )
         self.assertGreater(len(res_with_rerank["facets"]["category"]), 0)
 
+    def test_custom_score_rerank_no_redundant_bm25_terms_in_rank(self):
+        """
+        When the main lexical term already includes a field that is also requested in add_to_score
+        and multiply_score_by, the query sent to Vespa must not duplicate that field in rank().
+        (1) Capture the Vespa query and assert lexical YQL has no redundant BM25 term.
+        (2) Result order must still be correct (doc5 first with add_to_score bm25 lex_ranking_field).
+        """
+        self._add_tuxedo_docs()
+        # Main lexical term includes both lex_retrieval_field and lex_ranking_field; custom score
+        # requests bm25 for lex_ranking_field only -> redundant; simplification should omit extra
+        # term for lexical retriever so the field appears only once in the lexical YQL.
+        hybrid_params_redundant = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5001,
+            rrfK=60,
+            searchableAttributesTensor=["tensor_retrieval_field"],
+            searchableAttributesLexical=["lex_retrieval_field", "lex_ranking_field"],
+        )
+        captured_query = {}
+        original_query = self.config.vespa_client.query
+
+        def capture_then_query(**kwargs):
+            captured_query.clear()
+            captured_query.update(kwargs)
+            return original_query(**kwargs)
+
+        with mock.patch.object(self.config.vespa_client, "query", capture_then_query):
+            res = tensor_search.search(
+                config=self.config,
+                index_name=self.index.name,
+                text=TUXEDO_QUERY,
+                search_method="HYBRID",
+                hybrid_parameters=hybrid_params_redundant,
+                score_modifiers=ScoreModifierLists(
+                    add_to_score=[
+                        {
+                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                            "weight": 1.0,
+                        }
+                    ],
+                    multiply_score_by=[
+                        {
+                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                            "weight": 1.0,
+                        }
+                    ],
+                ),
+                result_count=10,
+            )
+
+        lexical_yql = captured_query.get("marqo__yql.lexical") or ""
+        tensor_yql = captured_query.get("marqo__yql.tensor") or ""
+
+        # Lexical retriever: main term already has lex_ranking_field, so no extra rank() term.
+        # So lexical YQL must not contain a second (redundant) contains for lex_ranking_field.
+        # Main term has two fields -> two "contains" for the phrase; no extra term -> still two.
+        self.assertEqual(
+            lexical_yql.count('contains "tuxedo"'),
+            2,
+            msg="Lexical YQL must have exactly two contains (one per field in main term), no redundant rank() term",
+        )
+        # Tensor retriever has no main lexical term, so it still needs the BM25 term in rank().
+        self.assertIn("rank(", tensor_yql, msg="Tensor YQL must still use rank() for BM25 custom score")
+
+        # Results must still be in correct order: add_to_score bm25 lex_ranking_field -> doc5 first.
+        ids = [h["_id"] for h in res["hits"]]
+        self.assertEqual(len(ids), 5)
+        self.assertEqual(ids[0], "doc5", msg="add_to_score bm25 lex_ranking_field: doc5 (highest bm25) must rank first")
+        self.assertEqual(ids[-1], "doc1", msg="doc1 (lowest bm25) must rank last")
+        for hit in res["hits"]:
+            self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
+
     # Pagination with custom score reranking: offset must be applied after global reranking.
     # Backend currently applies offset before/during the pipeline, so this test would fail.
     # Will be fixed in a separate feature; skipping until then.
@@ -1218,7 +1326,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
     def test_custom_score_rerank_with_collapse_fields(self):
         """
         Collapsing happens during fusion; reranking applies to the fused list.
-        With collapse_field_name and custom score reranking, we get one result per group
+        With collapse and custom score reranking, we get one result per group
         and custom score is applied to the reranked (then collapsed) list.
         """
         docs = _tuxedo_docs_with_extras(parent_id=("g1", "g1", "g2", "g2", "g1"))[:4]
@@ -1251,7 +1359,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 ]
             ),
             result_count=10,
-            collapse_field_name="parent_id",
+            collapse=CollapseModel(name="parent_id"),
         )
         self.assertIn("hits", res)
         # After collapse we get exactly one per parent_id (2 groups, 4 docs).
