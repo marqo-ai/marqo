@@ -1146,9 +1146,19 @@ public class HybridSearcher extends Searcher {
      * @return A new Query object configured for probe lexical search.
      */
     Query createProbeLexialQuery(Query query, Integer probeDepth, boolean verbose) {
+        // Use dedicated probe lexical YQL when set (no custom-score extra rank terms); else main
+        // lexical.
+        String probeLexicalYql = query.properties().getString("marqo__yql.lexical.probe", null);
+        if (probeLexicalYql == null || probeLexicalYql.isEmpty()) {
+            probeLexicalYql = query.properties().getString("marqo__yql.lexical", "");
+        }
         Query probeLexicalQuery =
                 createSubQuery(
-                        query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+                        query,
+                        MARQO_SEARCH_METHOD_LEXICAL,
+                        MARQO_SEARCH_METHOD_LEXICAL,
+                        verbose,
+                        probeLexicalYql);
 
         // Overwrite the lexical score modifiers in the probe query
         probeLexicalQuery
@@ -1556,7 +1566,7 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Finds the bm25 match feature name for the given Marqo field name. Tries conventional
-     * schema naming: bm25(marqo__lexical_&lt;field&gt;) and bm25(&lt;field&gt;_lexical).
+     * schema naming: bm25(marqo__lexical_<field>) and bm25(<field>_lexical).
      */
     @VisibleForTesting
     static String findBm25MatchFeatureName(Set<String> matchFeatureKeys, String fieldName) {
@@ -1581,8 +1591,8 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Finds the closeness(field, ...) match feature name for the given Marqo field name. Tries
-     * conventional naming: closeness(field,marqo__embeddings_&lt;field&gt;) and
-     * closeness(field,&lt;field&gt;_embeddings).
+     * conventional naming: closeness(field,marqo__embeddings_<field>) and
+     * closeness(field,<field>_embeddings).
      */
     @VisibleForTesting
     static String findClosenessMatchFeatureName(Set<String> matchFeatureKeys, String fieldName) {
@@ -1620,8 +1630,8 @@ public class HybridSearcher extends Searcher {
     /**
      * Extracts the custom score value for one key. Custom score reranking uses only
      * summary-features (no fallback to match-features). For closeness_retrieval_vector the
-     * summary feature name is ranking_closeness_metric_&lt;field_name&gt;. For bm25 we use
-     * bm25(marqo__lexical_&lt;field&gt;) per lexical field; aggregate = sum/max/avg over those.
+     * summary feature name is ranking_closeness_metric_<field_name>. For bm25 we use
+     * bm25(marqo__lexical_<field>) per lexical field; aggregate = sum/max/avg over those.
      */
     @VisibleForTesting
     static Double extractCustomScoreForHit(
@@ -1690,7 +1700,7 @@ public class HybridSearcher extends Searcher {
         return null;
     }
 
-    /** Summary feature name for single-field BM25: bm25(marqo__lexical_&lt;fieldName&gt;). One per lexical field; no bm25(marqo__ranking_strings). */
+    /** Summary feature name for single-field BM25: bm25(marqo__lexical_<fieldName>). One per lexical field; no bm25(marqo__ranking_strings). */
     private static String bm25SummaryFeatureName(String fieldName) {
         if (fieldName == null || fieldName.isEmpty()) {
             return null;
@@ -1798,13 +1808,13 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Returns true when the index distance metric is dot product, so the searcher should
-     * min-max normalize closeness scores across hits. Other metrics are already [0,1] in the rank
-     * profile.
+     * Closeness is always min-max normalized in the searcher (same as BM25): single field or
+     * aggregate, we compute min/max across hits and normalize. Kept for compatibility; callers
+     * should always normalize closeness when applying modifiers.
      */
     @VisibleForTesting
     static boolean shouldMinMaxNormalizeCloseness(String distanceMetric) {
-        return "dotproduct".equals(distanceMetric);
+        return true;
     }
 
     /**
@@ -1934,8 +1944,12 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Compute per-key min and max bm25 values across hits for keys that require bm25 normalization.
+     * For aggregate keys (e.g. bm25_sum), the value per hit is the aggregate (sum/max/avg) of
+     * per-field BM25; min/max are taken over those aggregated values, so normalization is after
+     * aggregation.
      */
-    private Map<String, double[]> computeBm25MinMaxPerKey(
+    @VisibleForTesting
+    Map<String, double[]> computeBm25MinMaxPerKey(
             HitGroup hits,
             Tensor customAddWeights,
             Tensor customMultWeights,
@@ -2128,15 +2142,11 @@ public class HybridSearcher extends Searcher {
             bm25MinMaxPerKey =
                     computeBm25MinMaxPerKey(
                             hits, customAddWeights, customMultWeights, allMatchFeatureKeys);
-            // Min-max normalize closeness only for dot product; other metrics are already [0,1] in
-            // the rank profile
-            String closenessDistanceMetric =
-                    query.properties()
-                            .getString("marqo__custom_score_closeness_distance_metric", "");
-            if (shouldMinMaxNormalizeCloseness(closenessDistanceMetric)) {
-                closenessMinMaxPerKey =
-                        computeClosenessMinMaxPerKey(hits, customAddWeights, customMultWeights);
-            }
+            // Min-max normalize closeness the same as BM25: per key (single field or aggregate),
+            // compute min/max across hits and normalize. Aggregate keys use the aggregated value
+            // per hit, so normalization is done after aggregation.
+            closenessMinMaxPerKey =
+                    computeClosenessMinMaxPerKey(hits, customAddWeights, customMultWeights);
         }
 
         boolean applyRecency =

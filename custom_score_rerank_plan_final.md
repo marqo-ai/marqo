@@ -187,7 +187,7 @@ select * from index where
 
 ### 2.3 Per-field ranking functions (summary-features)
 
-- For each **tensor field** (Marqo field name e.g. `tensor_field_a`): define a function **`ranking_closeness_metric_<field_name>()`** that computes similarity to **`query(marqo__query_embedding)`** and normalizes to [0,1] where 1 = closest (where possible; DotProduct may be normalized in Java).
+- For each **tensor field** (Marqo field name e.g. `tensor_field_a`): define a function **`ranking_closeness_metric_<field_name>()`** that computes similarity to **`query(marqo__query_embedding)`**. The expression need only guarantee **higher value = closer**; min-max normalization to [0,1] is done in the searcher (see §4.3).
 - For each **lexical field**: BM25 is exposed in summary-features as **`bm25(marqo__lexical_<field>)`**. One per lexical field;
 
 **Summary-features (example):**
@@ -203,11 +203,11 @@ summary-features {
 
 - **No** `marqo__tensor_field_order` query input; the searcher looks up `ranking_closeness_metric_` + &lt;field name&gt; from the custom score key.
 
-**Distance metrics:** Support angular, prenormalized-angular, euclidean, dotproduct, hamming (per index). Geodegrees not supported for ranking. Expressions (conceptually):
+**Distance metrics:** Support angular, prenormalized-angular, euclidean, dotproduct, hamming (per index). Geodegrees not supported for ranking. The rank profile only needs to expose a value per tensor field where **higher means closer**; there is no requirement to bound scores to [0,1] in the rank expression. Min-max normalization to [0,1] (with 1=closest) is done in the **custom searcher** for both single-field and aggregate closeness, the same as for BM25. Expressions (conceptually; any formula that preserves "higher = closer" is fine):
 
 - Angular / Prenormalized-angular: `(1.0 + cosine_similarity(attribute(emb_field), query(marqo__query_embedding), x)) / 2.0`
 - Euclidean: `1.0 / (1.0 + euclidean_distance(attribute(emb_field), query(marqo__query_embedding), x))`
-- DotProduct: `reduce(attribute(emb_field) * query(marqo__query_embedding), sum, x)` — raw in schema; **normalized in custom searcher** to [0,1] with 1=closest via min-max across hits **only when index distance metric is dot product** (Python sets `marqo__custom_score_closeness_distance_metric` to the index’s distance metric value; searcher checks for `"dotproduct"`; angular/euclidean/hamming are already [0,1] in the rank profile so are not min-max normalized in the searcher).
+- DotProduct: `reduce(attribute(emb_field) * query(marqo__query_embedding), sum, x)` (raw; unbounded). Min-max to [0,1] is done in the searcher for all metrics, like BM25.
 - Hamming: `1.0 - (hamming(...) / (8.0 * dim))`
 
 ### 2.4 Document summary for fill
@@ -241,20 +241,28 @@ summary-features {
   - Aggregate: collect all `bm25(marqo__lexical_*)` from summary-features and aggregate.
 - Rank features may be returned as tensors (e.g. single-cell); the searcher must handle both scalar and tensor (e.g. sum of tensor cells) when reading a double.
 
-### 4.3 Applying modifiers
+### 4.3 Normalization (0 to 1)
+
+- **When to normalize:** Min-max normalization to [0,1] is done **in the searcher only**, and **after** any aggregation.
+  - **Single-field score:** There is one value per hit (one BM25 or one closeness). Compute min and max of that value across hits, then normalize so the modifier is (weight × normalized_score).
+  - **Aggregate score (sum/max/avg):** First compute the aggregate **per hit** (e.g. sum/max/avg over the field values for that hit). Then compute min and max of that **aggregated** value across hits, and normalize. So normalization is applied to the aggregate, not to individual field values before aggregation.
+- **BM25:** The implementation already follows this: for a single field it reads one BM25 value per hit and min-max normalizes across hits; for bm25_sum / bm25_max / bm25_avg it aggregates per hit (sum/max/avg over `bm25(marqo__lexical_*)`), then computes min/max of that aggregate across hits and normalizes. So normalization is done after aggregation when an aggregate is used.
+- **Closeness:** Treat the same as BM25: rank profile only needs to expose a score per field where **higher means closer** (no requirement to bound to [0,1] in the rank expression). Min-max normalization to [0,1] is done in the searcher: for single field, normalize that value across hits; for aggregate, aggregate per hit first (sum/max/avg over `ranking_closeness_metric_*`), then min-max normalize the resulting value across hits. Reuse the same normalization path as BM25 where possible (e.g. shared min-max helper).
+
+### 4.4 Applying modifiers
 
 - Use the same logic as in the feature plan: for each key in add weights, add (weight × normalized score) to the 
   `global_add_modifier`; for each key in mult weights, multiply the `global_mult_modifier` by (weight × normalized 
-  score). BM25 scores are min-max normalized across hits when needed.
+  score). BM25 and closeness scores are min-max normalized in the searcher as above (after aggregation when applicable).
 - The `global_add_modifier` and `global_mult_modifier` are already extracted from match-features anyway so simply 
   execute the above step before applying the modifiers to the final score.
 
-### 4.4 Return _pre_rerank_score per hit
+### 4.5 Return _pre_rerank_score per hit
 - For each hit, SAVE the score applying the modifiers in a field, and let marqo interpret it and output it in the 
   final result. This will let us see the pure RRF score before the global modifiers, which is useful for debugging.
 - We already do this for _lexical_score and _tensor_score, so use a similar approach.
 
-### 4.5 Logs
+### 4.6 Logs
 - To make it easy to trace exactly what's happening in the custom searcher, please emit a clear log message every time:
   - We read and unpack the custom score requests from the query properties, including the score type, field, 
     aggregate type, keys and weights for each.

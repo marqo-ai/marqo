@@ -1,6 +1,7 @@
 package ai.marqo.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -241,20 +242,17 @@ class HybridSearcherCustomScoreRerankTest {
     @Nested
     class ClosenessDotProductNormalizationTest {
 
+        /** Min-max normalization is always applied to closeness in the searcher (same as BM25). */
         @Test
-        void shouldMinMaxNormalizeCloseness_true_only_for_dotproduct() {
+        void shouldMinMaxNormalizeCloseness_always_true() {
             assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("dotproduct")).isTrue();
-        }
-
-        @Test
-        void shouldMinMaxNormalizeCloseness_false_for_other_metrics() {
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("angular")).isFalse();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("euclidean")).isFalse();
+            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("angular")).isTrue();
+            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("euclidean")).isTrue();
             assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("prenormalized-angular"))
-                    .isFalse();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("hamming")).isFalse();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("")).isFalse();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness(null)).isFalse();
+                    .isTrue();
+            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("hamming")).isTrue();
+            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("")).isTrue();
+            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness(null)).isTrue();
         }
 
         @Test
@@ -347,6 +345,91 @@ class HybridSearcherCustomScoreRerankTest {
             Map<String, double[]> result =
                     searcher.computeClosenessMinMaxPerKey(hits, addWeights, null);
             assertThat(result).isEmpty();
+        }
+    }
+
+    /**
+     * Min-max normalization is applied after aggregation: for aggregate keys (bm25_sum,
+     * closeness_retrieval_vector_sum, etc.) we first compute the aggregate per hit, then compute
+     * min/max of that aggregated value across hits, then normalize. So the normalized score is
+     * based on the aggregate, not on individual field values.
+     */
+    @Nested
+    class NormalizationAfterAggregationTest {
+
+        @Test
+        void computeBm25MinMaxPerKey_for_bm25_sum_uses_aggregated_value_per_hit() {
+            HitGroup hits = new HitGroup();
+            // Hit1: bm25_a=1, bm25_b=2 -> sum=3
+            Hit hit1 = new Hit("doc1", 1.0);
+            FeatureData sf1 = mock(FeatureData.class);
+            when(sf1.getDouble("bm25(marqo__lexical_a)")).thenReturn(1.0);
+            when(sf1.getDouble("bm25(marqo__lexical_b)")).thenReturn(2.0);
+            when(sf1.featureNames())
+                    .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
+            hit1.setField("summaryfeatures", sf1);
+            hits.add(hit1);
+            // Hit2: bm25_a=2, bm25_b=4 -> sum=6
+            Hit hit2 = new Hit("doc2", 1.0);
+            FeatureData sf2 = mock(FeatureData.class);
+            when(sf2.getDouble("bm25(marqo__lexical_a)")).thenReturn(2.0);
+            when(sf2.getDouble("bm25(marqo__lexical_b)")).thenReturn(4.0);
+            when(sf2.featureNames())
+                    .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
+            hit2.setField("summaryfeatures", sf2);
+            hits.add(hit2);
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("bm25_sum"), 1.0)
+                            .build();
+            HybridSearcher searcher = new HybridSearcher();
+            Map<String, double[]> result =
+                    searcher.computeBm25MinMaxPerKey(hits, addWeights, null, Set.of());
+            assertThat(result).containsKey("bm25_sum");
+            double[] minMax = result.get("bm25_sum");
+            assertThat(minMax).hasSize(2);
+            assertThat(minMax[0]).isEqualTo(3.0);
+            assertThat(minMax[1]).isEqualTo(6.0);
+        }
+
+        @Test
+        void
+                computeClosenessMinMaxPerKey_for_closeness_retrieval_vector_sum_uses_aggregated_value_per_hit() {
+            HitGroup hits = new HitGroup();
+            // Hit1: f1=0.2, f2=0.4 -> sum=0.6
+            Hit hit1 = new Hit("doc1", 1.0);
+            FeatureData sf1 = mock(FeatureData.class);
+            when(sf1.getDouble("ranking_closeness_metric_f1")).thenReturn(0.2);
+            when(sf1.getDouble("ranking_closeness_metric_f2")).thenReturn(0.4);
+            when(sf1.featureNames())
+                    .thenReturn(
+                            Set.of("ranking_closeness_metric_f1", "ranking_closeness_metric_f2"));
+            hit1.setField("summaryfeatures", sf1);
+            hits.add(hit1);
+            // Hit2: f1=0.5, f2=0.5 -> sum=1.0
+            Hit hit2 = new Hit("doc2", 1.0);
+            FeatureData sf2 = mock(FeatureData.class);
+            when(sf2.getDouble("ranking_closeness_metric_f1")).thenReturn(0.5);
+            when(sf2.getDouble("ranking_closeness_metric_f2")).thenReturn(0.5);
+            when(sf2.featureNames())
+                    .thenReturn(
+                            Set.of("ranking_closeness_metric_f1", "ranking_closeness_metric_f2"));
+            hit2.setField("summaryfeatures", sf2);
+            hits.add(hit2);
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("closeness_retrieval_vector_sum"), 1.0)
+                            .build();
+            HybridSearcher searcher = new HybridSearcher();
+            Map<String, double[]> result =
+                    searcher.computeClosenessMinMaxPerKey(hits, addWeights, null);
+            assertThat(result).containsKey("closeness_retrieval_vector_sum");
+            double[] minMax = result.get("closeness_retrieval_vector_sum");
+            assertThat(minMax).hasSize(2);
+            assertThat(minMax[0]).isCloseTo(0.6, within(1e-9));
+            assertThat(minMax[1]).isEqualTo(1.0);
         }
     }
 }

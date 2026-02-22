@@ -1546,6 +1546,44 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             msg='Facets query must be unchanged by custom score modifiers',
         )
 
+    def test_relevance_cutoff_probe_lexical_yql_excludes_custom_score_extra_rank_terms(self):
+        """With relevance_cutoff and BM25 custom score, marqo__yql.lexical.probe is sent and has no extra rank() terms; main lexical has them."""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters=RelativeMaxScoreParameters(relative_score_factor=0.5),
+            probe_depth=100,
+        )
+        # Use searchableAttributesLexical=["description"] so main lexical is description-only;
+        # BM25 custom score is for title, so an extra rank(..., title_term) is added to main.
+        marqo_query = self._hybrid_query(
+            relevance_cutoff=relevance_cutoff,
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        marqo_query.hybrid_parameters.searchableAttributesLexical = ["description"]
+        marqo_query.hybrid_parameters.searchableAttributesTensor = ["title", "description"]
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+        self.assertIn(
+            "marqo__yql.lexical.probe",
+            vespa_query,
+            msg="Probe lexical YQL must be sent when relevance_cutoff is set",
+        )
+        main_lexical = vespa_query.get("marqo__yql.lexical", "")
+        probe_lexical = vespa_query.get("marqo__yql.lexical.probe", "")
+        self.assertIn("rank(", main_lexical, msg="Main lexical YQL must include extra rank() term for BM25 custom score")
+        self.assertNotEqual(
+            main_lexical,
+            probe_lexical,
+            msg="Probe must not include custom-score extra rank() terms; it must be base lexical only",
+        )
+        # Probe must be the base lexical (no second rank for BM25); main is rank(base, extra).
+        self.assertNotIn("rank(rank(", probe_lexical), "Probe YQL must not contain nested rank from custom score"
+
     def test_relevance_cutoff_params_unchanged_with_custom_score_modifiers(self):
         """Relevance cutoff query params must be identical with and without custom score modifiers."""
         relevance_cutoff = RelevanceCutoffModel(

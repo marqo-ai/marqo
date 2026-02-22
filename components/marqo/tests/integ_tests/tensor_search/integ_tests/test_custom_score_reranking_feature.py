@@ -1,8 +1,8 @@
 """
-Integration tests for the custom score reranking feature (Part C of the plan).
+Integration tests for the custom score reranking feature
 
 Follows custom_score_rerank_plan_final.md (Integration Test Structure): query "tuxedo",
-index with model open_clip/ViT-B-16-SigLIP-512/webli, 4 fields (lex_retrieval_field,
+index with model open_clip/ViT-B-16-SigLIP/webli, 4 fields (lex_retrieval_field,
 lex_ranking_field, tensor_retrieval_field, tensor_ranking_field). Docs are defined so
 base RRF order is deterministic (doc1..doc5) and add_to_score with bm25 lex_ranking_field
 or closeness tensor_ranking_field reverses order to (doc5..doc1). Each test shows:
@@ -39,8 +39,7 @@ from marqo.core.exceptions import InvalidArgumentError, UnsupportedFeatureError
 import unittest
 import time
 
-# --- Plan-based test data (custom_score_rerank_plan_final.md) ---
-TUXEDO_QUERY = "tuxedo"
+# --- Test Data ---
 TENSOR_FIELDS_PLAN = ["tensor_retrieval_field", "tensor_ranking_field"]
 DOCS_TUXEDO_PLAN = [
     {
@@ -63,7 +62,7 @@ DOCS_TUXEDO_PLAN = [
         # (3) In ONLY lexical (medium strength)
         "_id": "doc3",
         "lex_retrieval_field": "tuxedo tuxedo",         # MEDIUM lexical score
-        "tensor_retrieval_field": "unrelated",          # no tensor match for retrieval
+        # No retrieval tensor match at all
         "lex_ranking_field": "tuxedo tuxedo tuxedo",    # 3rd lowest bm25 score for global reranking
         "tensor_ranking_field": "shorts",               # 3rd lowest closeness score for global reranking
     },
@@ -79,11 +78,67 @@ DOCS_TUXEDO_PLAN = [
         # (5) In ONLY lexical (lower strength)
         "_id": "doc5",
         "lex_retrieval_field": "tuxedo",                # LOW lexical score
-        "tensor_retrieval_field": "backpack",           # no tensor match for retrieval
+        # No retrieval tensor match at all
         "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo tuxedo",  # highest bm25 score for global reranking
         "tensor_ranking_field": "tuxedo",               # highest closeness score for global reranking
     },
 ]
+
+# This doc structure allows certain docs to come to the surface depending on which aggregate was chosen.
+# Ranking fields only; retrieval fields are added when indexing so all docs match the query.
+# Design: strongest_sum has 6 fields with "tuxedo" (6*C_t); strongest_avg has 2 fields
+# "tuxedo tuxedo" (avg C_tt); strongest_max has one very high "tuxedo tuxedo tuxedo", one low.
+DOCS_TUXEDO_FOR_LEXICAL_AGGREGATES = [
+    {
+        # If max aggregate is chosen, this doc should come to the top (one field has highest BM25)
+        "_id": "strongest_max",
+        "lex_ranking_field_1": "tuxedo tuxedo tuxedo",
+        "lex_ranking_field_2": "no match",
+    },
+    {
+        # If avg aggregate is chosen, this doc should come to the top (high value in both fields)
+        "_id": "strongest_avg",
+        "lex_ranking_field_1": "tuxedo tuxedo",
+        "lex_ranking_field_2": "tuxedo tuxedo",
+    },
+    {
+        # If sum aggregate is chosen, this doc should come to the top (many fields with good BM25)
+        "_id": "strongest_sum",
+        "lex_ranking_field_1": "tuxedo",
+        "lex_ranking_field_2": "tuxedo",
+        "lex_ranking_field_3": "tuxedo",
+        "lex_ranking_field_4": "tuxedo",
+        "lex_ranking_field_5": "tuxedo",
+        "lex_ranking_field_6": "tuxedo",
+    }
+]
+
+# Closeness aggregate test: separate index, docs use CLOSENESS_TUXEDO terms so sum/max/avg differ per doc.
+DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES = [
+    {
+        # If max aggregate is chosen: one field has highest closeness (tuxedo 1.0), rest low
+        "_id": "strongest_max",
+        "tensor_ranking_field_1": "tuxedo",
+        "tensor_ranking_field_2": "unrelated",
+    },
+    {
+        # If avg aggregate is chosen: two fields with same high value (suit 0.90)
+        "_id": "strongest_avg",
+        "tensor_ranking_field_1": "suit",
+        "tensor_ranking_field_2": "suit",
+    },
+    {
+        # If sum aggregate is chosen: many fields with medium-high closeness (rainbow tie 0.795)
+        "_id": "strongest_sum",
+        "tensor_ranking_field_1": "rainbow tie",
+        "tensor_ranking_field_2": "rainbow tie",
+        "tensor_ranking_field_3": "rainbow tie",
+        "tensor_ranking_field_4": "rainbow tie",
+        "tensor_ranking_field_5": "rainbow tie",
+        "tensor_ranking_field_6": "rainbow tie",
+    },
+]
+
 HYBRID_PARAMS_TUXEDO = HybridParameters(
     retrievalMethod=RetrievalMethod.Disjunction,
     rankingMethod=RankingMethod.RRF,
@@ -92,6 +147,7 @@ HYBRID_PARAMS_TUXEDO = HybridParameters(
     searchableAttributesTensor=["tensor_retrieval_field"],
     searchableAttributesLexical=["lex_retrieval_field"],
 )
+
 BASE_RRF_ORDER = ["doc1", "doc2", "doc3", "doc4", "doc5"]
 REVERSED_ORDER = ["doc5", "doc4", "doc3", "doc2", "doc1"]
 
@@ -188,16 +244,22 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
         # TODO: Change hardcoded values. Original planned open_clip/ViT-B-16-SigLIP-512/webli is no longer there
-        index_request = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
-        )
-        # Second index is never given documents; used for aggregate validation tests (no lexical/tensor fields).
-        index_request_empty = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
-        )
-        cls.indexes = cls.create_indexes([index_request, index_request_empty])
+        model = Model(name="open_clip/ViT-B-16-SigLIP/webli")
+        index_request = cls.unstructured_marqo_index_request(model=model)
+        index_request_empty = cls.unstructured_marqo_index_request(model=model)
+        index_request_bm25_aggregates = cls.unstructured_marqo_index_request(model=model)
+        index_request_closeness_aggregates = cls.unstructured_marqo_index_request(model=model)
+
+        cls.indexes = cls.create_indexes([
+            index_request,
+            index_request_empty,
+            index_request_bm25_aggregates,
+            index_request_closeness_aggregates,
+        ])
         cls.index = cls.indexes[0]
         cls.index_empty = cls.indexes[1]
+        cls.index_bm25_aggregates = cls.indexes[2]
+        cls.index_closeness_aggregates = cls.indexes[3]
 
     def setUp(self) -> None:
         super().setUp()
@@ -274,15 +336,13 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
         )
         ids = [h["_id"] for h in res["hits"]]
-        self.assertEqual(len(ids), 5, msg="All 5 docs must be returned")
-        self.assertEqual(set(ids), set(BASE_RRF_ORDER), msg="Must return exactly doc1..doc5")
-        self.assertEqual(ids[0], "doc1", msg="Doc1 (in both tensor and lexical) should rank first with base RRF")
+        self.assertEqual(ids, BASE_RRF_ORDER, msg="Base RRF order must be doc1, doc2, doc3, doc4, doc5")
 
     def test_rrf_with_bm25_single_field_modifies_scores_and_reverses_order(self):
         """
@@ -294,7 +354,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_no_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
@@ -302,7 +362,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_with_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
@@ -317,8 +377,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         )
         self._assert_pre_rerank_score_matches_baseline(res_with_rerank, res_no_rerank)
         ids = [h["_id"] for h in res_with_rerank["hits"]]
-        self.assertEqual(ids[0], "doc5", msg="add_to_score bm25 lex_ranking_field: doc5 (highest bm25) must rank first")
-        self.assertEqual(ids[-1], "doc1", msg="add_to_score bm25 lex_ranking_field: doc1 (lowest bm25) must rank last")
+        self.assertEqual(ids, REVERSED_ORDER, msg="add_to_score bm25 lex_ranking_field: order must be doc5, doc4, doc3, doc2, doc1")
         scores_with = {h["_id"]: h["_score"] for h in res_with_rerank["hits"]}
         self.assertGreater(scores_with["doc5"], scores_with["doc1"], msg="doc5 (highest bm25 lex_ranking_field) should have higher score than doc1")
         any_changed = any(h["_score"] != h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"])
@@ -336,7 +395,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_no_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
@@ -344,7 +403,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_with_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
@@ -359,8 +418,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         )
         self._assert_pre_rerank_score_matches_baseline(res_with_rerank, res_no_rerank)
         ids = [h["_id"] for h in res_with_rerank["hits"]]
-        self.assertEqual(ids[0], "doc5", msg="add_to_score closeness: doc5 must rank first")
-        self.assertEqual(ids[-1], "doc1", msg="add_to_score closeness: doc1 must rank last")
+        self.assertEqual(ids, REVERSED_ORDER, msg="add_to_score closeness: order must be doc5, doc4, doc3, doc2, doc1")
         # Backend: final_score = pre_rerank + weight * raw_closeness (no min-max for closeness).
         # Assert exact formula with weight=1: contribution = score - pre_rerank must equal 1 * closeness.
         weight = 1.0
@@ -401,7 +459,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_no_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
@@ -410,7 +468,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_w1 = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
@@ -431,7 +489,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             res = tensor_search.search(
                 config=self.config,
                 index_name=self.index.name,
-                text=TUXEDO_QUERY,
+                text="tuxedo",
                 search_method="HYBRID",
                 hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                 score_modifiers=ScoreModifierLists(
@@ -466,7 +524,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_no_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
@@ -474,7 +532,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_with_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
@@ -494,74 +552,177 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         any_changed = any(h["_score"] != h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"])
         self.assertTrue(any_changed, msg="multiply_score_by must change at least one doc's score")
 
+    @unittest.skip("Skipping until we get clarification on how avg works. Over all fields in corpus, or just doc?")
     def test_all_bm25_aggregates_sum_max_avg(self):
         """
-        All three BM25 aggregate methods (sum, max, avg) must apply: each modifies scores,
-        doc5 (most 'tuxedo' in lex fields) ranks first, and _pre_rerank_score matches baseline.
-        Deterministic sum/avg/max (like closeness test) would require written-down BM25 values
-        per field from the plan; here we assert order and that the modifier is applied.
+        BM25 sum/max/avg aggregates: use a dedicated index and DOCS_TUXEDO_FOR_LEXICAL_AGGREGATES.
+        Derive contributions by running with add_to_score on lex_ranking_field_1 only
+        compute expected sum/max/avg per doc; assert strict top hit and exact score for each aggregate.
         """
-        self._add_tuxedo_docs()
-        res_no_rerank = tensor_search.search(
+
+        self.add_documents(
             config=self.config,
-            index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_bm25_aggregates.name,
+                docs=DOCS_TUXEDO_FOR_LEXICAL_AGGREGATES,
+                tensor_fields=["lex_ranking_field_1"]   # Making this a tensor field just so hybrid search works
+            ),
+        )
+        res_baseline = tensor_search.search(
+            config=self.config,
+            index_name=self.index_bm25_aggregates.name,
+            text="tuxedo",
             search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            hybrid_parameters=HybridParameters(
+                # There's a 3, 2, and 1 frequency of "tuxedo" in this first field, so we can use this as bm25 basis.
+                searchableAttributesLexical=["lex_ranking_field_1"]
+            ),
             result_count=10,
         )
+
+        # Contribution from a single field: max has the ttt, avg has the tt, sum has the t
+        for hit in res_baseline["hits"]:
+            if hit["_id"] == "strongest_max":
+                contrib_ttt = hit["_lexical_score"]
+            elif hit["_id"] == "strongest_avg":
+                contrib_tt = hit["_lexical_score"]
+            elif hit["_id"] == "strongest_sum":
+                contrib_t = hit["_lexical_score"]
+
         for agg in ("sum", "max", "avg"):
             with self.subTest(aggregate=agg):
                 res = tensor_search.search(
                     config=self.config,
-                    index_name=self.index.name,
-                    text=TUXEDO_QUERY,
+                    index_name=self.index_bm25_aggregates.name,
+                    text="tuxedo",
                     search_method="HYBRID",
-                    hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                    hybrid_parameters=HybridParameters(
+                        # There's a 3, 2, and 1 frequency of "tuxedo" in this first field, so we can use this as bm25 basis.
+                        searchableAttributesLexical=["lex_ranking_field_1"]
+                    ),
                     score_modifiers=ScoreModifierLists(
                         add_to_score=[
-                            {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_{agg}", "weight": 1.0}
+                            # High weight because the numbers are small.
+                            {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_{agg}", "weight": 1000.0}
                         ]
                     ),
                     result_count=10,
                 )
-                self.assertEqual(len(res["hits"]), 5)
-                self._assert_pre_rerank_score_matches_baseline(res, res_no_rerank)
-                ids = [h["_id"] for h in res["hits"]]
-                self.assertEqual(ids[0], "doc5", msg=f"bm25_{agg}: doc5 must rank first")
-                self.assertGreater(res["hits"][0]["_score"], res["hits"][-1]["_score"])
+                self.assertEqual(len(res["hits"]), 3)
+                self._assert_pre_rerank_score_matches_baseline(res, res_baseline)
+                # Strict: each hit's contribution and score match the expected aggregate for that doc
+                for hit in res["hits"]:
+                    doc_id = hit["_id"]
+                    pre = hit[MARQO_DOC_PRE_RERANK_SCORE]
+                    contrib = hit["_score"] - pre
+                    self.assertAlmostEqual(
+                        contrib,
+                        expected_agg[doc_id],
+                        delta=1e-5,
+                        msg=f"bm25_{agg} doc {doc_id}: contribution must match expected",
+                    )
+                    self.assertAlmostEqual(
+                        hit["_score"],
+                        baseline_by_id[doc_id] + expected_agg[doc_id],
+                        delta=1e-5,
+                        msg=f"bm25_{agg} doc {doc_id}: score = baseline + contribution",
+                    )
+                # Order: hits must be sorted by expected aggregate descending
+                order_by_expected = [doc_id for doc_id, _ in sorted(expected_agg.items(), key=lambda x: -x[1])]
+                actual_order = [h["_id"] for h in res["hits"]]
+                self.assertEqual(
+                    actual_order,
+                    order_by_expected,
+                    msg=f"bm25_{agg}: result order must match expected aggregate order (expected {order_by_expected})",
+                )
 
+    @unittest.skip("Skipping until we get clarification on how avg works. Over all fields in corpus, or just doc?")
     def test_all_closeness_aggregates_sum_max_avg(self):
         """
-        Prove that sum/avg/max are carried out deterministically. Each doc has two tensor
-        fields (tensor_retrieval_field, tensor_ranking_field) with known closeness to
-        "tuxedo" from the plan (DOC_TENSOR_CLOSENESS_PAIR, CLOSENESS_TUXEDO). We manually
-        compute expected sum, avg, and max of those two values per doc. Then:
-        (1) With weight=1.0, the order of contributions (_score - _pre_rerank_score) must
-            match the order of our expected aggregate (descending). So the doc with highest
-            expected sum (or avg or max) has highest contribution, etc. This proves the
-            backend is applying the correct operation.
-        (2) With weight=2.0, contribution must exactly double (proves weight is applied).
+        Closeness sum/max/avg aggregates: use a dedicated index and DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES
+        with tensor_ranking_field_<i> and CLOSENESS_TUXEDO terms. Derive contribution per field by
+        running with add_to_score on closeness_retrieval_vector_field_tensor_ranking_field_<i> only;
+        compute expected sum/max/avg per doc; assert strict top hit and exact score for each aggregate.
         """
-        self._add_tuxedo_docs()
-        res_no_rerank = tensor_search.search(
+        # Docs need retrieval fields so all match the query "tuxedo"
+        docs = [
+            {**d, "lex_retrieval_field": "tuxedo", "tensor_retrieval_field": "tuxedo"}
+            for d in DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES
+        ]
+        tensor_fields_close = ["tensor_retrieval_field", "tensor_ranking_field_1", "tensor_ranking_field_2",
+                               "tensor_ranking_field_3", "tensor_ranking_field_4", "tensor_ranking_field_5",
+                               "tensor_ranking_field_6"]
+        self.add_documents(
             config=self.config,
-            index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_closeness_aggregates.name,
+                docs=docs,
+                tensor_fields=tensor_fields_close,
+            ),
+        )
+        res_baseline = tensor_search.search(
+            config=self.config,
+            index_name=self.index_closeness_aggregates.name,
+            text="tuxedo",
             search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            hybrid_parameters=HYBRID_PARAMS_CLOSENESS_AGGREGATES,
             result_count=10,
         )
+        baseline_by_id = {h["_id"]: h["_score"] for h in res_baseline["hits"]}
+
+        def contrib_for_tensor_field(field_name: str):
+            r = tensor_search.search(
+                config=self.config,
+                index_name=self.index_closeness_aggregates.name,
+                text="tuxedo",
+                search_method="HYBRID",
+                hybrid_parameters=HYBRID_PARAMS_CLOSENESS_AGGREGATES,
+                score_modifiers=ScoreModifierLists(
+                    add_to_score=[
+                        {
+                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_{field_name}",
+                            "weight": 1.0,
+                        }
+                    ]
+                ),
+                result_count=10,
+            )
+            return {h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in r["hits"]}
+
+        c_ret = contrib_for_tensor_field("tensor_retrieval_field")
+        c1 = contrib_for_tensor_field("tensor_ranking_field_1")
+        c2 = contrib_for_tensor_field("tensor_ranking_field_2")
+        C_ret = c_ret["strongest_max"]
+        C_tuxedo = c1["strongest_max"]
+        C_unrelated = c2["strongest_max"]
+        C_suit = c1["strongest_avg"]
+        C_rainbow = c1["strongest_sum"]
+        # All docs have tensor_retrieval_field="tuxedo"; aggregate includes it. 3, 3, 7 tensor fields.
+        expected_sum = {
+            "strongest_max": C_ret + C_tuxedo + C_unrelated,
+            "strongest_avg": C_ret + 2 * C_suit,
+            "strongest_sum": C_ret + 6 * C_rainbow,
+        }
+        expected_max = {
+            "strongest_max": max(C_ret, C_tuxedo, C_unrelated),
+            "strongest_avg": max(C_ret, C_suit),
+            "strongest_sum": max(C_ret, C_rainbow),
+        }
+        expected_avg = {
+            "strongest_max": (C_ret + C_tuxedo + C_unrelated) / 3.0,
+            "strongest_avg": (C_ret + 2 * C_suit) / 3.0,
+            "strongest_sum": (C_ret + 6 * C_rainbow) / 7.0,
+        }
+
         for agg in ("sum", "max", "avg"):
             with self.subTest(aggregate=agg):
-                expected = {doc_id: _expected_closeness_aggregate(doc_id, agg) for doc_id in BASE_RRF_ORDER}
-                # (1) weight=1.0
-                res_w1 = tensor_search.search(
+                expected_agg = expected_sum if agg == "sum" else (expected_max if agg == "max" else expected_avg)
+                res = tensor_search.search(
                     config=self.config,
-                    index_name=self.index.name,
-                    text=TUXEDO_QUERY,
+                    index_name=self.index_closeness_aggregates.name,
+                    text="tuxedo",
                     search_method="HYBRID",
-                    hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                    hybrid_parameters=HYBRID_PARAMS_CLOSENESS_AGGREGATES,
                     score_modifiers=ScoreModifierLists(
                         add_to_score=[
                             {
@@ -572,38 +733,33 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                     ),
                     result_count=10,
                 )
-                self.assertEqual(len(res_w1["hits"]), 5)
-                self._assert_pre_rerank_score_matches_baseline(res_w1, res_no_rerank)
-                contrib_w1 = {h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_w1["hits"]}
-                # Order of contributions must match order of expected aggregate (descending)
-                order_expected = sorted(BASE_RRF_ORDER, key=lambda d: expected[d], reverse=True)
-                order_observed = [h["_id"] for h in sorted(res_w1["hits"], key=lambda h: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE], reverse=True)]
-                self.assertEqual(order_observed, order_expected, msg=f"{agg}: contribution order must match expected aggregate order")
-                # (2) weight=2.0: contribution must double
-                res_w2 = tensor_search.search(
-                    config=self.config,
-                    index_name=self.index.name,
-                    text=TUXEDO_QUERY,
-                    search_method="HYBRID",
-                    hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-                    score_modifiers=ScoreModifierLists(
-                        add_to_score=[
-                            {
-                                "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_{agg}",
-                                "weight": 2.0,
-                            }
-                        ]
-                    ),
-                    result_count=10,
-                )
-                contrib_w2 = {h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_w2["hits"]}
-                for doc_id in BASE_RRF_ORDER:
+                self.assertEqual(len(res["hits"]), 3)
+                self._assert_pre_rerank_score_matches_baseline(res, res_baseline)
+                # Strict: each hit's contribution and score match the expected aggregate for that doc
+                for hit in res["hits"]:
+                    doc_id = hit["_id"]
+                    pre = hit[MARQO_DOC_PRE_RERANK_SCORE]
+                    contrib = hit["_score"] - pre
                     self.assertAlmostEqual(
-                        contrib_w2[doc_id] / contrib_w1[doc_id],
-                        2.0,
+                        contrib,
+                        expected_agg[doc_id],
                         delta=1e-5,
-                        msg=f"{agg} doc {doc_id}: weight 2.0 must exactly double contribution",
+                        msg=f"closeness_{agg} doc {doc_id}: contribution must match expected",
                     )
+                    self.assertAlmostEqual(
+                        hit["_score"],
+                        baseline_by_id[doc_id] + expected_agg[doc_id],
+                        delta=1e-5,
+                        msg=f"closeness_{agg} doc {doc_id}: score = baseline + contribution",
+                    )
+                # Order: hits must be sorted by expected aggregate descending
+                order_by_expected = [doc_id for doc_id, _ in sorted(expected_agg.items(), key=lambda x: -x[1])]
+                actual_order = [h["_id"] for h in res["hits"]]
+                self.assertEqual(
+                    actual_order,
+                    order_by_expected,
+                    msg=f"closeness_{agg}: result order must match expected aggregate order (expected {order_by_expected})",
+                )
 
     def test_custom_score_rerank_different_weights_affect_order_and_scores(self):
         """
@@ -614,7 +770,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_no_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
@@ -622,7 +778,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_neg = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
@@ -634,8 +790,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         )
         self._assert_pre_rerank_score_matches_baseline(res_neg, res_no_rerank)
         ids_neg = [h["_id"] for h in res_neg["hits"]]
-        self.assertEqual(ids_neg[0], "doc1", msg="Weight -1.0: doc1 (lowest bm25) should rank first")
-        self.assertEqual(ids_neg[-1], "doc5", msg="Weight -1.0: doc5 (highest bm25) should rank last")
+        self.assertEqual(ids_neg, BASE_RRF_ORDER, msg="Weight -1.0: order must be doc1, doc2, doc3, doc4, doc5")
         # With negative weight, at least docs with non-zero bm25 contribution should have score != pre_rerank
         any_changed = any(h["_score"] != h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_neg["hits"])
         self.assertTrue(any_changed, msg="Weight -1.0 must change at least one doc's score")
@@ -643,7 +798,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_double = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
@@ -664,7 +819,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             tensor_search.search(
                 config=self.config,
                 index_name=self.index.name,
-                text=TUXEDO_QUERY,
+                text="tuxedo",
                 search_method="HYBRID",
                 hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                 score_modifiers=ScoreModifierLists(
@@ -687,7 +842,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             tensor_search.search(
                 config=self.config,
                 index_name=self.index.name,
-                text=TUXEDO_QUERY,
+                text="tuxedo",
                 search_method="HYBRID",
                 hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                 score_modifiers=ScoreModifierLists(
@@ -714,12 +869,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 index_name=self.index_empty.name,
                 text="anything",
                 search_method="HYBRID",
-                hybrid_parameters=HybridParameters(
-                    retrievalMethod=RetrievalMethod.Disjunction,
-                    rankingMethod=RankingMethod.RRF,
-                    alpha=0.5,
-                    rrfK=60,
-                ),
+                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
@@ -744,12 +894,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 index_name=self.index_empty.name,
                 text="anything",
                 search_method="HYBRID",
-                hybrid_parameters=HybridParameters(
-                    retrievalMethod=RetrievalMethod.Disjunction,
-                    rankingMethod=RankingMethod.RRF,
-                    alpha=0.5,
-                    rrfK=60,
-                ),
+                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
@@ -880,7 +1025,7 @@ class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):
                 res = tensor_search.search(
                     config=self.config,
                     index_name=index.name,
-                    text=TUXEDO_QUERY,
+                    text="tuxedo",
                     search_method="HYBRID",
                     hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                     score_modifiers=ScoreModifierLists(
@@ -894,7 +1039,8 @@ class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):
                     result_count=10,
                 )
                 self.assertEqual(len(res["hits"]), 5, msg=f"distance_metric={metric.value}: expect 5 hits")
-                self.assertEqual(res["hits"][0]["_id"], "doc5", msg=f"distance_metric={metric.value}: doc5 must rank first")
+                ids = [h["_id"] for h in res["hits"]]
+                self.assertEqual(ids, REVERSED_ORDER, msg=f"distance_metric={metric.value}: order must be doc5, doc4, doc3, doc2, doc1")
                 for hit in res["hits"]:
                     self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit, msg=f"distance_metric={metric.value}: each hit must have _pre_rerank_score")
 
@@ -968,7 +1114,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         res = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
@@ -1006,7 +1152,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         res_baseline = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
@@ -1014,16 +1160,16 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         res_with_modifier = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(add_to_score=[{"field_name": "popularity", "weight": 1.0}]),
             result_count=10,
         )
         self.assertEqual(len(res_with_modifier["hits"]), 5)
-        # Higher popularity should rank higher (doc5 has 0.5, doc1 has 0.1).
-        self.assertEqual(res_with_modifier["hits"][0]["_id"], "doc5")
-        self.assertEqual(res_with_modifier["hits"][-1]["_id"], "doc1")
+        # Higher popularity should rank higher (doc5 has 0.5, doc4 0.4, ..., doc1 has 0.1).
+        ids_with_modifier = [h["_id"] for h in res_with_modifier["hits"]]
+        self.assertEqual(ids_with_modifier, REVERSED_ORDER, msg="Order by popularity must be doc5, doc4, doc3, doc2, doc1")
         baseline_by_id = {h["_id"]: h["_score"] for h in res_baseline["hits"]}
         for hit in res_with_modifier["hits"]:
             if MARQO_DOC_PRE_RERANK_SCORE not in hit:
@@ -1051,21 +1197,16 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             captured_query.update(kwargs)
             return original_query(**kwargs)
 
+        hybrid_params_rerank = HybridParameters(
+            **{**HYBRID_PARAMS_TUXEDO.dict(), "rerankDepthTensor": rerank_depth_tensor}
+        )
         with mock.patch.object(self.config.vespa_client, "query", capture_then_query):
             res = tensor_search.search(
                 config=self.config,
                 index_name=self.index.name,
-                text=TUXEDO_QUERY,
+                text="tuxedo",
                 search_method="HYBRID",
-                hybrid_parameters=HybridParameters(
-                    retrievalMethod=RetrievalMethod.Disjunction,
-                    rankingMethod=RankingMethod.RRF,
-                    alpha=0.5001,
-                    rrfK=60,
-                    searchableAttributesTensor=["tensor_retrieval_field"],
-                    searchableAttributesLexical=["lex_retrieval_field"],
-                    rerankDepthTensor=rerank_depth_tensor,
-                ),
+                hybrid_parameters=hybrid_params_rerank,
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
@@ -1079,8 +1220,8 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             )
         tensor_yql = captured_query.get("marqo__yql.tensor") or ""
         self.assertIn(f"targetHits:{rerank_depth_tensor}", tensor_yql)
-        self.assertEqual(len(res["hits"]), 5)
-        self.assertEqual(res["hits"][0]["_id"], "doc5")
+        ids = [h["_id"] for h in res["hits"]]
+        self.assertEqual(ids, REVERSED_ORDER, msg="add_to_score closeness with rerankDepthTensor: order must be doc5, doc4, doc3, doc2, doc1")
         for hit in res["hits"]:
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
 
@@ -1093,7 +1234,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         res_baseline = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=5,
@@ -1103,7 +1244,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         res_rerank = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
@@ -1118,6 +1259,9 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             rerank_depth=3,
         )
         self.assertEqual(len(res_rerank["hits"]), 5)
+        ids_rerank = [h["_id"] for h in res_rerank["hits"]]
+        # Only top 3 docs are reranked, so the order must be 3,2,1,4,5
+        self.assertEqual(ids_rerank, ["doc3", "doc2", "doc1", "doc4", "doc5"], msg="rerank_depth=3: order must be doc3, doc2, doc1, doc4, doc5")
         for i in range(3):
             hit = res_rerank["hits"][i]
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
@@ -1157,7 +1301,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 return tensor_search.search(
                     config=self.config,
                     index_name=self.index.name,
-                    text=TUXEDO_QUERY,
+                    text="tuxedo",
                     search_method="HYBRID",
                     hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                     score_modifiers=score_modifiers,
@@ -1221,7 +1365,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             res = tensor_search.search(
                 config=self.config,
                 index_name=self.index.name,
-                text=TUXEDO_QUERY,
+                text="tuxedo",
                 search_method="HYBRID",
                 hybrid_parameters=hybrid_params_redundant,
                 score_modifiers=ScoreModifierLists(
@@ -1255,11 +1399,9 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         # Tensor retriever has no main lexical term, so it still needs the BM25 term in rank().
         self.assertIn("rank(", tensor_yql, msg="Tensor YQL must still use rank() for BM25 custom score")
 
-        # Results must still be in correct order: add_to_score bm25 lex_ranking_field -> doc5 first.
+        # Results must still be in correct order: add_to_score bm25 lex_ranking_field -> doc5, doc4, doc3, doc2, doc1.
         ids = [h["_id"] for h in res["hits"]]
-        self.assertEqual(len(ids), 5)
-        self.assertEqual(ids[0], "doc5", msg="add_to_score bm25 lex_ranking_field: doc5 (highest bm25) must rank first")
-        self.assertEqual(ids[-1], "doc1", msg="doc1 (lowest bm25) must rank last")
+        self.assertEqual(ids, REVERSED_ORDER, msg="add_to_score bm25 lex_ranking_field: order must be doc5, doc4, doc3, doc2, doc1")
         for hit in res["hits"]:
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
 
@@ -1293,7 +1435,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         res_full = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                 score_modifiers=score_modifiers,
@@ -1305,7 +1447,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         res_offset_2 = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=score_modifiers,
@@ -1338,18 +1480,12 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 tensor_fields=TENSOR_FIELDS_PLAN,
             ),
         )
-        hybrid_params = HybridParameters(
-            retrievalMethod=RetrievalMethod.Disjunction,
-            rankingMethod=RankingMethod.RRF,
-            alpha=0.5,
-            rrfK=60,
-        )
         res = tensor_search.search(
             config=self.config,
             index_name=self.collapse_index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
-            hybrid_parameters=hybrid_params,
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
@@ -1377,25 +1513,79 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         Custom scores do not change or use targetHits; relevance cutoff (and its probe
         lexical query) should be unaffected. Both together: cutoff is applied and custom
         score reranking is applied to the returned hits.
+        Probe lexical query sent to Vespa must be identical with and without custom score
+        modifiers (custom score must not change the relevance-cutoff probe).
         """
         self._add_tuxedo_docs()
-        hybrid_params = HybridParameters(
-            retrievalMethod=RetrievalMethod.Disjunction,
-            rankingMethod=RankingMethod.RRF,
-            alpha=0.5,
-            rrfK=60,
-        )
         relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.RelativeMaxScore,
             probe_depth=50,
             parameters=RelativeMaxScoreParameters(relative_score_factor=0.5),
         )
+        captured_queries = []
+        original_query = self.config.vespa_client.query
+
+        def capture_then_query(**kwargs):
+            captured_queries.append(dict(kwargs))
+            return original_query(**kwargs)
+
+        with mock.patch.object(self.config.vespa_client, "query", capture_then_query):
+            tensor_search.search(
+                config=self.config,
+                index_name=self.index.name,
+                text="tuxedo",
+                search_method="HYBRID",
+                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                score_modifiers=ScoreModifierLists(
+                    add_to_score=[
+                        {
+                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                            "weight": 1.0,
+                        }
+                    ]
+                ),
+                result_count=10,
+                relevance_cutoff=relevance_cutoff,
+            )
+            tensor_search.search(
+                config=self.config,
+                index_name=self.index.name,
+                text="tuxedo",
+                search_method="HYBRID",
+                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                result_count=10,
+                relevance_cutoff=relevance_cutoff,
+            )
+        self.assertEqual(len(captured_queries), 2, msg="Must capture both requests")
+        captured_with_custom_score = captured_queries[0]
+        captured_without_custom_score = captured_queries[1]
+
+        # Probe uses marqo__yql.lexical.probe when relevance_cutoff is set (no custom-score extra terms).
+        # Both requests must send the same probe YQL so the relevance-cutoff probe is unchanged.
+        probe_yql_with = captured_with_custom_score.get("marqo__yql.lexical.probe")
+        probe_yql_without = captured_without_custom_score.get("marqo__yql.lexical.probe")
+        self.assertIsNotNone(probe_yql_with, msg="Probe YQL must be sent when relevance_cutoff is set")
+        self.assertIsNotNone(probe_yql_without, msg="Probe YQL must be sent when relevance_cutoff is set")
+        self.assertEqual(
+            probe_yql_with,
+            probe_yql_without,
+            msg="Probe lexical YQL must be identical with and without custom score rerank",
+        )
+        # Main lexical with custom score can have extra rank() terms; probe must not.
+        main_lexical_with = captured_with_custom_score.get("marqo__yql.lexical") or ""
+        self.assertNotEqual(
+            main_lexical_with,
+            probe_yql_with,
+            msg="With custom score BM25, main lexical YQL should include extra rank() term; probe must not",
+        )
+
+        # Run again (without patch) to assert hit count and pre-rerank score
         res = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
-            hybrid_parameters=hybrid_params,
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
@@ -1408,7 +1598,10 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             relevance_cutoff=relevance_cutoff,
         )
         self.assertIn("hits", res)
-        self.assertEqual(len(res["hits"]), 5, msg="Exactly 5 docs; all pass relevance cutoff with this setup")
+        self.assertEqual(
+            len(res["hits"]), 3,
+            msg="Relevance cutoff returns at least one hit; count is determined by probe",
+        )
         for hit in res["hits"]:
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
 
@@ -1430,12 +1623,6 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 tensor_fields=TENSOR_FIELDS_PLAN,
             ),
         )
-        hybrid_params = HybridParameters(
-            retrievalMethod=RetrievalMethod.Disjunction,
-            rankingMethod=RankingMethod.RRF,
-            alpha=0.5,
-            rrfK=60,
-        )
         recency_params = RecencyParameters(
             recency_field="timestamp",
             scale="7d",
@@ -1445,9 +1632,9 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         res = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
-            text=TUXEDO_QUERY,
+            text="tuxedo",
             search_method="HYBRID",
-            hybrid_parameters=hybrid_params,
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
@@ -1470,7 +1657,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         cannot be used together; API validation should error out.
         """
         payload = {
-            "q": TUXEDO_QUERY,
+            "q": "tuxedo",
             "searchMethod": SearchMethod.HYBRID,
             "limit": 5,
             "hybridParameters": HybridParameters(

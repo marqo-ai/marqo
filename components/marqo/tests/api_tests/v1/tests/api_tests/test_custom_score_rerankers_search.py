@@ -10,27 +10,45 @@ from tests.marqo_test import MarqoTestCase
 TUXEDO_QUERY = "tuxedo"
 DOCS = [
     {
-        "_id": "doc1", "lex_retrieval_field": "tuxedo tuxedo tuxedo", 
-        "tensor_retrieval_field": "tuxedo",
-        "lex_ranking_field": "tuxedo", 
-        "tensor_ranking_field": "unrelated"
+        # (1) In BOTH tensor and lexical
+        "_id": "doc1",
+        "lex_retrieval_field": "tuxedo tuxedo tuxedo",  # VERY HIGH lexical score
+        "tensor_retrieval_field": "tuxedo",             # VERY HIGH tensor score
+        "lex_ranking_field": "tuxedo",                  # lowest bm25 score for global reranking
+        "tensor_ranking_field": "unrelated",            # lowest closeness score for global reranking
     },
     {
-        "_id": "doc2", "lex_retrieval_field": "no match", 
-        "tensor_retrieval_field": "suit",
-        "lex_ranking_field": "tuxedo tuxedo", 
-        "tensor_ranking_field": "rainbow tie"
+        # (2) In ONLY tensor (medium strength)
+        "_id": "doc2",
+        "lex_retrieval_field": "no match",              # no lexical match
+        "tensor_retrieval_field": "suit",                # MEDIUM tensor score
+        "lex_ranking_field": "tuxedo tuxedo",           # 2nd lowest bm25 score for global reranking
+        "tensor_ranking_field": "rainbow tie",          # 2nd lowest closeness score for global reranking
     },
     {
-        "_id": "doc3", "lex_retrieval_field": "tuxedo tuxedo", 
-        "tensor_retrieval_field": "unrelated",
-        "lex_ranking_field": "tuxedo tuxedo tuxedo", 
-        "tensor_ranking_field": "shorts"
+        # (3) In ONLY lexical (medium strength)
+        "_id": "doc3",
+        "lex_retrieval_field": "tuxedo tuxedo",         # MEDIUM lexical score
+        # No retrieval tensor match at all
+        "lex_ranking_field": "tuxedo tuxedo tuxedo",    # 3rd lowest bm25 score for global reranking
+        "tensor_ranking_field": "shorts",               # 3rd lowest closeness score for global reranking
     },
-    {"_id": "doc4", "lex_retrieval_field": "no match", "tensor_retrieval_field": "shorts",
-     "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo", "tensor_ranking_field": "suit"},
-    {"_id": "doc5", "lex_retrieval_field": "tuxedo", "tensor_retrieval_field": "backpack",
-     "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo tuxedo", "tensor_ranking_field": "tuxedo"},
+    {
+        # (4) In ONLY tensor (lower strength)
+        "_id": "doc4",
+        "lex_retrieval_field": "no match",              # no lexical match
+        "tensor_retrieval_field": "shorts",             # LOWER tensor score (but it's still clothes)
+        "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo",  # 4th lowest bm25 score for global reranking
+        "tensor_ranking_field": "suit",                      # 4th lowest closeness score for global reranking
+    },
+    {
+        # (5) In ONLY lexical (lower strength)
+        "_id": "doc5",
+        "lex_retrieval_field": "tuxedo",                # LOW lexical score
+        # No retrieval tensor match at all
+        "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo tuxedo",  # highest bm25 score for global reranking
+        "tensor_ranking_field": "tuxedo",               # highest closeness score for global reranking
+    },
 ]
 TENSOR_FIELDS = ["tensor_retrieval_field", "tensor_ranking_field"]
 BASE_RRF_ORDER = ["doc1", "doc2", "doc3", "doc4", "doc5"]

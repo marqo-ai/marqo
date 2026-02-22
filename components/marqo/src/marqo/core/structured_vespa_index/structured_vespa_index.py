@@ -545,6 +545,11 @@ class StructuredVespaIndex(VespaIndex):
         select_attributes = self._get_select_attributes(marqo_query)
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
 
+        # Base lexical YQL without custom-score extra rank() terms. Used for relevance-cutoff probe only.
+        lexical_yql_for_probe = (
+            f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
+        )
+
         # Assign parameters to query
         query_inputs = {
             common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
@@ -669,6 +674,11 @@ class StructuredVespaIndex(VespaIndex):
         }
 
         query = {k: v for k, v in query.items() if v is not None}
+
+        # When relevance cutoff is used, send a separate probe lexical YQL without custom-score
+        # extra rank() terms so the probe is unchanged by custom score rerank.
+        if getattr(marqo_query, "relevance_cutoff", None) is not None:
+            query["marqo__yql.lexical.probe"] = lexical_yql_for_probe
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
