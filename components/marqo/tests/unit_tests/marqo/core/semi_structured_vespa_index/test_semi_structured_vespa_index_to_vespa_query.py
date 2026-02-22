@@ -1459,7 +1459,7 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             string_array_fields=[],
         )
 
-    def _hybrid_query(self, score_modifiers=None, facets=None, relevance_cutoff=None):
+    def _hybrid_query(self, score_modifiers=None, facets=None, relevance_cutoff=None, hybrid_parameters=None):
         return MarqoHybridQuery(
             index_name=self.vespa_index._marqo_index.name,
             limit=10,
@@ -1467,20 +1467,20 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             vector_query=[0.1, 0.2, 0.3, 0.4],
             or_phrases=['search'],
             and_phrases=[],
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF,
-                alpha=0.5,
-                rrfK=60,
-            ),
+            hybrid_parameters=hybrid_parameters,
             score_modifiers=score_modifiers,
             facets=facets,
             relevance_cutoff=relevance_cutoff,
         )
 
     def test_hybrid_query_with_bm25_custom_score_includes_rank_in_yql(self):
-        """With BM25 custom score modifiers, lexical and tensor YQL must wrap in rank() with extra BM25 term."""
+        """With BM25 custom score modifiers, lexical and tensor YQL must wrap in rank() with extra BM25 term
+        if not already included in the main lexical query."""
         marqo_query = self._hybrid_query(
+            hybrid_parameters=HybridParameters(
+                # Using description so title has to be used in rank()
+                searchableAttributesLexical=["description"]
+            ),
             score_modifiers=[
                 ScoreModifier(
                     field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
