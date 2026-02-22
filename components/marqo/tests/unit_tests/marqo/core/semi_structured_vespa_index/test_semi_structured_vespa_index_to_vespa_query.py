@@ -1460,6 +1460,12 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         )
 
     def _hybrid_query(self, score_modifiers=None, facets=None, relevance_cutoff=None, hybrid_parameters=None):
+        # Set default hybrid parameters to use RRF
+        if hybrid_parameters == None:
+            hybrid_parameters = HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+            )
+
         return MarqoHybridQuery(
             index_name=self.vespa_index._marqo_index.name,
             limit=10,
