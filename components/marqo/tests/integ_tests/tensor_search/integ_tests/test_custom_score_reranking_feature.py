@@ -86,8 +86,6 @@ DOCS_TUXEDO_PLAN = [
 
 # This doc structure allows certain docs to come to the surface depending on which aggregate was chosen.
 # Ranking fields only; retrieval fields are added when indexing so all docs match the query.
-# Design: strongest_sum has 6 fields with "tuxedo" (6*C_t); strongest_avg has 2 fields
-# "tuxedo tuxedo" (avg C_tt); strongest_max has one very high "tuxedo tuxedo tuxedo", one low.
 DOCS_TUXEDO_FOR_LEXICAL_AGGREGATES = [
     {
         # If max aggregate is chosen, this doc should come to the top (one field has highest BM25)
@@ -95,15 +93,17 @@ DOCS_TUXEDO_FOR_LEXICAL_AGGREGATES = [
         "lex_ranking_field_1": "tuxedo tuxedo tuxedo",
         "lex_ranking_field_2": "no match",
     },
-    {
-        # If avg aggregate is chosen, this doc should come to the top (high value in both fields)
-        "_id": "strongest_avg",
+{
+        # A doc that should end up in the middle, whether aggregate method is sum, avg, or max.
+        # Note that avg divides by all fields in the index, not just that in this doc. That's why this doc
+        # doesn't have the highest avg
+        "_id": "middle_of_both",
         "lex_ranking_field_1": "tuxedo tuxedo",
         "lex_ranking_field_2": "tuxedo tuxedo",
     },
     {
-        # If sum aggregate is chosen, this doc should come to the top (many fields with good BM25)
-        "_id": "strongest_sum",
+        # If sum/avg aggregate is chosen, this doc should come to the top (many fields with good BM25)
+        "_id": "strongest_sum_avg",
         "lex_ranking_field_1": "tuxedo",
         "lex_ranking_field_2": "tuxedo",
         "lex_ranking_field_3": "tuxedo",
@@ -122,14 +122,14 @@ DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES = [
         "tensor_ranking_field_2": "unrelated",
     },
     {
-        # If avg aggregate is chosen: two fields with same high value (suit 0.90)
-        "_id": "strongest_avg",
+        # A doc that should end up in the middle, whether aggregate method is sum, avg, or max.
+        "_id": "middle_of_both",
         "tensor_ranking_field_1": "suit",
         "tensor_ranking_field_2": "suit",
     },
     {
-        # If sum aggregate is chosen: many fields with medium-high closeness (rainbow tie 0.795)
-        "_id": "strongest_sum",
+        # If sum/avg aggregate is chosen: many fields with medium-high closeness (rainbow tie 0.795)
+        "_id": "strongest_sum_avg",
         "tensor_ranking_field_1": "rainbow tie",
         "tensor_ranking_field_2": "rainbow tie",
         "tensor_ranking_field_3": "rainbow tie",
@@ -305,7 +305,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                     search_method="HYBRID",
                     hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                     score_modifiers=ScoreModifierLists(
-                        add_to_score=[{"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum", "weight": 1.0}]
+                        add_to_score=[{"field_name": f"marqo__score_bm25_sum", "weight": 1.0}]
                     ),
                     result_count=5,
                 )
@@ -371,7 +371,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -412,7 +412,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_tensor_ranking_field",
+                        "field_name": f"marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -477,7 +477,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_tensor_ranking_field",
+                        "field_name": f"marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -498,7 +498,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_tensor_ranking_field",
+                            "field_name": f"marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
                             "weight": weight,
                         }
                     ]
@@ -541,7 +541,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             score_modifiers=ScoreModifierLists(
                 multiply_score_by=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -555,12 +555,11 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         any_changed = any(h["_score"] != h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"])
         self.assertTrue(any_changed, msg="multiply_score_by must change at least one doc's score")
 
-    @unittest.skip("Skipping until we get clarification on how avg works. Over all fields in corpus, or just doc?")
+
     def test_all_bm25_aggregates_sum_max_avg(self):
         """
         BM25 sum/max/avg aggregates: use a dedicated index and DOCS_TUXEDO_FOR_LEXICAL_AGGREGATES.
-        Derive contributions by running with add_to_score on lex_ranking_field_1 only
-        compute expected sum/max/avg per doc; assert strict top hit and exact score for each aggregate.
+        Assert strict order for each aggregate. Assert that aggregate was normalized.
         """
 
         self.add_documents(
@@ -576,21 +575,17 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             index_name=self.index_bm25_aggregates.name,
             text="tuxedo",
             search_method="HYBRID",
-            hybrid_parameters=HybridParameters(
-                # There's a 3, 2, and 1 frequency of "tuxedo" in this first field, so we can use this as bm25 basis.
-                searchableAttributesLexical=["lex_ranking_field_1"]
-            ),
             result_count=10,
         )
 
-        # Contribution from a single field: max has the ttt, avg has the tt, sum has the t
+        # Collect baseline scores for comparison
         for hit in res_baseline["hits"]:
             if hit["_id"] == "strongest_max":
-                contrib_ttt = hit["_lexical_score"]
-            elif hit["_id"] == "strongest_avg":
-                contrib_tt = hit["_lexical_score"]
-            elif hit["_id"] == "strongest_sum":
-                contrib_t = hit["_lexical_score"]
+                baseline_score_strongest_max = hit["_score"]
+            elif hit["_id"] == "middle_of_both":
+                baseline_score_middle = hit["_score"]
+            elif hit["_id"] == "strongest_sum_avg":
+                baseline_score_strongest_sum_avg = hit["_score"]
 
         for agg in ("sum", "max", "avg"):
             with self.subTest(aggregate=agg):
@@ -599,68 +594,54 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                     index_name=self.index_bm25_aggregates.name,
                     text="tuxedo",
                     search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(
-                        # There's a 3, 2, and 1 frequency of "tuxedo" in this first field, so we can use this as bm25 basis.
-                        searchableAttributesLexical=["lex_ranking_field_1"]
-                    ),
                     score_modifiers=ScoreModifierLists(
                         add_to_score=[
                             # High weight because the numbers are small.
-                            {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_{agg}", "weight": 1000.0}
+                            {"field_name": f"marqo__score_bm25_{agg}", "weight": 1000.0}
                         ]
                     ),
                     result_count=10,
                 )
+
+                # Basic assertions. List length and base score
                 self.assertEqual(len(res["hits"]), 3)
                 self._assert_pre_rerank_score_matches_baseline(res, res_baseline)
-                # Strict: each hit's contribution and score match the expected aggregate for that doc
-                for hit in res["hits"]:
-                    doc_id = hit["_id"]
-                    pre = hit[MARQO_DOC_PRE_RERANK_SCORE]
-                    contrib = hit["_score"] - pre
-                    self.assertAlmostEqual(
-                        contrib,
-                        expected_agg[doc_id],
-                        delta=1e-5,
-                        msg=f"bm25_{agg} doc {doc_id}: contribution must match expected",
-                    )
-                    self.assertAlmostEqual(
-                        hit["_score"],
-                        baseline_by_id[doc_id] + expected_agg[doc_id],
-                        delta=1e-5,
-                        msg=f"bm25_{agg} doc {doc_id}: score = baseline + contribution",
-                    )
-                # Order: hits must be sorted by expected aggregate descending
-                order_by_expected = [doc_id for doc_id, _ in sorted(expected_agg.items(), key=lambda x: -x[1])]
-                actual_order = [h["_id"] for h in res["hits"]]
-                self.assertEqual(
-                    actual_order,
-                    order_by_expected,
-                    msg=f"bm25_{agg}: result order must match expected aggregate order (expected {order_by_expected})",
-                )
 
-    @unittest.skip("Skipping until we get clarification on how avg works. Over all fields in corpus, or just doc?")
+                # Assert order is correct for each aggregate type
+                if agg in ("sum", "avg"):
+                    expected_order = ["strongest_sum_avg", "middle_of_both", "strongest_max"]
+                    # Confirm that it's normalized.
+                    # Meaning top hit has +1000 to original score
+                    self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_sum_avg + 1000.0)
+                    # Then bottom hit score must match its base score (it was normlized to 0).
+                    self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_max)
+
+                else:  # max
+                    expected_order = ["strongest_max", "middle_of_both", "strongest_sum_avg"]
+                    self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_max + 1000.0)
+                    self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_sum_avg)
+
+
+                # Confirm order is correct
+                ids = [h["_id"] for h in res["hits"]]
+                self.assertEqual(ids, expected_order, msg=f"add_to_score bm25_{agg}: order must be {expected_order}")
+
+
+
+
     def test_all_closeness_aggregates_sum_max_avg(self):
         """
         Closeness sum/max/avg aggregates: use a dedicated index and DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES
-        with tensor_ranking_field_<i> and CLOSENESS_TUXEDO terms. Derive contribution per field by
-        running with add_to_score on closeness_retrieval_vector_field_tensor_ranking_field_<i> only;
-        compute expected sum/max/avg per doc; assert strict top hit and exact score for each aggregate.
+        Assert strict order for each aggregate. Assert that aggregate was normalized.
         """
-        # Docs need retrieval fields so all match the query "tuxedo"
-        docs = [
-            {**d, "lex_retrieval_field": "tuxedo", "tensor_retrieval_field": "tuxedo"}
-            for d in DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES
-        ]
-        tensor_fields_close = ["tensor_retrieval_field", "tensor_ranking_field_1", "tensor_ranking_field_2",
-                               "tensor_ranking_field_3", "tensor_ranking_field_4", "tensor_ranking_field_5",
-                               "tensor_ranking_field_6"]
+
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.index_closeness_aggregates.name,
-                docs=docs,
-                tensor_fields=tensor_fields_close,
+                docs=DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES,
+                tensor_fields=["tensor_ranking_field_1", "tensor_ranking_field_2", "tensor_ranking_field3",
+                                 "tensor_ranking_field4", "tensor_ranking_field5", "tensor_ranking_field6"]
             ),
         )
         res_baseline = tensor_search.search(
@@ -668,101 +649,55 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             index_name=self.index_closeness_aggregates.name,
             text="tuxedo",
             search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_CLOSENESS_AGGREGATES,
             result_count=10,
         )
-        baseline_by_id = {h["_id"]: h["_score"] for h in res_baseline["hits"]}
 
-        def contrib_for_tensor_field(field_name: str):
-            r = tensor_search.search(
-                config=self.config,
-                index_name=self.index_closeness_aggregates.name,
-                text="tuxedo",
-                search_method="HYBRID",
-                hybrid_parameters=HYBRID_PARAMS_CLOSENESS_AGGREGATES,
-                score_modifiers=ScoreModifierLists(
-                    add_to_score=[
-                        {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_{field_name}",
-                            "weight": 1.0,
-                        }
-                    ]
-                ),
-                result_count=10,
-            )
-            return {h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in r["hits"]}
-
-        c_ret = contrib_for_tensor_field("tensor_retrieval_field")
-        c1 = contrib_for_tensor_field("tensor_ranking_field_1")
-        c2 = contrib_for_tensor_field("tensor_ranking_field_2")
-        C_ret = c_ret["strongest_max"]
-        C_tuxedo = c1["strongest_max"]
-        C_unrelated = c2["strongest_max"]
-        C_suit = c1["strongest_avg"]
-        C_rainbow = c1["strongest_sum"]
-        # All docs have tensor_retrieval_field="tuxedo"; aggregate includes it. 3, 3, 7 tensor fields.
-        expected_sum = {
-            "strongest_max": C_ret + C_tuxedo + C_unrelated,
-            "strongest_avg": C_ret + 2 * C_suit,
-            "strongest_sum": C_ret + 6 * C_rainbow,
-        }
-        expected_max = {
-            "strongest_max": max(C_ret, C_tuxedo, C_unrelated),
-            "strongest_avg": max(C_ret, C_suit),
-            "strongest_sum": max(C_ret, C_rainbow),
-        }
-        expected_avg = {
-            "strongest_max": (C_ret + C_tuxedo + C_unrelated) / 3.0,
-            "strongest_avg": (C_ret + 2 * C_suit) / 3.0,
-            "strongest_sum": (C_ret + 6 * C_rainbow) / 7.0,
-        }
+        # Collect baseline scores for comparison
+        for hit in res_baseline["hits"]:
+            if hit["_id"] == "strongest_max":
+                baseline_score_strongest_max = hit["_score"]
+            elif hit["_id"] == "middle_of_both":
+                baseline_score_middle = hit["_score"]
+            elif hit["_id"] == "strongest_sum_avg":
+                baseline_score_strongest_sum_avg = hit["_score"]
 
         for agg in ("sum", "max", "avg"):
             with self.subTest(aggregate=agg):
-                expected_agg = expected_sum if agg == "sum" else (expected_max if agg == "max" else expected_avg)
                 res = tensor_search.search(
                     config=self.config,
                     index_name=self.index_closeness_aggregates.name,
                     text="tuxedo",
                     search_method="HYBRID",
-                    hybrid_parameters=HYBRID_PARAMS_CLOSENESS_AGGREGATES,
                     score_modifiers=ScoreModifierLists(
                         add_to_score=[
-                            {
-                                "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_{agg}",
-                                "weight": 1.0,
-                            }
+                            # High weight because the numbers are small.
+                            {"field_name": f"marqo__score_closeness_retrieval_vector_{agg}", "weight": 1000.0}
                         ]
                     ),
                     result_count=10,
                 )
+
+                # Basic assertions. List length and base score
                 self.assertEqual(len(res["hits"]), 3)
                 self._assert_pre_rerank_score_matches_baseline(res, res_baseline)
-                # Strict: each hit's contribution and score match the expected aggregate for that doc
-                for hit in res["hits"]:
-                    doc_id = hit["_id"]
-                    pre = hit[MARQO_DOC_PRE_RERANK_SCORE]
-                    contrib = hit["_score"] - pre
-                    self.assertAlmostEqual(
-                        contrib,
-                        expected_agg[doc_id],
-                        delta=1e-5,
-                        msg=f"closeness_{agg} doc {doc_id}: contribution must match expected",
-                    )
-                    self.assertAlmostEqual(
-                        hit["_score"],
-                        baseline_by_id[doc_id] + expected_agg[doc_id],
-                        delta=1e-5,
-                        msg=f"closeness_{agg} doc {doc_id}: score = baseline + contribution",
-                    )
-                # Order: hits must be sorted by expected aggregate descending
-                order_by_expected = [doc_id for doc_id, _ in sorted(expected_agg.items(), key=lambda x: -x[1])]
-                actual_order = [h["_id"] for h in res["hits"]]
-                self.assertEqual(
-                    actual_order,
-                    order_by_expected,
-                    msg=f"closeness_{agg}: result order must match expected aggregate order (expected {order_by_expected})",
-                )
+
+                # Assert order is correct for each aggregate type
+                if agg in ("sum", "avg"):
+                    expected_order = ["strongest_sum_avg", "middle_of_both", "strongest_max"]
+                    # Confirm that it's normalized.
+                    # Meaning top hit has +1000 to original score
+                    self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_sum_avg + 1000.0)
+                    # Then bottom hit score must match its base score (it was normlized to 0).
+                    self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_max)
+
+                else:  # max
+                    expected_order = ["strongest_max", "middle_of_both", "strongest_sum_avg"]
+                    self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_max + 1000.0)
+                    self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_sum_avg)
+
+                # Confirm order is correct
+                ids = [h["_id"] for h in res["hits"]]
+                self.assertEqual(ids, expected_order, msg=f"add_to_score bm25_{agg}: order must be {expected_order}")
 
     def test_custom_score_rerank_different_weights_affect_order_and_scores(self):
         """
@@ -786,7 +721,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
-                    {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field", "weight": -1.0}
+                    {"field_name": f"marqo__score_bm25_field_lex_ranking_field", "weight": -1.0}
                 ]
             ),
             result_count=10,
@@ -806,7 +741,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
-                    {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field", "weight": 2.0}
+                    {"field_name": f"marqo__score_bm25_field_lex_ranking_field", "weight": 2.0}
                 ]
             ),
             result_count=10,
@@ -828,7 +763,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_nonexistent_tensor_field",
+                            "field_name": f"marqo__score_closeness_retrieval_vector_field_nonexistent_tensor_field",
                             "weight": 1.0,
                         }
                     ]
@@ -851,7 +786,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_nonexistent_lex_field",
+                            "field_name": f"marqo__score_bm25_field_nonexistent_lex_field",
                             "weight": 1.0,
                         }
                     ]
@@ -886,7 +821,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum",
+                            "field_name": f"marqo__score_bm25_sum",
                             "weight": 1.0,
                         }
                     ]
@@ -931,7 +866,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_sum",
+                            "field_name": f"marqo__score_closeness_retrieval_vector_sum",
                             "weight": 1.0,
                         }
                     ]
@@ -997,7 +932,7 @@ class TestCustomScoreRerankStructuredIndexUnsupported(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                            "field_name": f"marqo__score_bm25_field_title",
                             "weight": 1.0,
                         }
                     ]
@@ -1064,7 +999,7 @@ class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):
                     score_modifiers=ScoreModifierLists(
                         add_to_score=[
                             {
-                                "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_tensor_ranking_field",
+                                "field_name": f"marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
                                 "weight": 1.0,
                             }
                         ]
@@ -1154,7 +1089,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 add_to_score=[
                     {"field_name": "popularity", "weight": 1.0},
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     },
                 ]
@@ -1243,7 +1178,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_tensor_ranking_field",
+                            "field_name": f"marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
                             "weight": 1.0,
                         }
                     ]
@@ -1283,7 +1218,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -1347,7 +1282,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -1404,13 +1339,13 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                            "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                             "weight": 1.0,
                         }
                     ],
                     multiply_score_by=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                            "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                             "weight": 1.0,
                         }
                     ],
@@ -1462,7 +1397,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         )
         score_modifiers = ScoreModifierLists(
             add_to_score=[
-                {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field", "weight": 1.0}
+                {"field_name": f"marqo__score_bm25_field_lex_ranking_field", "weight": 1.0}
             ]
         )
         res_full = tensor_search.search(
@@ -1522,7 +1457,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -1572,7 +1507,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
-                            "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                            "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                             "weight": 1.0,
                         }
                     ]
@@ -1622,7 +1557,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -1671,7 +1606,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             score_modifiers=ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     }
                 ]
@@ -1701,7 +1636,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
             "scoreModifiers": ScoreModifierLists(
                 add_to_score=[
                     {
-                        "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                        "field_name": f"marqo__score_bm25_field_lex_ranking_field",
                         "weight": 1.0,
                     }
                 ]
