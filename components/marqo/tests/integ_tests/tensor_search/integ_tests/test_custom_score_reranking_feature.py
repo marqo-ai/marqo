@@ -249,17 +249,20 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         index_request_empty = cls.unstructured_marqo_index_request(model=model)
         index_request_bm25_aggregates = cls.unstructured_marqo_index_request(model=model)
         index_request_closeness_aggregates = cls.unstructured_marqo_index_request(model=model)
+        index_request_lexical_only = cls.unstructured_marqo_index_request(model=model)
 
         cls.indexes = cls.create_indexes([
             index_request,
             index_request_empty,
             index_request_bm25_aggregates,
             index_request_closeness_aggregates,
+            index_request_lexical_only,
         ])
         cls.index = cls.indexes[0]
-        cls.index_empty = cls.indexes[1]
+        cls.index_number_only = cls.indexes[1]
         cls.index_bm25_aggregates = cls.indexes[2]
         cls.index_closeness_aggregates = cls.indexes[3]
+        cls.index_lexical_only = cls.indexes[4]
 
     def setUp(self) -> None:
         super().setUp()
@@ -860,16 +863,26 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
     def test_validation_bm25_aggregate_with_no_lexical_fields_raises(self):
         """
         Requesting a BM25 aggregate (sum/max/avg) when the index has no lexically searchable fields
-        must raise InvalidArgumentError (400). We use an index that has never had documents added,
-        so it has no lexical and no tensor fields.
+        must raise InvalidArgumentError (400). We use an index that has only the tensor retrieval
+        field (no lexical fields), so searchable-attributes validation passes but custom score
+        validation raises.
         """
+        # Ensure index has tensor_retrieval_field so searchable-attributes validation passes
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_number_only.name,
+                docs=[{"_id": "seed", "numeric_field": 1}],
+                tensor_fields=[],
+            ),
+        )
+
         with self.assertRaises(InvalidArgumentError) as ctx:
             tensor_search.search(
                 config=self.config,
-                index_name=self.index_empty.name,
+                index_name=self.index_number_only.name,
                 text="anything",
                 search_method="HYBRID",
-                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
@@ -886,15 +899,35 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
     def test_validation_closeness_aggregate_with_no_tensor_fields_raises(self):
         """
         Requesting a closeness aggregate (sum/max/avg) when the index has no tensor fields
-        must raise InvalidArgumentError (400). We use an index that has never had documents added.
+        must raise InvalidArgumentError (400). We use an index that has only the lexical
+        retrieval field (no tensor fields), so searchable-attributes validation passes but
+        custom score validation raises.
         """
+        # Ensure index has lex_retrieval_field so searchable-attributes validation passes.
+        # Use a separate index so it has only lexical (no tensor) and doesn't conflict with BM25 test.
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index_lexical_only.name,
+                docs=[{"_id": "seed_lex", "lex_retrieval_field": "anything"}],
+                tensor_fields=[],  # no tensor fields in this index
+            ),
+        )
+        params_lexical_only = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5001,
+            rrfK=60,
+            searchableAttributesTensor=[],  # no tensor fields in this index
+            searchableAttributesLexical=["lex_retrieval_field"],
+        )
         with self.assertRaises(InvalidArgumentError) as ctx:
             tensor_search.search(
                 config=self.config,
-                index_name=self.index_empty.name,
+                index_name=self.index_lexical_only.name,
                 text="anything",
                 search_method="HYBRID",
-                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                hybrid_parameters=params_lexical_only,
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
                         {
