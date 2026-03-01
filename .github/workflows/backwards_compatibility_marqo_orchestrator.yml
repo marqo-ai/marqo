@@ -27,7 +27,7 @@ jobs:
     # Responsible for deciding if we should invoke build_push_img.yml GitHub actions workflow in the same repo.
     # We do not want to build and push the image if it already exists in the ECR registry, which will be the case if this is a manual developer initiated re-run using the same commit.
     name: Check if image already exists in ECR
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     outputs:
       image_exists: ${{ steps.check-image.outputs.image_exists }}
@@ -111,7 +111,7 @@ jobs:
   orchestrate:
     # Job to orchestrate backwards compatibility test execution. Majorly responsible for determining to_version and for generating the list of from_version(s) to test against.
     name: Orchestrate backwards compatibility test execution
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: components/marqo

@@ -45,7 +45,7 @@ env:
 
 jobs:
   Determine-Vespa-Setup:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
       MULTINODE_TEST_ARGS: ${{ steps.set_var.outputs.MULTINODE_TEST_ARGS }}
@@ -157,7 +157,7 @@ jobs:
     name: Merge Coverage And Generate Reports
     needs:
       - Test-Marqo
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Download coverage files for this configuration
         uses: actions/download-artifact@v4

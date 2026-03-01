@@ -17,7 +17,7 @@ permissions:
 jobs:
   Determine-changes:
     name: Determine Scope of Changes
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       non_documentation_changes_found: ${{ steps.check_changes.outputs.non_documentation_changes_found }}
     steps:
@@ -86,7 +86,7 @@ jobs:
   # GitHub status will rely on the result of this step to determine if the PR is ready for merge
   Report-required-test-status:
     needs: [Determine-changes, Run-coverage-checks]
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: always()
     steps:
       - name: Set integration test status

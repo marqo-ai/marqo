@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build-and-deploy:
     name: Build and Deploy Marqo Images to ECR for all AWS Environments
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     strategy:
       matrix:
         environment: [staging, preprod, os, prod-cell-1]
