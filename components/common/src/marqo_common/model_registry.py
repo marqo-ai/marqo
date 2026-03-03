@@ -185,9 +185,9 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "type": "open_clip",
         "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
-            "name": "timm-ViT-B-16-SigLIP2-256-image_encoder",
+            "name": "timm-ViT-B-16-SigLIP2-256-image-encoder",
             "sources": [
-                f"s3://{_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-B-16-SigLIP2-256/image-encoder/model.onnx"
+                f"{_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-B-16-SigLIP2-256/image-encoder/model.onnx"
             ],
             "input": [
                 {
@@ -212,9 +212,9 @@ _MODEL_REGISTRY: dict[str, dict] = {
         },
         "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
-            "name": "timm-ViT-B-16-SigLIP2-256-text_encoder",
+            "name": "timm-ViT-B-16-SigLIP2-256-text-encoder",
             "sources": [
-                f"s3://{_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-B-16-SigLIP2-256/text-encoder/model.onnx"
+                f"{_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-B-16-SigLIP2-256/text-encoder/model.onnx"
             ],
             "input": [
                 {
