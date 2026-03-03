@@ -187,7 +187,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 8,
             "name": "timm-ViT-B-16-SigLIP2-256-image_encoder",
             "sources": [
-                "s3://marqo-default-models-os/timm-ViT-B-16-SigLIP2-256/image-encoder/model.onnx"
+                f"s3://{_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-B-16-SigLIP2-256/image-encoder/model.onnx"
             ],
             "input": [
                 {
@@ -214,7 +214,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "maxBatchSize": 16,
             "name": "timm-ViT-B-16-SigLIP2-256-text_encoder",
             "sources": [
-                "s3://marqo-default-models-os/timm-ViT-B-16-SigLIP2-256/text-encoder/model.onnx"
+                f"s3://{_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-ViT-B-16-SigLIP2-256/text-encoder/model.onnx"
             ],
             "input": [
                 {
