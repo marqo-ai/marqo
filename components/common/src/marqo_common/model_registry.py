@@ -181,7 +181,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
     },
     "timm/ViT-B-16-SigLIP2-256": {
         "name": "hf-hub:timm/ViT-B-16-SigLIP2-256",
-        "dimensions": 512,
+        "dimensions": 768,
         "type": "open_clip",
         "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
@@ -238,7 +238,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
     },
     "open_clip/ViT-B-32/laion2b_s34b_b79k": {
         "name": "hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
-        "dimensions": 512,
+        "dimensions": 768,
         "type": "open_clip",
         "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
