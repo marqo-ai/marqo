@@ -41,9 +41,7 @@ class BaseModelProperties(AppImmutableBaseModel):
     @property
     def effective_name(self) -> str:
         """Return tritonModelName if set, otherwise fall back to name."""
-        return (
-            self.triton_model_name if self.triton_model_name is not None else self.name
-        )
+        return self.triton_model_name if self.triton_model_name is not None else self.name
 
 
 class ModelInput(AppImmutableBaseModel):

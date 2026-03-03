@@ -299,9 +299,7 @@ class TestOpenCLIPModel(unittest.TestCase):
         # Properties with old name but new tritonModelName
         properties_with_triton_name = self.valid_hf_model_properties.copy()
         properties_with_triton_name["name"] = "ViT-B-16-SigLIP"  # Old name
-        properties_with_triton_name["tritonModelName"] = (
-            "hf-hub:timm/ViT-B-16-SigLIP"  # New name
-        )
+        properties_with_triton_name["tritonModelName"] = "hf-hub:timm/ViT-B-16-SigLIP"  # New name
 
         model = OpenCLIPModel(
             model_properties=properties_with_triton_name,
@@ -321,9 +319,7 @@ class TestOpenCLIPModel(unittest.TestCase):
     @patch(
         "inference_orchestrator.services.triton_inference.embedding_models.open_clip.open_clip_model.open_clip"
     )
-    def test_load_openclip_registry_uses_effective_name_from_triton_model_name(
-        self, mock_open_clip
-    ):
+    def test_load_openclip_registry_uses_effective_name_from_triton_model_name(self, mock_open_clip):
         """Test that loading from open_clip registry uses tritonModelName when set."""
         mock_model = MagicMock()
         mock_preprocess = MagicMock()
@@ -338,9 +334,7 @@ class TestOpenCLIPModel(unittest.TestCase):
         # Properties with old name but new tritonModelName pointing to open_clip registry
         properties_with_triton_name = self.valid_openclip_model_properties.copy()
         properties_with_triton_name["name"] = "old-name"
-        properties_with_triton_name["tritonModelName"] = (
-            "open_clip/ViT-L-14/laion2b_s32b_b82k"
-        )
+        properties_with_triton_name["tritonModelName"] = "open_clip/ViT-L-14/laion2b_s32b_b82k"
 
         model = OpenCLIPModel(
             model_properties=properties_with_triton_name,
@@ -407,9 +401,7 @@ class TestOpenCLIPModel(unittest.TestCase):
 
                 result = model._load_tokenizer_from_checkpoint()
 
-                mock_open_clip.get_tokenizer.assert_called_once_with(
-                    expected_tokenizer_arg
-                )
+                mock_open_clip.get_tokenizer.assert_called_once_with(expected_tokenizer_arg)
                 self.assertIs(mock_tokenizer, result)
 
     def test_load_with_invalid_prefix_raises_error(self):

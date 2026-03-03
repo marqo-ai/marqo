@@ -545,12 +545,7 @@ class TestOpenCLIPModelProperties(unittest.TestCase):
         """Test effective_name with different tritonModelName values."""
         test_cases = [
             ("hf-hub prefix", "old-name", "hf-hub:org/model", "hf-hub:org/model"),
-            (
-                "open_clip prefix",
-                "old-name",
-                "open_clip/ViT-B-32/openai",
-                "open_clip/ViT-B-32/openai",
-            ),
+            ("open_clip prefix", "old-name", "open_clip/ViT-B-32/openai", "open_clip/ViT-B-32/openai"),
             ("None triton_model_name", "original-name", None, "original-name"),
         ]
 

@@ -248,9 +248,7 @@ class TestHuggingFaceModel(unittest.TestCase):
         # Properties with old name but new tritonModelName
         properties_with_triton_name = self.valid_model_properties.copy()
         properties_with_triton_name["name"] = "old-model-name"
-        properties_with_triton_name["tritonModelName"] = (
-            "sentence-transformers/all-MiniLM-L6-v2"
-        )
+        properties_with_triton_name["tritonModelName"] = "sentence-transformers/all-MiniLM-L6-v2"
 
         model = HuggingFaceModel(
             model_properties=properties_with_triton_name,

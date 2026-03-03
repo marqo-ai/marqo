@@ -133,9 +133,7 @@ class OpenCLIPModel(AbstractEmbeddingModel):
                 self._load_model_and_image_preprocessor_from_hf_repo()
             )
             self.tokenizer = self._load_tokenizer_from_hf_repo()
-        elif self.model_properties.effective_name.startswith(
-            MARQO_OPEN_CLIP_REGISTRY_PREFIX
-        ):
+        elif self.model_properties.effective_name.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
             _, self.image_preprocessor = (
                 self._load_model_and_image_preprocessor_from_open_clip_repo()
             )
@@ -239,14 +237,11 @@ class OpenCLIPModel(AbstractEmbeddingModel):
 
     def _load_tokenizer_from_hf_repo(self) -> Callable:
         return open_clip.get_tokenizer(
-            self.model_properties.effective_name,
-            cache_dir=ModelDownloadCache.hf_cache_path,
+            self.model_properties.effective_name, cache_dir=ModelDownloadCache.hf_cache_path
         )
 
     def _load_tokenizer_from_open_clip_repo(self) -> Callable:
-        return open_clip.get_tokenizer(
-            self.model_properties.effective_name.split("/", 3)[1]
-        )
+        return open_clip.get_tokenizer(self.model_properties.effective_name.split("/", 3)[1])
 
     def encode(
         self, inputs: List, modality: Modality, normalize: bool
