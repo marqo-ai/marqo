@@ -179,6 +179,63 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         },
     },
+    "timm/ViT-B-16-SigLIP2-256": {
+        "name": "hf-hub:timm/ViT-B-16-SigLIP2-256",
+        "dimensions": 512,
+        "type": "open_clip",
+        "tritonImageEncoderProperties": {
+            "maxBatchSize": 8,
+            "name": "timm-ViT-B-16-SigLIP2-256-image_encoder",
+            "sources": [
+                "s3://marqo-default-models-os/timm-ViT-B-16-SigLIP2-256/image-encoder/model.onnx"
+            ],
+            "input": [
+                {
+                    "name": "input",
+                    "dims": [
+                        3,
+                        256,
+                        256
+                    ],
+                    "dataType": "TYPE_FP32"
+                }
+            ],
+            "output": [
+                {
+                    "name": "output",
+                    "dims": [
+                        512
+                    ],
+                    "dataType": "TYPE_FP32"
+                }
+            ]
+        },
+        "tritonTextEncoderProperties": {
+            "maxBatchSize": 16,
+            "name": "timm-ViT-B-16-SigLIP2-256-text_encoder",
+            "sources": [
+                "s3://marqo-default-models-os/timm-ViT-B-16-SigLIP2-256/text-encoder/model.onnx"
+            ],
+            "input": [
+                {
+                    "name": "input",
+                    "dims": [
+                        64
+                    ],
+                    "dataType": "TYPE_INT32"
+                }
+            ],
+            "output": [
+                {
+                    "name": "output",
+                    "dims": [
+                        512
+                    ],
+                    "dataType": "TYPE_FP32"
+                }
+            ]
+        }
+    },
     "open_clip/ViT-B-32/laion2b_s34b_b79k": {
         "name": "hf-hub:laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
         "dimensions": 512,

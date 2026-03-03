@@ -93,7 +93,8 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         """
 
         self._tokenizer = AutoTokenizer.from_pretrained(
-            self.model_properties.effective_name, cache_dir=ModelDownloadCache.hf_cache_path
+            self.model_properties.effective_name,
+            cache_dir=ModelDownloadCache.hf_cache_path,
         )
         self._pooling_func = self._load_pooling_method()
 

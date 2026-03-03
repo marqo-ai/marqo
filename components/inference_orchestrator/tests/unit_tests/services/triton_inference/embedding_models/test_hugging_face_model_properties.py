@@ -419,7 +419,9 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
             triton_text_encoder_properties=self.text_encoder_properties,
         )
 
-        self.assertEqual("sentence-transformers/all-MiniLM-L6-v2", properties.effective_name)
+        self.assertEqual(
+            "sentence-transformers/all-MiniLM-L6-v2", properties.effective_name
+        )
         self.assertIsNone(properties.triton_model_name)
 
     def test_effective_name_returns_triton_model_name_when_set(self):
@@ -433,9 +435,13 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
             triton_text_encoder_properties=self.text_encoder_properties,
         )
 
-        self.assertEqual("sentence-transformers/all-MiniLM-L6-v2", properties.effective_name)
+        self.assertEqual(
+            "sentence-transformers/all-MiniLM-L6-v2", properties.effective_name
+        )
         self.assertEqual("old-model-name", properties.name)
-        self.assertEqual("sentence-transformers/all-MiniLM-L6-v2", properties.triton_model_name)
+        self.assertEqual(
+            "sentence-transformers/all-MiniLM-L6-v2", properties.triton_model_name
+        )
 
     def test_effective_name_with_various_triton_model_names(self):
         """Test effective_name with different tritonModelName values."""
