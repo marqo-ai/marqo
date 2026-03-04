@@ -286,13 +286,13 @@ _MODEL_REGISTRY: dict[str, dict] = {
             "output": [{"name": "output", "dims": [768], "dataType": "TYPE_FP32"}],
         },
     },
-    "open_clip/ViT-L-14/laion400m_e32b_b82k": {
+    "open_clip/ViT-L-14/laion400m_e32": {
         "name": "hf-hub:timm/vit_large_patch14_clip_224.laion400m_e32",
         "dimensions": 768,
         "type": "open_clip",
         "tritonImageEncoderProperties": {
             "maxBatchSize": 8,
-            "name": "timm-ViT-L-14-laion400m_e32b_b82k-image-encoder",
+            "name": "timm-ViT-L-14-laion400m_e32-image-encoder",
             "sources": [
                 f"{_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-vit_large_patch14_clip_224.laion400m_e32/image-encoder/model.onnx"
             ],
@@ -303,7 +303,7 @@ _MODEL_REGISTRY: dict[str, dict] = {
         },
         "tritonTextEncoderProperties": {
             "maxBatchSize": 16,
-            "name": "timm-ViT-L-14-laion400m_e32b_b82k-text-encoder",
+            "name": "timm-ViT-L-14-laion400m_e32-text-encoder",
             "sources": [
                 f"{_MARQO_DEFAULT_MODELS_S3_BUCKET_PLACE_HOLDER}/timm-vit_large_patch14_clip_224.laion400m_e32/text-encoder/model.onnx",
             ],
