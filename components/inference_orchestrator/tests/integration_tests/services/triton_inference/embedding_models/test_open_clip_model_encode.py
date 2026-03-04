@@ -28,6 +28,7 @@ OPEN_CLIP_TEST_MODELS = [
     "open_clip/ViT-B-16-SigLIP/webli",
     "open_clip/ViT-L-14/laion2b_s32b_b82k",
     "timm/ViT-B-16-SigLIP2-256",
+    "open_clip/ViT-L-14/laion400m_e32",
 ]
 
 
