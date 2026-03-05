@@ -37,6 +37,7 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import InvalidArgumentError, UnsupportedFeatureError
 
 import unittest
+import pytest
 import time
 
 # --- Test Data ---
@@ -333,6 +334,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 msg=f"Doc {doc_id}: _pre_rerank_score should equal baseline score",
             )
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_base_rrf_order_deterministic(self):
         """Base RRF (no modifiers) returns all 5 docs; doc1 (in both tensor and lexical) ranks first."""
         self._add_tuxedo_docs()
@@ -347,6 +349,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         ids = [h["_id"] for h in res["hits"]]
         self.assertEqual(ids, BASE_RRF_ORDER, msg="Base RRF order must be doc1, doc2, doc3, doc4, doc5")
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_bm25_single_field_modifies_scores_and_reverses_order(self):
         """
         add_to_score with bm25 lex_ranking_field: (1) modifies final score so doc with highest
@@ -386,6 +389,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         any_changed = any(h["_score"] != h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"])
         self.assertTrue(any_changed, msg="Custom score modifier must change at least one doc's score")
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_closeness_retrieval_vector_single_field_modifies_scores_and_reverses_order(self):
         """
         add_to_score with closeness tensor_ranking_field (weight 1.0): order reverses to doc5..doc1.
@@ -1191,6 +1195,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         for hit in res["hits"]:
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_custom_score_rerank_only_affects_first_rerank_depth_hits(self):
         """
         rerank_depth=3, result_count=5: top 3 hits have _pre_rerank_score and modified scores;
@@ -1300,6 +1305,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         )
         self.assertGreater(len(res_with_rerank["facets"]["category"]), 0)
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_custom_score_rerank_no_redundant_bm25_terms_in_rank(self):
         """
         When the main lexical term already includes a field that is also requested in add_to_score
@@ -1374,7 +1380,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
     # Pagination with custom score reranking: offset must be applied after global reranking.
     # Backend currently applies offset before/during the pipeline, so this test would fail.
     # Will be fixed in a separate feature; skipping until then.
-    @unittest.skip("Pagination after custom score reranking will be fixed in a separate feature")
+    @pytest.skip("Pagination after custom score reranking will be fixed in a separate feature")
     def test_custom_score_rerank_with_pagination(self):
         """
         Pagination happens after reranking. With custom score reranking, offset must
