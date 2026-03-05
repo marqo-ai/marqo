@@ -11,8 +11,9 @@ import com.yahoo.search.result.HitGroup;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Nested;
@@ -234,70 +235,30 @@ class HybridSearcherCustomScoreRerankTest {
         }
     }
 
-    /**
-     * Closeness (e.g. dot product) is min-max normalized to [0,1] with 1 = closest so that
-     * unbounded metrics behave like angular/euclidean. These tests cover the normalization helper
-     * and the computation of per-key min/max across hits.
-     */
+    /** Min-max normalization and key stripping: used for both BM25 and closeness. */
     @Nested
-    class ClosenessDotProductNormalizationTest {
+    class MinMaxNormalizationTest {
 
-        /** Min-max normalization is always applied to closeness in the searcher (same as BM25). */
         @Test
-        void shouldMinMaxNormalizeCloseness_always_true() {
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("dotproduct")).isTrue();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("angular")).isTrue();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("euclidean")).isTrue();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("prenormalized-angular"))
-                    .isTrue();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("hamming")).isTrue();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness("")).isTrue();
-            assertThat(HybridSearcher.shouldMinMaxNormalizeCloseness(null)).isTrue();
+        void minMaxNormalize_returns_zero_one_between_min_max() {
+            assertThat(HybridSearcher.minMaxNormalize(10.0, 10.0, 30.0)).isEqualTo(0.0);
+            assertThat(HybridSearcher.minMaxNormalize(30.0, 10.0, 30.0)).isEqualTo(1.0);
+            assertThat(HybridSearcher.minMaxNormalize(20.0, 10.0, 30.0)).isEqualTo(0.5);
         }
 
         @Test
-        void normalizeClosenessScoreForRerank_returns_zero_one_when_map_has_key() {
-            String key = "closeness_retrieval_vector_field_title";
-            Map<String, double[]> map = new HashMap<>();
-            map.put(key, new double[] {10.0, 30.0}); // min=10, max=30 (e.g. raw dot product)
-            assertThat(HybridSearcher.normalizeClosenessScoreForRerank(10.0, key, map))
-                    .isEqualTo(0.0);
-            assertThat(HybridSearcher.normalizeClosenessScoreForRerank(30.0, key, map))
-                    .isEqualTo(1.0);
-            assertThat(HybridSearcher.normalizeClosenessScoreForRerank(20.0, key, map))
-                    .isEqualTo(0.5);
+        void minMaxNormalize_clamps_out_of_range() {
+            assertThat(HybridSearcher.minMaxNormalize(-1.0, 0.0, 10.0)).isEqualTo(0.0);
+            assertThat(HybridSearcher.minMaxNormalize(11.0, 0.0, 10.0)).isEqualTo(1.0);
         }
 
         @Test
-        void normalizeClosenessScoreForRerank_returns_score_unchanged_when_map_null() {
-            assertThat(HybridSearcher.normalizeClosenessScoreForRerank(25.0, "any_key", null))
-                    .isEqualTo(25.0);
+        void minMaxNormalize_returns_one_when_min_equals_max() {
+            assertThat(HybridSearcher.minMaxNormalize(5.0, 5.0, 5.0)).isEqualTo(1.0);
         }
 
         @Test
-        void normalizeClosenessScoreForRerank_returns_score_unchanged_when_key_missing() {
-            Map<String, double[]> map = new HashMap<>();
-            map.put("other_key", new double[] {0.0, 1.0});
-            assertThat(
-                            HybridSearcher.normalizeClosenessScoreForRerank(
-                                    25.0, "closeness_retrieval_vector_field_title", map))
-                    .isEqualTo(25.0);
-        }
-
-        @Test
-        void normalizeClosenessScoreForRerank_clamps_to_zero_one() {
-            String key = "closeness_retrieval_vector_field_title";
-            Map<String, double[]> map = new HashMap<>();
-            map.put(key, new double[] {10.0, 30.0});
-            assertThat(HybridSearcher.normalizeClosenessScoreForRerank(5.0, key, map))
-                    .isEqualTo(0.0);
-            assertThat(HybridSearcher.normalizeClosenessScoreForRerank(35.0, key, map))
-                    .isEqualTo(1.0);
-        }
-
-        @Test
-        void
-                computeClosenessMinMaxPerKey_returns_min_max_across_hits_for_dot_product_like_scores() {
+        void computeMinMaxPerKey_returns_min_max_for_closeness_single_field() {
             HitGroup hits = new HitGroup();
             for (double value : new double[] {10.0, 20.0, 30.0}) {
                 Hit hit = new Hit("doc_" + value, 1.0);
@@ -317,8 +278,7 @@ class HybridSearcherCustomScoreRerankTest {
                                     1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result =
-                    searcher.computeClosenessMinMaxPerKey(hits, addWeights, null);
+            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
             assertThat(result).containsKey("closeness_retrieval_vector_field_title");
             double[] minMax = result.get("closeness_retrieval_vector_field_title");
             assertThat(minMax).hasSize(2);
@@ -327,24 +287,64 @@ class HybridSearcherCustomScoreRerankTest {
         }
 
         @Test
-        void computeClosenessMinMaxPerKey_ignores_bm25_keys() {
+        void computeMinMaxPerKey_aggregate_closeness_sum_two_fields() {
+            HitGroup hits = new HitGroup();
+            Hit hit1 = new Hit("doc1", 1.0);
+            FeatureData sf1 = mock(FeatureData.class);
+            when(sf1.getDouble("ranking_closeness_metric_f1")).thenReturn(0.2);
+            when(sf1.getDouble("ranking_closeness_metric_f2")).thenReturn(0.4);
+            when(sf1.featureNames())
+                    .thenReturn(
+                            Set.of("ranking_closeness_metric_f1", "ranking_closeness_metric_f2"));
+            hit1.setField("summaryfeatures", sf1);
+            hits.add(hit1);
+            Hit hit2 = new Hit("doc2", 1.0);
+            FeatureData sf2 = mock(FeatureData.class);
+            when(sf2.getDouble("ranking_closeness_metric_f1")).thenReturn(0.5);
+            when(sf2.getDouble("ranking_closeness_metric_f2")).thenReturn(0.5);
+            when(sf2.featureNames())
+                    .thenReturn(
+                            Set.of("ranking_closeness_metric_f1", "ranking_closeness_metric_f2"));
+            hit2.setField("summaryfeatures", sf2);
+            hits.add(hit2);
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("closeness_retrieval_vector_sum"), 1.0)
+                            .build();
+            HybridSearcher searcher = new HybridSearcher();
+            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
+            assertThat(result).containsKey("closeness_retrieval_vector_sum");
+            double[] minMax = result.get("closeness_retrieval_vector_sum");
+            assertThat(minMax[0]).isCloseTo(0.6, within(1e-9));
+            assertThat(minMax[1]).isEqualTo(1.0);
+        }
+
+        @Test
+        void computeMinMaxPerKey_includes_both_bm25_and_closeness_keys() {
             HitGroup hits = new HitGroup();
             Hit hit = new Hit("doc1", 1.0);
-            FeatureData summaryFeatures = mock(FeatureData.class);
-            when(summaryFeatures.getDouble("ranking_closeness_metric_title")).thenReturn(0.9);
-            when(summaryFeatures.featureNames())
-                    .thenReturn(Set.of("ranking_closeness_metric_title"));
-            hit.setField("summaryfeatures", summaryFeatures);
+            FeatureData sf = mock(FeatureData.class);
+            when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(1.0);
+            when(sf.getDouble("ranking_closeness_metric_title")).thenReturn(0.9);
+            when(sf.featureNames())
+                    .thenReturn(
+                            Set.of("bm25(marqo__lexical_title)", "ranking_closeness_metric_title"));
+            hit.setField("summaryfeatures", sf);
             hits.add(hit);
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
             Tensor addWeights =
                     Tensor.Builder.of(tensorType)
                             .cell(TensorAddress.ofLabels("bm25_field_title"), 1.0)
+                            .cell(
+                                    TensorAddress.ofLabels(
+                                            "closeness_retrieval_vector_field_title"),
+                                    1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result =
-                    searcher.computeClosenessMinMaxPerKey(hits, addWeights, null);
-            assertThat(result).isEmpty();
+            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
+            assertThat(result).containsKey("bm25_field_title");
+            assertThat(result).containsKey("closeness_retrieval_vector_field_title");
         }
     }
 
@@ -384,8 +384,7 @@ class HybridSearcherCustomScoreRerankTest {
                             .cell(TensorAddress.ofLabels("bm25_sum"), 1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result =
-                    searcher.computeBm25MinMaxPerKey(hits, addWeights, null, Set.of());
+            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
             assertThat(result).containsKey("bm25_sum");
             double[] minMax = result.get("bm25_sum");
             assertThat(minMax).hasSize(2);
@@ -423,13 +422,247 @@ class HybridSearcherCustomScoreRerankTest {
                             .cell(TensorAddress.ofLabels("closeness_retrieval_vector_sum"), 1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result =
-                    searcher.computeClosenessMinMaxPerKey(hits, addWeights, null);
+            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
             assertThat(result).containsKey("closeness_retrieval_vector_sum");
             double[] minMax = result.get("closeness_retrieval_vector_sum");
             assertThat(minMax).hasSize(2);
             assertThat(minMax[0]).isCloseTo(0.6, within(1e-9));
             assertThat(minMax[1]).isEqualTo(1.0);
+        }
+    }
+
+    /**
+     * Normalization maps raw custom scores (which may be outside [0,1]) to [0,1], with the
+     * minimum score across hits mapping to 0 and the maximum to 1. Five hits with raw scores
+     * -2, 0.25, 0.5, 0.75, 5 (inside and outside [0,1]) are used; we assert normalized values
+     * are in [0,1] and that min->0 and max->1 for all key types.
+     */
+    @Nested
+    class NormalizationOutputZeroToOneTest {
+
+        private static final double[] RAW_SCORES = {-2.0, 0.25, 0.5, 0.75, 5.0};
+        private static final double MIN_RAW = -2.0;
+        private static final double MAX_RAW = 5.0;
+
+        /** Build 5 hits, compute minMaxPerKey for the given key, return normalized scores in hit order. */
+        private List<Double> computeNormalizedScoresForKey(
+                HitGroup hits, String key, Tensor addWeights) {
+            HybridSearcher searcher = new HybridSearcher();
+            Map<String, double[]> minMaxPerKey =
+                    searcher.computeMinMaxPerKey(hits, addWeights, null);
+            assertThat(minMaxPerKey).containsKey(key);
+            double[] minMax = minMaxPerKey.get(key);
+            assertThat(minMax).hasSize(2);
+            assertThat(minMax[0]).isEqualTo(MIN_RAW);
+            assertThat(minMax[1]).isEqualTo(MAX_RAW);
+
+            HybridSearcher.CustomScoreKeyParsed parsed = HybridSearcher.parseCustomScoreKey(key);
+            assertThat(parsed).isNotNull();
+            List<Double> normalized = new ArrayList<>();
+            for (Hit hit : hits) {
+                FeatureData summaryFeatures = (FeatureData) hit.getField("summaryfeatures");
+                Double raw =
+                        HybridSearcher.extractCustomScoreForHit(
+                                null, key, parsed, Set.of(), summaryFeatures);
+                assertThat(raw).isNotNull();
+                double norm = HybridSearcher.minMaxNormalize(raw, minMax[0], minMax[1]);
+                normalized.add(norm);
+            }
+            return normalized;
+        }
+
+        private void assertNormalizationMapsMinToZeroMaxToOne(List<Double> normalized) {
+            assertThat(normalized).hasSize(5);
+            for (Double n : normalized) {
+                assertThat(n).isBetween(0.0, 1.0);
+            }
+            assertThat(normalized.get(0)).isEqualTo(0.0);
+            assertThat(normalized.get(4)).isEqualTo(1.0);
+            assertThat(normalized.get(1))
+                    .isCloseTo((0.25 - MIN_RAW) / (MAX_RAW - MIN_RAW), within(1e-9));
+            assertThat(normalized.get(2))
+                    .isCloseTo((0.5 - MIN_RAW) / (MAX_RAW - MIN_RAW), within(1e-9));
+            assertThat(normalized.get(3))
+                    .isCloseTo((0.75 - MIN_RAW) / (MAX_RAW - MIN_RAW), within(1e-9));
+        }
+
+        @Test
+        void bm25_single_field_normalized_in_zero_one_min_zero_max_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
+                when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("bm25_field_title"), 1.0)
+                            .build();
+            List<Double> normalized =
+                    computeNormalizedScoresForKey(hits, "bm25_field_title", addWeights);
+            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+        }
+
+        @Test
+        void bm25_sum_normalized_in_zero_one_min_zero_max_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("bm25(marqo__lexical_a)")).thenReturn(raw);
+                when(sf.getDouble("bm25(marqo__lexical_b)")).thenReturn(0.0);
+                when(sf.featureNames())
+                        .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("bm25_sum"), 1.0)
+                            .build();
+            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_sum", addWeights);
+            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+        }
+
+        @Test
+        void bm25_max_normalized_in_zero_one_min_zero_max_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
+                when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("bm25_max"), 1.0)
+                            .build();
+            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_max", addWeights);
+            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+        }
+
+        @Test
+        void bm25_avg_normalized_in_zero_one_min_zero_max_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
+                when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("bm25_avg"), 1.0)
+                            .build();
+            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_avg", addWeights);
+            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+        }
+
+        @Test
+        void closeness_retrieval_vector_single_field_normalized_in_zero_one_min_zero_max_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("ranking_closeness_metric_title")).thenReturn(raw);
+                when(sf.featureNames()).thenReturn(Set.of("ranking_closeness_metric_title"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(
+                                    TensorAddress.ofLabels(
+                                            "closeness_retrieval_vector_field_title"),
+                                    1.0)
+                            .build();
+            List<Double> normalized =
+                    computeNormalizedScoresForKey(
+                            hits, "closeness_retrieval_vector_field_title", addWeights);
+            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+        }
+
+        @Test
+        void closeness_retrieval_vector_sum_normalized_in_zero_one_min_zero_max_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("ranking_closeness_metric_f1")).thenReturn(raw);
+                when(sf.getDouble("ranking_closeness_metric_f2")).thenReturn(0.0);
+                when(sf.featureNames())
+                        .thenReturn(
+                                Set.of(
+                                        "ranking_closeness_metric_f1",
+                                        "ranking_closeness_metric_f2"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("closeness_retrieval_vector_sum"), 1.0)
+                            .build();
+            List<Double> normalized =
+                    computeNormalizedScoresForKey(
+                            hits, "closeness_retrieval_vector_sum", addWeights);
+            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+        }
+
+        @Test
+        void closeness_retrieval_vector_max_normalized_in_zero_one_min_zero_max_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("ranking_closeness_metric_title")).thenReturn(raw);
+                when(sf.featureNames()).thenReturn(Set.of("ranking_closeness_metric_title"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("closeness_retrieval_vector_max"), 1.0)
+                            .build();
+            List<Double> normalized =
+                    computeNormalizedScoresForKey(
+                            hits, "closeness_retrieval_vector_max", addWeights);
+            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+        }
+
+        @Test
+        void closeness_retrieval_vector_avg_normalized_in_zero_one_min_zero_max_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("ranking_closeness_metric_title")).thenReturn(raw);
+                when(sf.featureNames()).thenReturn(Set.of("ranking_closeness_metric_title"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("closeness_retrieval_vector_avg"), 1.0)
+                            .build();
+            List<Double> normalized =
+                    computeNormalizedScoresForKey(
+                            hits, "closeness_retrieval_vector_avg", addWeights);
+            assertNormalizationMapsMinToZeroMaxToOne(normalized);
         }
     }
 }

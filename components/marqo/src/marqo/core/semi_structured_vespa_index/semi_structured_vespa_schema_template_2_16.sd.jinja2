@@ -379,18 +379,18 @@ schema {{ index.schema_name }} {
             {% if collapse_field %}collapse_field_hash{% endif %}
         }
 
-        {# Per-field ranking score (similarity to marqo__query_embedding), normalized to [0,1] where 1=closest. Named by field so searcher can look up ranking_closeness_metric_<field_name>. Geodegrees not supported. #}
+        {# Per-field ranking score (similarity to marqo__query_embedding), normalized to [0,1] where 1=closest. Output as scalar double (like bm25) via reduce(..., sum). Named by field so searcher can look up ranking_closeness_metric_<field_name>. Geodegrees not supported. #}
         {% if index.tensor_fields and index.distance_metric.value != 'geodegrees' -%}
         {% for field in index.tensor_fields %}
         function ranking_closeness_metric_{{ field.name }}() {
             {%- if index.distance_metric.value in ['angular', 'prenormalized-angular'] %}
-            expression: (1.0 + cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)) / 2.0
+            expression: reduce((1.0 + cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)) / 2.0, sum)
             {%- elif index.distance_metric.value == 'euclidean' %}
-            expression: 1.0 / (1.0 + euclidean_distance(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x))
+            expression: reduce(1.0 / (1.0 + euclidean_distance(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)), sum)
             {%- elif index.distance_metric.value == 'dotproduct' %}
-            expression: reduce(attribute({{ field.embeddings_field_name }}) * query(marqo__query_embedding), sum, x)
+            expression: reduce(reduce(attribute({{ field.embeddings_field_name }}) * query(marqo__query_embedding), sum, x), sum)
             {%- elif index.distance_metric.value == 'hamming' %}
-            expression: 1.0 - (hamming(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding)) / (8.0 * {{ dimension }}))
+            expression: reduce(1.0 - (hamming(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding)) / (8.0 * {{ dimension }})), sum)
             {%- endif %}
         }
         {% endfor %}

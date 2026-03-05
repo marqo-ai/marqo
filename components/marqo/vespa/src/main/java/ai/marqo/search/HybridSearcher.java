@@ -31,6 +31,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.statistics.descriptive.DoubleStatistics;
@@ -56,6 +57,7 @@ public class HybridSearcher extends Searcher {
             "marqo__custom_score_mult_weights_global";
     private static String QUERY_INPUT_CUSTOM_SCORE_ADD_WEIGHTS_GLOBAL =
             "marqo__custom_score_add_weights_global";
+
     private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
@@ -1615,19 +1617,6 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Extracts the custom score value for one key from a hit. Used by tests; in production
-     * custom score reranking uses only summary-features, so summaryFeatures must be provided.
-     */
-    @VisibleForTesting
-    static Double extractCustomScoreForHit(
-            FeatureData matchFeatures,
-            String key,
-            CustomScoreKeyParsed parsed,
-            Set<String> matchFeatureKeys) {
-        return extractCustomScoreForHit(matchFeatures, key, parsed, matchFeatureKeys, null);
-    }
-
-    /**
      * Extracts the custom score value for one key. Custom score reranking uses only
      * summary-features (no fallback to match-features). For closeness_retrieval_vector the
      * summary feature name is ranking_closeness_metric_<field_name>. For bm25 we use
@@ -1661,41 +1650,34 @@ public class HybridSearcher extends Searcher {
         if ("bm25".equals(parsed.scoreType)) {
             if (summaryFeatures == null) return null;
             if (parsed.aggregateType != null) {
-                return aggregateBm25FromSummaryFeatures(
-                        summaryFeatures, parsed.aggregateType, logger, keyForLog);
+                return aggregateFromSummaryFeatures(
+                        summaryFeatures,
+                        name -> name.startsWith("bm25(") && name.endsWith(")"),
+                        parsed.aggregateType,
+                        logger,
+                        keyForLog,
+                        "bm25Values",
+                        false);
             }
-            String featNameBm25 = bm25SummaryFeatureName(parsed.fieldName);
-            Double scoreBm25 =
-                    featNameBm25 != null ? getFeatureDouble(summaryFeatures, featNameBm25) : null;
-            if (logger != null && keyForLog != null && scoreBm25 != null) {
-                logger.info(
-                        "[CustomScoreRerank] read from summary-features key="
-                                + keyForLog
-                                + " featureName="
-                                + featNameBm25
-                                + " value="
-                                + scoreBm25);
-            }
-            return scoreBm25;
+            String featName = bm25SummaryFeatureName(parsed.fieldName);
+            return getSingleFieldScoreWithLog(summaryFeatures, featName, logger, keyForLog);
         }
         if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
             if (summaryFeatures == null) return null;
             if (parsed.aggregateType != null) {
-                return aggregateClosenessFromSummaryFeatures(
-                        summaryFeatures, parsed.aggregateType, logger, keyForLog);
+                // Same pattern as BM25: iterate summary-features. Treat null/NaN as 0 so all
+                // index tensor fields contribute (schema lists all ranking_closeness_metric_*).
+                return aggregateFromSummaryFeatures(
+                        summaryFeatures,
+                        name -> name.startsWith("ranking_closeness_metric_"),
+                        parsed.aggregateType,
+                        logger,
+                        keyForLog,
+                        "closenessValues",
+                        true);
             }
-            String featNameCloseness = "ranking_closeness_metric_" + parsed.fieldName;
-            Double scoreCloseness = getFeatureDouble(summaryFeatures, featNameCloseness);
-            if (logger != null && keyForLog != null && scoreCloseness != null) {
-                logger.info(
-                        "[CustomScoreRerank] read from summary-features key="
-                                + keyForLog
-                                + " featureName="
-                                + featNameCloseness
-                                + " value="
-                                + scoreCloseness);
-            }
-            return scoreCloseness;
+            String featName = "ranking_closeness_metric_" + parsed.fieldName;
+            return getSingleFieldScoreWithLog(summaryFeatures, featName, logger, keyForLog);
         }
         return null;
     }
@@ -1709,8 +1691,9 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Gets a double from FeatureData; rank features may be scalar or tensor (e.g. tensor(float)(p{})).
-     * For tensors, returns the sum of all cells (single cell = that value).
+     * Gets a double from FeatureData. Summary-features may be scalar (e.g. bm25, ranking_closeness_metric_*)
+     * or tensor (e.g. tensor(float)(p{})); for tensors, returns the sum of all cells (single cell =
+     * that value). Schema emits ranking_closeness_metric_* as scalar via reduce(..., sum).
      */
     private static Double getFeatureDouble(FeatureData data, String name) {
         if (data == null || name == null) return null;
@@ -1727,14 +1710,45 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    private static Double aggregateClosenessFromSummaryFeatures(
-            FeatureData summaryFeatures, String aggregateType, Logger logger, String keyForLog) {
+    /** Reads one summary-feature value and optionally logs; used for single-field custom score keys. */
+    private static Double getSingleFieldScoreWithLog(
+            FeatureData summaryFeatures, String featureName, Logger logger, String keyForLog) {
+        Double score = featureName != null ? getFeatureDouble(summaryFeatures, featureName) : null;
+        if (logger != null && keyForLog != null && score != null) {
+            logger.info(
+                    "[CustomScoreRerank] read from summary-features key="
+                            + keyForLog
+                            + " featureName="
+                            + featureName
+                            + " value="
+                            + score);
+        }
+        return score;
+    }
+
+    /**
+     * Collects summary-feature values whose names pass the filter, aggregates them (sum/max/avg),
+     * and optionally logs. Used for both BM25 and closeness_retrieval_vector aggregate keys.
+     *
+     * @param useZeroForMissing when true, treat null/NaN as 0.0 so every listed summary-feature
+     *     contributes (e.g. closeness over all index tensor fields; schema lists all
+     *     ranking_closeness_metric_*). When false, skip null/NaN (BM25 behavior).
+     */
+    private static Double aggregateFromSummaryFeatures(
+            FeatureData summaryFeatures,
+            Predicate<String> nameFilter,
+            String aggregateType,
+            Logger logger,
+            String keyForLog,
+            String logLabel,
+            boolean useZeroForMissing) {
         List<Double> values = new ArrayList<>();
-        String prefix = "ranking_closeness_metric_";
         for (String name : summaryFeatures.featureNames()) {
-            if (name.startsWith(prefix)) {
+            if (nameFilter.test(name)) {
                 Double v = getFeatureDouble(summaryFeatures, name);
-                if (v != null && !Double.isNaN(v)) {
+                if (useZeroForMissing) {
+                    values.add((v != null && !Double.isNaN(v)) ? v : 0.0);
+                } else if (v != null && !Double.isNaN(v)) {
                     values.add(v);
                 }
             }
@@ -1746,34 +1760,9 @@ public class HybridSearcher extends Searcher {
                             + keyForLog
                             + " aggregateType="
                             + aggregateType
-                            + " closenessValues="
-                            + values
-                            + " result="
-                            + result);
-        }
-        return result;
-    }
-
-    /** Aggregate BM25 from per-lexical-field summary features bm25(marqo__lexical_*). No bm25(marqo__ranking_strings). */
-    private static Double aggregateBm25FromSummaryFeatures(
-            FeatureData summaryFeatures, String aggregateType, Logger logger, String keyForLog) {
-        List<Double> values = new ArrayList<>();
-        for (String name : summaryFeatures.featureNames()) {
-            if (name.startsWith("bm25(") && name.endsWith(")")) {
-                Double d = getFeatureDouble(summaryFeatures, name);
-                if (d != null && !Double.isNaN(d)) {
-                    values.add(d);
-                }
-            }
-        }
-        Double result = aggregateValues(values, aggregateType);
-        if (logger != null && keyForLog != null && result != null) {
-            logger.info(
-                    "[CustomScoreRerank] aggregation key="
-                            + keyForLog
-                            + " aggregateType="
-                            + aggregateType
-                            + " bm25Values="
+                            + " "
+                            + logLabel
+                            + "="
                             + values
                             + " result="
                             + result);
@@ -1795,8 +1784,8 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Computes min-max normalization (value in [0,1]) for a list of bm25 values. If min == max,
-     * returns 1.0 for all to avoid division by zero.
+     * Computes min-max normalization (value in [0,1]). If min == max or invalid, returns 1.0 to
+     * avoid division by zero. Used for both BM25 and closeness custom score keys.
      */
     @VisibleForTesting
     static double minMaxNormalize(double value, double min, double max) {
@@ -1808,42 +1797,17 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Closeness is always min-max normalized in the searcher (same as BM25): single field or
-     * aggregate, we compute min/max across hits and normalize. Kept for compatibility; callers
-     * should always normalize closeness when applying modifiers.
-     */
-    @VisibleForTesting
-    static boolean shouldMinMaxNormalizeCloseness(String distanceMetric) {
-        return true;
-    }
-
-    /**
-     * Normalizes a closeness_retrieval_vector score to [0,1] with 1 = closest (max), using
-     * per-key min/max across hits. Used for dot product and other unbounded closeness metrics.
-     * If no min/max for key, returns score unchanged.
-     */
-    @VisibleForTesting
-    static double normalizeClosenessScoreForRerank(
-            double score, String key, Map<String, double[]> closenessMinMaxPerKey) {
-        if (closenessMinMaxPerKey == null) return score;
-        double[] minMax = closenessMinMaxPerKey.get(key);
-        if (minMax == null || minMax.length != 2) return score;
-        return minMaxNormalize(score, minMax[0], minMax[1]);
-    }
-
-    /**
      * Returns weight * normalizedScore for one custom-score cell, or null if the score is missing
-     * or the key is invalid. BM25 scores are min-max normalized when min/max are available.
-     * Closeness_retrieval_vector scores are min-max normalized so dot product (and others) end in
-     * [0,1] with 1 = closest. Custom score values are read only from summaryFeatures.
-     * When logger is non-null, logs read (in extractCustomScoreForHit) and apply modifier here.
+     * or the key is invalid. Scores are min-max normalized using minMaxPerKey (same for BM25 and
+     * closeness). Custom score values are read only from summaryFeatures.
+     * Tensor keys are always in canonical form (e.g. closeness_retrieval_vector_sum, bm25_sum)
+     * without the marqo__score_ prefix, as set by Python when building the query.
      */
     private Double getWeightedNormalizedScoreForCell(
             Cell cell,
             FeatureData hitMatchFeatures,
             Set<String> matchFeatureKeys,
-            Map<String, double[]> bm25MinMaxPerKey,
-            Map<String, double[]> closenessMinMaxPerKey,
+            Map<String, double[]> minMaxPerKey,
             FeatureData summaryFeatures,
             Logger logger) {
         String key = cell.getKey().label(0);
@@ -1861,13 +1825,9 @@ public class HybridSearcher extends Searcher {
         if (score == null || Double.isNaN(score)) return null;
         double weight = cell.getValue().doubleValue();
         double normalizedScore = score;
-        if ("bm25".equals(parsed.scoreType)) {
-            double[] minMax = bm25MinMaxPerKey.get(key);
-            if (minMax != null && minMax.length == 2) {
-                normalizedScore = minMaxNormalize(score, minMax[0], minMax[1]);
-            }
-        } else if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
-            normalizedScore = normalizeClosenessScoreForRerank(score, key, closenessMinMaxPerKey);
+        double[] minMax = minMaxPerKey != null ? minMaxPerKey.get(key) : null;
+        if (minMax != null && minMax.length == 2) {
+            normalizedScore = minMaxNormalize(score, minMax[0], minMax[1]);
         }
         double modifierValue = weight * normalizedScore;
         if (logger != null) {
@@ -1899,8 +1859,7 @@ public class HybridSearcher extends Searcher {
             Set<String> matchFeatureKeys,
             Tensor customAddWeights,
             Tensor customMultWeights,
-            Map<String, double[]> bm25MinMaxPerKey,
-            Map<String, double[]> closenessMinMaxPerKey,
+            Map<String, double[]> minMaxPerKey,
             double[] outAdd,
             double[] outMult,
             boolean verbose,
@@ -1915,8 +1874,7 @@ public class HybridSearcher extends Searcher {
                                 it.next(),
                                 hitMatchFeatures,
                                 matchFeatureKeys,
-                                bm25MinMaxPerKey,
-                                closenessMinMaxPerKey,
+                                minMaxPerKey,
                                 summaryFeatures,
                                 logger);
                 if (contrib != null) add += contrib;
@@ -1930,8 +1888,7 @@ public class HybridSearcher extends Searcher {
                                 it.next(),
                                 hitMatchFeatures,
                                 matchFeatureKeys,
-                                bm25MinMaxPerKey,
-                                closenessMinMaxPerKey,
+                                minMaxPerKey,
                                 summaryFeatures,
                                 logger);
                 if (contrib != null) mult *= contrib;
@@ -1943,92 +1900,31 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Compute per-key min and max bm25 values across hits for keys that require bm25 normalization.
-     * For aggregate keys (e.g. bm25_sum), the value per hit is the aggregate (sum/max/avg) of
-     * per-field BM25; min/max are taken over those aggregated values, so normalization is after
-     * aggregation.
+     * Compute per-key min and max values across hits for all custom score keys (BM25 and
+     * closeness_retrieval_vector) present in add/mult weight tensors. Tensor keys are always in
+     * canonical form (e.g. bm25_sum, closeness_retrieval_vector_sum).
+     * For aggregate keys, the value per hit is the aggregate (sum/max/avg); min/max are
+     * taken over those values, so normalization is after aggregation.
+     *
      */
     @VisibleForTesting
-    Map<String, double[]> computeBm25MinMaxPerKey(
-            HitGroup hits,
-            Tensor customAddWeights,
-            Tensor customMultWeights,
-            Set<String> allMatchFeatureKeys) {
-        Map<String, double[]> result = new HashMap<>();
-        Set<String> bm25Keys = new HashSet<>();
-        if (customAddWeights != null) {
-            for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
-                Cell cell = it.next();
-                String key = cell.getKey().label(0);
-                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
-                if (parsed != null && "bm25".equals(parsed.scoreType)) {
-                    bm25Keys.add(key);
-                }
-            }
-        }
-        if (customMultWeights != null) {
-            for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
-                Cell cell = it.next();
-                String key = cell.getKey().label(0);
-                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
-                if (parsed != null && "bm25".equals(parsed.scoreType)) {
-                    bm25Keys.add(key);
-                }
-            }
-        }
-        for (String key : bm25Keys) {
-            CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
-            if (parsed == null) continue;
-            double min = Double.POSITIVE_INFINITY;
-            double max = Double.NEGATIVE_INFINITY;
-            for (Hit hit : hits) {
-                FeatureData summaryFeatures = (FeatureData) hit.getField("summaryfeatures");
-                if (summaryFeatures == null) continue;
-                Double v =
-                        extractCustomScoreForHit(
-                                null, key, parsed, Collections.emptySet(), summaryFeatures);
-                if (v != null && !Double.isNaN(v)) {
-                    min = Math.min(min, v);
-                    max = Math.max(max, v);
-                }
-            }
-            if (min <= max && Double.isFinite(min) && Double.isFinite(max)) {
-                result.put(key, new double[] {min, max});
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Compute per-key min and max closeness_retrieval_vector values across hits. Used to
-     * min-max normalize closeness scores (e.g. dot product) to [0,1] with 1 = closest.
-     */
-    @VisibleForTesting
-    Map<String, double[]> computeClosenessMinMaxPerKey(
+    Map<String, double[]> computeMinMaxPerKey(
             HitGroup hits, Tensor customAddWeights, Tensor customMultWeights) {
-        Map<String, double[]> result = new HashMap<>();
-        Set<String> closenessKeys = new HashSet<>();
+        Set<String> keys = new HashSet<>();
         if (customAddWeights != null) {
             for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
-                Cell cell = it.next();
-                String key = cell.getKey().label(0);
-                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
-                if (parsed != null && "closeness_retrieval_vector".equals(parsed.scoreType)) {
-                    closenessKeys.add(key);
-                }
+                String key = it.next().getKey().label(0);
+                if (parseCustomScoreKey(key) != null) keys.add(key);
             }
         }
         if (customMultWeights != null) {
             for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
-                Cell cell = it.next();
-                String key = cell.getKey().label(0);
-                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
-                if (parsed != null && "closeness_retrieval_vector".equals(parsed.scoreType)) {
-                    closenessKeys.add(key);
-                }
+                String key = it.next().getKey().label(0);
+                if (parseCustomScoreKey(key) != null) keys.add(key);
             }
         }
-        for (String key : closenessKeys) {
+        Map<String, double[]> result = new HashMap<>();
+        for (String key : keys) {
             CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
             if (parsed == null) continue;
             double min = Double.POSITIVE_INFINITY;
@@ -2126,8 +2022,7 @@ public class HybridSearcher extends Searcher {
         }
 
         Set<String> allMatchFeatureKeys = new HashSet<>();
-        Map<String, double[]> bm25MinMaxPerKey = new HashMap<>();
-        Map<String, double[]> closenessMinMaxPerKey = new HashMap<>();
+        Map<String, double[]> minMaxPerKey = new HashMap<>();
         if (hasCustomScores) {
             Hit firstHit = hits.get(0);
             FeatureData firstMf = (FeatureData) firstHit.getField("matchfeatures");
@@ -2139,14 +2034,8 @@ public class HybridSearcher extends Searcher {
                             + allMatchFeatureKeys.size()
                             + "): "
                             + allMatchFeatureKeys);
-            bm25MinMaxPerKey =
-                    computeBm25MinMaxPerKey(
-                            hits, customAddWeights, customMultWeights, allMatchFeatureKeys);
-            // Min-max normalize closeness the same as BM25: per key (single field or aggregate),
-            // compute min/max across hits and normalize. Aggregate keys use the aggregated value
-            // per hit, so normalization is done after aggregation.
-            closenessMinMaxPerKey =
-                    computeClosenessMinMaxPerKey(hits, customAddWeights, customMultWeights);
+            /* Compute min and max scores for each key for use in normalization */
+            minMaxPerKey = computeMinMaxPerKey(hits, customAddWeights, customMultWeights);
         }
 
         boolean applyRecency =
@@ -2185,8 +2074,7 @@ public class HybridSearcher extends Searcher {
                                 hitMatchFeatureKeys,
                                 customAddWeights,
                                 customMultWeights,
-                                bm25MinMaxPerKey,
-                                closenessMinMaxPerKey,
+                                minMaxPerKey,
                                 outAdd,
                                 outMult,
                                 verbose,
@@ -2197,11 +2085,11 @@ public class HybridSearcher extends Searcher {
                             logger.info(
                                     String.format(
                                             "[CustomScoreRerank] first hit add_modifier=%.5f"
-                                                    + " outAdd=%.5f outMult=%.5f bm25MinMaxKeys=%d",
+                                                + " outAdd=%.5f outMult=%.5f minMaxPerKeySize=%d",
                                             add_modifier,
                                             outAdd[0],
                                             outMult[0],
-                                            bm25MinMaxPerKey.size()));
+                                            minMaxPerKey.size()));
                         }
                     }
 

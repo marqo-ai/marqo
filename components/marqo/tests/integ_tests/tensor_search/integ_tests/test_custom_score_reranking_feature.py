@@ -613,7 +613,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                     # Confirm that it's normalized.
                     # Meaning top hit has +1000 to original score
                     self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_sum_avg + 1000.0)
-                    # Then bottom hit score must match its base score (it was normlized to 0).
+                    # Then bottom hit score must match its base score (it was normalized to 0).
                     self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_max)
 
                 else:  # max
@@ -627,8 +627,6 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 self.assertEqual(ids, expected_order, msg=f"add_to_score bm25_{agg}: order must be {expected_order}")
 
 
-
-
     def test_all_closeness_aggregates_sum_max_avg(self):
         """
         Closeness sum/max/avg aggregates: use a dedicated index and DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES
@@ -640,8 +638,8 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.index_closeness_aggregates.name,
                 docs=DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES,
-                tensor_fields=["tensor_ranking_field_1", "tensor_ranking_field_2", "tensor_ranking_field3",
-                                 "tensor_ranking_field4", "tensor_ranking_field5", "tensor_ranking_field6"]
+                tensor_fields=["tensor_ranking_field_1", "tensor_ranking_field_2", "tensor_ranking_field_3",
+                               "tensor_ranking_field_4", "tensor_ranking_field_5", "tensor_ranking_field_6"]
             ),
         )
         res_baseline = tensor_search.search(
@@ -687,7 +685,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                     # Confirm that it's normalized.
                     # Meaning top hit has +1000 to original score
                     self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_sum_avg + 1000.0)
-                    # Then bottom hit score must match its base score (it was normlized to 0).
+                    # Then bottom hit score must match its base score (it was normalized to 0).
                     self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_max)
 
                 else:  # max
