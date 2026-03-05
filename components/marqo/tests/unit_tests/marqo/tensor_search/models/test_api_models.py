@@ -549,6 +549,104 @@ class TestSearchQuery(unittest.TestCase):
                     self.assertIsNotNone(search_query.sort_by)
 
 
+    def test_apply_to_subqueries_only_for_hybrid_search(self):
+        """Test that applyToSubqueries is only allowed for hybrid search."""
+        recency_params = RecencyParameters(
+            recency_field="created_at",
+            apply_to_subqueries=["tensor"]
+        )
+
+        # Valid: hybrid search with applyToSubqueries
+        with self.subTest("hybrid_valid"):
+            search_query = SearchQuery(
+                q="test query",
+                searchMethod=SearchMethod.HYBRID,
+                recencyParameters=recency_params
+            )
+            self.assertIsNotNone(search_query.recencyParameters)
+
+        # Invalid: tensor search with applyToSubqueries
+        with self.subTest("tensor_invalid"):
+            with self.assertRaises(ValidationError) as cm:
+                SearchQuery(
+                    q="test query",
+                    searchMethod=SearchMethod.TENSOR,
+                    recencyParameters=recency_params
+                )
+            # Should fail on "Recency parameters can only be provided for 'HYBRID' search"
+            self.assertIn("HYBRID", str(cm.exception))
+
+        # Invalid: lexical search with applyToSubqueries
+        with self.subTest("lexical_invalid"):
+            with self.assertRaises(ValidationError) as cm:
+                SearchQuery(
+                    q="test query",
+                    searchMethod=SearchMethod.LEXICAL,
+                    recencyParameters=recency_params
+                )
+            self.assertIn("HYBRID", str(cm.exception))
+
+    def test_apply_to_subqueries_only_for_rrf_ranking(self):
+        """Test that applyToSubqueries is only allowed with RRF ranking method."""
+        recency_params = RecencyParameters(
+            recency_field="created_at",
+            apply_to_subqueries=["tensor"]
+        )
+
+        # Valid: RRF ranking (explicit)
+        with self.subTest("rrf_explicit"):
+            search_query = SearchQuery(
+                q="test query",
+                searchMethod=SearchMethod.HYBRID,
+                hybridParameters=HybridParameters(rankingMethod=RankingMethod.RRF),
+                recencyParameters=recency_params
+            )
+            self.assertIsNotNone(search_query.recencyParameters)
+
+        # Valid: default ranking (which is RRF)
+        with self.subTest("default_ranking"):
+            search_query = SearchQuery(
+                q="test query",
+                searchMethod=SearchMethod.HYBRID,
+                recencyParameters=recency_params
+            )
+            self.assertIsNotNone(search_query.recencyParameters)
+
+        # Invalid: non-RRF ranking methods
+        non_rrf_methods = [
+            ("tensor_ranking", RankingMethod.Tensor, RetrievalMethod.Lexical),
+            ("lexical_ranking", RankingMethod.Lexical, RetrievalMethod.Tensor),
+        ]
+
+        for test_name, ranking_method, retrieval_method in non_rrf_methods:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError) as cm:
+                    SearchQuery(
+                        q="test query",
+                        searchMethod=SearchMethod.HYBRID,
+                        hybridParameters=HybridParameters(
+                            rankingMethod=ranking_method,
+                            retrievalMethod=retrieval_method
+                        ),
+                        recencyParameters=recency_params
+                    )
+                self.assertIn("rrf", str(cm.exception).lower())
+
+        # Valid: applyToSubqueries is None (no restriction even with non-RRF)
+        with self.subTest("apply_to_subqueries_none_with_tensor_ranking"):
+            recency_params_no_apply = RecencyParameters(recency_field="created_at")
+            search_query = SearchQuery(
+                q="test query",
+                searchMethod=SearchMethod.HYBRID,
+                hybridParameters=HybridParameters(
+                    rankingMethod=RankingMethod.Tensor,
+                    retrievalMethod=RetrievalMethod.Lexical
+                ),
+                recencyParameters=recency_params_no_apply
+            )
+            self.assertIsNotNone(search_query.recencyParameters)
+
+
 class TestCustomVectorQuery(unittest.TestCase):
 
     def test_custom_vector_query_creation(self):

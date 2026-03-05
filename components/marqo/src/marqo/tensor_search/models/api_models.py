@@ -214,6 +214,34 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
+    def validate_apply_to_subqueries_only_for_hybrid_rrf(cls, values):
+        """Validate that applyToSubqueries is only used with HYBRID search and RRF ranking."""
+        recency_parameters = values.get('recencyParameters')
+        if recency_parameters is None or recency_parameters.apply_to_subqueries is None:
+            return values
+
+        # Must be HYBRID search
+        search_method = values.get('searchMethod')
+        if search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(
+                f"'applyToSubqueries' can only be used with 'HYBRID' search. "
+                f"Search method is {search_method}."
+            )
+
+        # Must be RRF ranking method (or default which is RRF)
+        hybrid_parameters = values.get('hybridParameters')
+        if hybrid_parameters is not None:
+            from marqo.core.models.hybrid_parameters import RankingMethod
+            ranking_method = hybrid_parameters.rankingMethod
+            if ranking_method is not None and ranking_method != RankingMethod.RRF:
+                raise ValueError(
+                    f"'applyToSubqueries' can only be used with 'rrf' ranking method. "
+                    f"Ranking method is '{ranking_method}'."
+                )
+
+        return values
+
+    @root_validator(pre=False)
     def validate_facet_exclude_terms_in_filter(cls, values):
         """Validate that excluded facet fields appear in filter string.
 

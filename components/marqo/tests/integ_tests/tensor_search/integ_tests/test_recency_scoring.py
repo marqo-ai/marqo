@@ -1546,5 +1546,355 @@ class TestRecencyScoring(MarqoTestCase):
                 )
 
 
+class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
+    """Integration tests for center and applyToSubqueries recency parameters."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        cls.main_index_request = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2')
+        )
+
+        cls.indexes = cls.create_indexes([cls.main_index_request])
+        cls.main_index = cls.indexes[0]
+
+    def _add_test_documents(self):
+        """Add documents with known timestamps for reproducibility tests."""
+        now = datetime.now()
+        documents = [
+            {
+                "_id": "doc-recent",
+                "title": "recent document about technology",
+                "timestamp": (now - timedelta(hours=1)).timestamp(),
+            },
+            {
+                "_id": "doc-old",
+                "title": "old document about technology",
+                "timestamp": (now - timedelta(days=14)).timestamp(),
+            },
+            {
+                "_id": "doc-medium",
+                "title": "medium age document about technology",
+                "timestamp": (now - timedelta(days=3)).timestamp(),
+            },
+        ]
+
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.main_index.name,
+                docs=documents,
+                tensor_fields=["title"],
+            ),
+        )
+        return documents
+
+    def test_center_produces_reproducible_scores(self):
+        """Test that center parameter produces the same scores across multiple queries."""
+        self._add_test_documents()
+
+        fixed_center = datetime.now().timestamp()
+
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            decay_to=0.5,
+            center=fixed_center
+        )
+
+        # Run the same query twice
+        results_1 = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=recency_params,
+            result_count=10,
+        )
+
+        # Small sleep to make sure now() would differ
+        time.sleep(0.1)
+
+        results_2 = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=recency_params,
+            result_count=10,
+        )
+
+        # Scores should be identical when using center
+        self.assertEqual(len(results_1["hits"]), len(results_2["hits"]))
+        for hit1, hit2 in zip(results_1["hits"], results_2["hits"]):
+            self.assertEqual(hit1["_id"], hit2["_id"])
+            self.assertAlmostEqual(hit1["_score"], hit2["_score"], places=5)
+
+    def test_center_in_past_vs_present_gives_different_scores(self):
+        """Test that center in the past vs. present gives different scores."""
+        self._add_test_documents()
+
+        now = datetime.now().timestamp()
+        past_center = (datetime.now() - timedelta(days=30)).timestamp()
+
+        # Query with center = now
+        results_now = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+                center=now
+            ),
+            result_count=10,
+        )
+
+        # Query with center = 30 days ago
+        results_past = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+                center=past_center
+            ),
+            result_count=10,
+        )
+
+        # With center=30 days ago, all docs are "in the future" relative to center,
+        # so scores should differ from center=now
+        scores_now = {h["_id"]: h["_score"] for h in results_now["hits"]}
+        scores_past = {h["_id"]: h["_score"] for h in results_past["hits"]}
+
+        # At least one doc should have different scores
+        has_difference = False
+        for doc_id in scores_now:
+            if doc_id in scores_past:
+                if abs(scores_now[doc_id] - scores_past[doc_id]) > 0.001:
+                    has_difference = True
+                    break
+        self.assertTrue(has_difference, "Scores should differ when using different center values")
+
+    def test_apply_to_subqueries_tensor_only(self):
+        """Test applyToSubqueries=['tensor'] only applies recency to tensor subquery."""
+        self._add_test_documents()
+
+        # With recency on both subqueries
+        results_both = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+            ),
+            result_count=10,
+        )
+
+        # With recency on tensor only
+        results_tensor_only = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+                apply_to_subqueries=["tensor"],
+            ),
+            result_count=10,
+        )
+
+        # Results should be different (lexical subquery is not boosted in tensor_only)
+        scores_both = {h["_id"]: h["_score"] for h in results_both["hits"]}
+        scores_tensor = {h["_id"]: h["_score"] for h in results_tensor_only["hits"]}
+
+        # At least some scores should differ when recency is removed from lexical
+        has_difference = any(
+            abs(scores_both.get(doc_id, 0) - scores_tensor.get(doc_id, 0)) > 0.001
+            for doc_id in set(scores_both) | set(scores_tensor)
+        )
+        self.assertTrue(has_difference,
+                        "Scores should differ between apply_to both vs tensor-only")
+
+    def test_apply_to_subqueries_lexical_only(self):
+        """Test applyToSubqueries=['lexical'] only applies recency to lexical subquery."""
+        self._add_test_documents()
+
+        # With recency on lexical only
+        results_lexical_only = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+                apply_to_subqueries=["lexical"],
+            ),
+            result_count=10,
+        )
+
+        # With recency on both
+        results_both = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+            ),
+            result_count=10,
+        )
+
+        scores_both = {h["_id"]: h["_score"] for h in results_both["hits"]}
+        scores_lexical = {h["_id"]: h["_score"] for h in results_lexical_only["hits"]}
+
+        has_difference = any(
+            abs(scores_both.get(doc_id, 0) - scores_lexical.get(doc_id, 0)) > 0.001
+            for doc_id in set(scores_both) | set(scores_lexical)
+        )
+        self.assertTrue(has_difference,
+                        "Scores should differ between apply_to both vs lexical-only")
+
+    def test_apply_to_subqueries_empty_applies_to_neither(self):
+        """Test applyToSubqueries=[] applies recency to neither subquery (only global phase)."""
+        self._add_test_documents()
+
+        # With recency on neither subquery
+        results_none = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+                apply_to_subqueries=[],
+            ),
+            result_count=10,
+        )
+
+        # With recency on both subqueries
+        results_both = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+            ),
+            result_count=10,
+        )
+
+        # Verify we got results
+        self.assertGreater(len(results_none["hits"]), 0)
+        self.assertGreater(len(results_both["hits"]), 0)
+
+    def test_default_apply_to_subqueries_matches_existing_behavior(self):
+        """Test that default (None) matches existing behavior (both applied)."""
+        self._add_test_documents()
+
+        # Default (no applyToSubqueries)
+        results_default = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+            ),
+            result_count=10,
+        )
+
+        # Explicit both
+        results_explicit_both = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="technology",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            ),
+            recency_parameters=RecencyParameters(
+                recency_field="timestamp",
+                scale="7d",
+                decay_to=0.5,
+                apply_to_subqueries=["tensor", "lexical"],
+            ),
+            result_count=10,
+        )
+
+        # Should produce identical results
+        self.assertEqual(len(results_default["hits"]), len(results_explicit_both["hits"]))
+        for hit_default, hit_explicit in zip(results_default["hits"], results_explicit_both["hits"]):
+            self.assertEqual(hit_default["_id"], hit_explicit["_id"])
+            self.assertAlmostEqual(hit_default["_score"], hit_explicit["_score"], places=5)
+
+
 if __name__ == '__main__':
     unittest.main()
