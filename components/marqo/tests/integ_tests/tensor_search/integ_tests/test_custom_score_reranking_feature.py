@@ -701,6 +701,8 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 ids = [h["_id"] for h in res["hits"]]
                 self.assertEqual(ids, expected_order, msg=f"add_to_score bm25_{agg}: order must be {expected_order}")
 
+
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_custom_score_rerank_different_weights_affect_order_and_scores(self):
         """
         add_to_score with weight -1.0 reverses order (doc1 first, doc5 last); with weight 2.0
