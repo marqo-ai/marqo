@@ -455,6 +455,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 msg=f"Closeness contributions should decrease in order doc5..doc1: {contributions}",
             )
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_closeness_weighted_exact_final_score(self):
         """
         add_to_score with closeness and weight 2.0 or -1.0: final _score must equal
@@ -522,6 +523,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                     msg=f"Doc {doc_id} weight={weight}: expected _score = pre_rerank + {weight} * contribution = {expected}",
                 )
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_bm25_multiply_score_by_affects_scores(self):
         """
         multiply_score_by with bm25 lex_ranking_field: may not fully reverse order (doc1 base score
