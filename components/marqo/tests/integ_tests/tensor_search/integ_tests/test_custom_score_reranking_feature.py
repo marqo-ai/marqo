@@ -1380,7 +1380,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
     # Pagination with custom score reranking: offset must be applied after global reranking.
     # Backend currently applies offset before/during the pipeline, so this test would fail.
     # Will be fixed in a separate feature; skipping until then.
-    @pytest.skip("Pagination after custom score reranking will be fixed in a separate feature")
+    @pytest.mark.skip(reason="Pagination after custom score reranking will be fixed in a separate feature")
     def test_custom_score_rerank_with_pagination(self):
         """
         Pagination happens after reranking. With custom score reranking, offset must
