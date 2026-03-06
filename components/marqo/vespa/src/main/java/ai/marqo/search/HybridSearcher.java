@@ -53,7 +53,8 @@ public class HybridSearcher extends Searcher {
     private static String QUERY_INPUT_MULT_WEIGHTS_GLOBAL = "marqo__mult_weights_global";
     private static String QUERY_INPUT_ADD_WEIGHTS_GLOBAL = "marqo__add_weights_global";
     private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
-    private static String QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE = "marqo__recency_should_apply_score";
+    private static String QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE =
+            "marqo__recency_should_apply_score";
     private static String QUERY_INPUT_RECENCY_APPLY_TO_TENSOR = "marqo__recency_apply_to_tensor";
     private static String QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL = "marqo__recency_apply_to_lexical";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
@@ -1383,24 +1384,27 @@ public class HybridSearcher extends Searcher {
         }
 
         // Check applyToSubqueries flags and override recency if this subquery type shouldn't get it
-        int applyRecencyToTensor = query.properties().getInteger(
-                QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, 1);
-        int applyRecencyToLexical = query.properties().getInteger(
-                QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, 1);
+        int applyRecencyToTensor =
+                query.properties().getInteger(QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, 1);
+        int applyRecencyToLexical =
+                query.properties().getInteger(QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, 1);
 
         boolean shouldDisableRecency = false;
         if (retrievalMethod.equals(MARQO_SEARCH_METHOD_TENSOR) && applyRecencyToTensor == 0) {
             shouldDisableRecency = true;
-        } else if (retrievalMethod.equals(MARQO_SEARCH_METHOD_LEXICAL) && applyRecencyToLexical == 0) {
+        } else if (retrievalMethod.equals(MARQO_SEARCH_METHOD_LEXICAL)
+                && applyRecencyToLexical == 0) {
             shouldDisableRecency = true;
         }
 
         if (shouldDisableRecency) {
             logIfVerbose(
-                    String.format("Disabling recency for %s subquery based on applyToSubqueries",
+                    String.format(
+                            "Disabling recency for %s subquery based on applyToSubqueries",
                             retrievalMethod),
                     verbose);
-            queryNew.getRanking().getFeatures()
+            queryNew.getRanking()
+                    .getFeatures()
                     .put(addQueryWrapper(QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE), 0.0);
         }
 
