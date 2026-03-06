@@ -138,12 +138,13 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query['marqo__recency_enabled'] = True
             query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL
 
-            # Set apply_to_subqueries flags (default to both if None)
+            # Set apply_to_subqueries flags as top-level query properties (not ranking features)
+            # so Java can read them via query.properties().getInteger()
             apply_to = marqo_query.recency_parameters.apply_to_subqueries
             if apply_to is None:
                 apply_to = ["tensor", "lexical"]
-            query_input[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR] = 1 if "tensor" in apply_to else 0
-            query_input[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL] = 1 if "lexical" in apply_to else 0
+            query[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR] = 1 if "tensor" in apply_to else 0
+            query[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL] = 1 if "lexical" in apply_to else 0
 
         # add lexical specific hybrid parameters
         if marqo_query.hybrid_parameters.secondPhaseModifier:
