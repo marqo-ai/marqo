@@ -1561,22 +1561,27 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
         cls.main_index = cls.indexes[0]
 
     def _add_test_documents(self):
-        """Add documents with known timestamps for reproducibility tests."""
+        """Add documents with known timestamps and varying content relevance.
+
+        doc-old has the highest BM25 relevance for "technology" (short doc = high term frequency)
+        but is the oldest. doc-recent has lower BM25 relevance but is the newest. This ensures
+        recency can flip rank order in subqueries.
+        """
         now = datetime.now()
         documents = [
             {
                 "_id": "doc-recent",
-                "title": "recent document about technology",
+                "title": "recent document about technology and innovation in software engineering",
                 "timestamp": (now - timedelta(hours=1)).timestamp(),
             },
             {
                 "_id": "doc-old",
-                "title": "old document about technology",
+                "title": "technology",
                 "timestamp": (now - timedelta(days=14)).timestamp(),
             },
             {
                 "_id": "doc-medium",
-                "title": "medium age document about technology",
+                "title": "medium age document about technology and computers",
                 "timestamp": (now - timedelta(days=3)).timestamp(),
             },
         ]
@@ -1703,7 +1708,7 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
         """Test applyToSubqueries=['tensor'] only applies recency to tensor subquery."""
         self._add_test_documents()
 
-        # With recency on both subqueries
+        # With recency on both subqueries (aggressive decay so 14-day-old doc gets near-zero recency)
         results_both = tensor_search.search(
             config=self.config,
             index_name=self.main_index.name,
@@ -1715,8 +1720,8 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
             ),
             recency_parameters=RecencyParameters(
                 recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
+                scale="1d",
+                decay_to=0.1,
             ),
             result_count=10,
         )
@@ -1733,8 +1738,8 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
             ),
             recency_parameters=RecencyParameters(
                 recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
+                scale="1d",
+                decay_to=0.1,
                 apply_to_subqueries=["tensor"],
             ),
             result_count=10,
@@ -1756,7 +1761,7 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
         """Test applyToSubqueries=['lexical'] only applies recency to lexical subquery."""
         self._add_test_documents()
 
-        # With recency on lexical only
+        # With recency on lexical only (aggressive decay so 14-day-old doc gets near-zero recency)
         results_lexical_only = tensor_search.search(
             config=self.config,
             index_name=self.main_index.name,
@@ -1768,8 +1773,8 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
             ),
             recency_parameters=RecencyParameters(
                 recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
+                scale="1d",
+                decay_to=0.1,
                 apply_to_subqueries=["lexical"],
             ),
             result_count=10,
@@ -1787,8 +1792,8 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
             ),
             recency_parameters=RecencyParameters(
                 recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
+                scale="1d",
+                decay_to=0.1,
             ),
             result_count=10,
         )
