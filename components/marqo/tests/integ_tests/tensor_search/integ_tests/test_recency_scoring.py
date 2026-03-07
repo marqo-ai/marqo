@@ -1581,9 +1581,9 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
             },
         ]
 
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
+        self.add_documents(
+            self.config,
+            AddDocsParams(
                 index_name=self.main_index.name,
                 docs=documents,
                 tensor_fields=["title"],
