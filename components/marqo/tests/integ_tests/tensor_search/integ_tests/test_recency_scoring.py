@@ -1328,13 +1328,12 @@ class TestRecencyScoring(MarqoTestCase):
 
     def test_non_hybrid_search_method_not_supported(self):
         """Recency requires HYBRID search method (validated at API layer)."""
-        from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
+        from marqo.tensor_search.models.api_models import SearchQuery
 
         for search_method in ["TENSOR", "LEXICAL"]:
             with self.subTest(search_method=search_method):
                 with self.assertRaises(ValueError) as ctx:
-                    BulkSearchQueryEntity(
-                        index=self.main_index.name,
+                    SearchQuery(
                         q="product",
                         searchMethod=search_method,
                         recencyParameters={
@@ -1351,15 +1350,82 @@ class TestRecencyScoring(MarqoTestCase):
                     "Error should mention HYBRID search"
                 )
 
+    def test_apply_to_subqueries_non_hybrid_fails(self):
+        """applyToSubqueries requires HYBRID search method."""
+        from marqo.tensor_search.models.api_models import SearchQuery
+
+        for search_method in ["TENSOR", "LEXICAL"]:
+            with self.subTest(search_method=search_method):
+                with self.assertRaises(ValueError) as ctx:
+                    SearchQuery(
+                        q="product",
+                        searchMethod=search_method,
+                        recencyParameters={
+                            "recencyField": "timestamp",
+                            "scale": "7d",
+                            "decayTo": 0.5,
+                            "applyToSubqueries": ["tensor"],
+                        }
+                    )
+                self.assertIn("HYBRID", str(ctx.exception))
+
+    def test_apply_to_subqueries_non_rrf_fails(self):
+        """applyToSubqueries requires RRF ranking method."""
+        from marqo.tensor_search.models.api_models import SearchQuery
+
+        with self.assertRaises(ValueError) as ctx:
+            SearchQuery(
+                q="product",
+                searchMethod="HYBRID",
+                hybridParameters={"rankingMethod": "tensor", "retrievalMethod": "lexical"},
+                recencyParameters={
+                    "recencyField": "timestamp",
+                    "scale": "7d",
+                    "decayTo": 0.5,
+                    "applyToSubqueries": ["tensor"],
+                }
+            )
+        self.assertIn("rrf", str(ctx.exception).lower())
+
+    def test_apply_to_subqueries_with_hybrid_rrf_succeeds(self):
+        """applyToSubqueries with HYBRID search and RRF ranking is valid."""
+        from marqo.tensor_search.models.api_models import SearchQuery
+
+        # Explicit RRF
+        query = SearchQuery(
+            q="product",
+            searchMethod="HYBRID",
+            hybridParameters={"rankingMethod": "rrf", "retrievalMethod": "disjunction"},
+            recencyParameters={
+                "recencyField": "timestamp",
+                "scale": "7d",
+                "decayTo": 0.5,
+                "applyToSubqueries": ["tensor"],
+            }
+        )
+        self.assertIsNotNone(query.recencyParameters)
+
+        # Default hybrid parameters (RRF is default)
+        query2 = SearchQuery(
+            q="product",
+            searchMethod="HYBRID",
+            recencyParameters={
+                "recencyField": "timestamp",
+                "scale": "7d",
+                "decayTo": 0.5,
+                "applyToSubqueries": ["lexical"],
+            }
+        )
+        self.assertIsNotNone(query2.recencyParameters)
+
     def test_sort_by_with_non_exclude_global_fails(self):
         """sortBy + recency should fail unless exclude-global."""
-        from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
+        from marqo.tensor_search.models.api_models import SearchQuery
 
         for phase in ["all", "only-global"]:
             with self.subTest(phase=phase):
                 with self.assertRaises(ValueError) as ctx:
-                    BulkSearchQueryEntity(
-                        index=self.main_index.name,
+                    SearchQuery(
                         q="product",
                         searchMethod="HYBRID",
                         recencyParameters={
@@ -1533,6 +1599,21 @@ class TestRecencyScoring(MarqoTestCase):
                  "grow_from": 0.5, "grow_function": "exponential"},
                 "Grow parameters must be either all provided or all omitted"
             ),
+            (
+                "negative center value",
+                {"recency_field": "timestamp", "center": -1.0},
+                "center must be non-negative"
+            ),
+            (
+                "invalid apply_to_subqueries value",
+                {"recency_field": "timestamp", "apply_to_subqueries": ["invalid"]},
+                "unexpected value; permitted:"
+            ),
+            (
+                "mixed invalid apply_to_subqueries",
+                {"recency_field": "timestamp", "apply_to_subqueries": ["tensor", "bad"]},
+                "unexpected value; permitted:"
+            ),
         ]
 
         for description, kwargs, expected_error in validation_cases:
@@ -1546,95 +1627,89 @@ class TestRecencyScoring(MarqoTestCase):
                 )
 
 
-class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
-    """Integration tests for center and applyToSubqueries recency parameters."""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-
-        cls.main_index_request = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all-MiniLM-L6-v2')
-        )
-
-        cls.indexes = cls.create_indexes([cls.main_index_request])
-        cls.main_index = cls.indexes[0]
-
-    def _add_test_documents(self):
-        """Add documents with known timestamps for testing."""
+    def test_apply_to_subqueries_accepted_and_returns_results(self):
+        """Test that various applyToSubqueries values are accepted in hybrid RRF search."""
         now = datetime.now()
         documents = [
-            {
-                "_id": "doc-recent",
-                "title": "recent document about technology",
-                "timestamp": (now - timedelta(hours=1)).timestamp(),
-            },
-            {
-                "_id": "doc-old",
-                "title": "old document about technology",
-                "timestamp": (now - timedelta(days=14)).timestamp(),
-            },
-            {
-                "_id": "doc-medium",
-                "title": "medium age document about technology",
-                "timestamp": (now - timedelta(days=3)).timestamp(),
-            },
+            {"_id": "doc-recent", "title": "recent document about technology",
+             "timestamp": (now - timedelta(hours=1)).timestamp()},
+            {"_id": "doc-old", "title": "old document about technology",
+             "timestamp": (now - timedelta(days=14)).timestamp()},
+            {"_id": "doc-medium", "title": "medium age document about technology",
+             "timestamp": (now - timedelta(days=3)).timestamp()},
         ]
-
         self.add_documents(
             self.config,
-            AddDocsParams(
-                index_name=self.main_index.name,
-                docs=documents,
-                tensor_fields=["title"],
-            ),
+            AddDocsParams(index_name=self.main_index.name, docs=documents, tensor_fields=["title"]),
         )
-        return documents
+
+        subquery_variants = [
+            ("tensor only", ["tensor"]),
+            ("lexical only", ["lexical"]),
+            ("both explicit", ["tensor", "lexical"]),
+            ("empty list", []),
+            ("default (None)", None),
+        ]
+
+        for description, apply_to in subquery_variants:
+            with self.subTest(apply_to_subqueries=description):
+                results = tensor_search.search(
+                    config=self.config,
+                    index_name=self.main_index.name,
+                    text="technology",
+                    search_method=SearchMethod.HYBRID,
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF
+                    ),
+                    recency_parameters=RecencyParameters(
+                        recency_field="timestamp",
+                        scale="7d",
+                        decay_to=0.5,
+                        apply_to_subqueries=apply_to,
+                    ),
+                    result_count=10,
+                )
+                self.assertGreater(len(results["hits"]), 0,
+                                   f"Should return results with apply_to_subqueries={description}")
 
     def test_center_produces_reproducible_scores(self):
         """Test that center parameter produces the same scores across multiple queries."""
-        self._add_test_documents()
+        now = datetime.now()
+        documents = [
+            {"_id": "doc-recent", "title": "recent document about technology",
+             "timestamp": (now - timedelta(hours=1)).timestamp()},
+            {"_id": "doc-old", "title": "old document about technology",
+             "timestamp": (now - timedelta(days=14)).timestamp()},
+        ]
+        self.add_documents(
+            self.config,
+            AddDocsParams(index_name=self.main_index.name, docs=documents, tensor_fields=["title"]),
+        )
 
-        fixed_center = datetime.now().timestamp()
-
+        fixed_center = now.timestamp()
         recency_params = RecencyParameters(
-            recency_field="timestamp",
-            scale="7d",
-            decay_to=0.5,
-            center=fixed_center
+            recency_field="timestamp", scale="7d", decay_to=0.5, center=fixed_center
         )
 
-        # Run the same query twice
         results_1 = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
+            config=self.config, index_name=self.main_index.name,
+            text="technology", search_method=SearchMethod.HYBRID,
             hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=recency_params,
-            result_count=10,
+                retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF),
+            recency_parameters=recency_params, result_count=10,
         )
 
-        # Small sleep to make sure now() would differ
         time.sleep(0.1)
 
         results_2 = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
+            config=self.config, index_name=self.main_index.name,
+            text="technology", search_method=SearchMethod.HYBRID,
             hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=recency_params,
-            result_count=10,
+                retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF),
+            recency_parameters=recency_params, result_count=10,
         )
 
-        # Scores should be identical when using center
         self.assertEqual(len(results_1["hits"]), len(results_2["hits"]))
         for hit1, hit2 in zip(results_1["hits"], results_2["hits"]):
             self.assertEqual(hit1["_id"], hit2["_id"])
@@ -1642,304 +1717,49 @@ class TestRecencyCenterAndApplyToSubqueries(MarqoTestCase):
 
     def test_center_in_past_vs_present_gives_different_scores(self):
         """Test that center in the past vs. present gives different scores."""
-        self._add_test_documents()
+        now = datetime.now()
+        documents = [
+            {"_id": "doc-recent", "title": "recent document about technology",
+             "timestamp": (now - timedelta(hours=1)).timestamp()},
+            {"_id": "doc-old", "title": "old document about technology",
+             "timestamp": (now - timedelta(days=14)).timestamp()},
+        ]
+        self.add_documents(
+            self.config,
+            AddDocsParams(index_name=self.main_index.name, docs=documents, tensor_fields=["title"]),
+        )
 
-        now = datetime.now().timestamp()
-        past_center = (datetime.now() - timedelta(days=30)).timestamp()
+        now_ts = now.timestamp()
+        past_center = (now - timedelta(days=30)).timestamp()
 
-        # Query with center = now
         results_now = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
+            config=self.config, index_name=self.main_index.name,
+            text="technology", search_method=SearchMethod.HYBRID,
             hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
+                retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF),
             recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-                center=now
-            ),
+                recency_field="timestamp", scale="7d", decay_to=0.5, center=now_ts),
             result_count=10,
         )
 
-        # Query with center = 30 days ago
         results_past = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
+            config=self.config, index_name=self.main_index.name,
+            text="technology", search_method=SearchMethod.HYBRID,
             hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
+                retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF),
             recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-                center=past_center
-            ),
+                recency_field="timestamp", scale="7d", decay_to=0.5, center=past_center),
             result_count=10,
         )
 
-        # With center=30 days ago, all docs are "in the future" relative to center,
-        # so scores should differ from center=now
         scores_now = {h["_id"]: h["_score"] for h in results_now["hits"]}
         scores_past = {h["_id"]: h["_score"] for h in results_past["hits"]}
 
-        # At least one doc should have different scores
-        has_difference = False
-        for doc_id in scores_now:
-            if doc_id in scores_past:
-                if abs(scores_now[doc_id] - scores_past[doc_id]) > 0.001:
-                    has_difference = True
-                    break
+        has_difference = any(
+            abs(scores_now.get(doc_id, 0) - scores_past.get(doc_id, 0)) > 0.001
+            for doc_id in set(scores_now) | set(scores_past)
+        )
         self.assertTrue(has_difference, "Scores should differ when using different center values")
-
-    def test_apply_to_subqueries_tensor_only(self):
-        """Test applyToSubqueries=['tensor'] applies recency only to tensor subquery.
-
-        Verifies the parameter is accepted and produces valid results.
-        Uses default (global-phase) recency to check that tensor-only produces
-        the same result as both (since global-phase recency applies identically
-        regardless of apply_to_subqueries in RRF).
-        """
-        self._add_test_documents()
-
-        # With recency on both subqueries (default)
-        results_both = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-            ),
-            result_count=10,
-        )
-
-        # With recency on tensor only
-        results_tensor_only = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-                apply_to_subqueries=["tensor"],
-            ),
-            result_count=10,
-        )
-
-        # Without recency
-        results_no_recency = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            result_count=10,
-        )
-
-        # Verify we got results
-        self.assertGreater(len(results_both["hits"]), 0)
-        self.assertGreater(len(results_tensor_only["hits"]), 0)
-        self.assertGreater(len(results_no_recency["hits"]), 0)
-
-        # Recency (on both) should produce different scores than no recency
-        scores_both = {h["_id"]: h["_score"] for h in results_both["hits"]}
-        scores_no_recency = {h["_id"]: h["_score"] for h in results_no_recency["hits"]}
-        has_difference = any(
-            abs(scores_both.get(doc_id, 0) - scores_no_recency.get(doc_id, 0)) > 0.001
-            for doc_id in set(scores_both) | set(scores_no_recency)
-        )
-        self.assertTrue(has_difference,
-                        "Recency should produce different scores than no recency")
-
-    def test_apply_to_subqueries_lexical_only(self):
-        """Test applyToSubqueries=['lexical'] applies recency only to lexical subquery.
-
-        Verifies the parameter is accepted and produces valid results.
-        Uses default (global-phase) recency to check that lexical-only produces
-        the same result as both (since global-phase recency applies identically
-        regardless of apply_to_subqueries in RRF).
-        """
-        self._add_test_documents()
-
-        # With recency on lexical only
-        results_lexical_only = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-                apply_to_subqueries=["lexical"],
-            ),
-            result_count=10,
-        )
-
-        # With recency on both
-        results_both = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-            ),
-            result_count=10,
-        )
-
-        # Without recency
-        results_no_recency = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            result_count=10,
-        )
-
-        # Verify we got results
-        self.assertGreater(len(results_both["hits"]), 0)
-        self.assertGreater(len(results_lexical_only["hits"]), 0)
-        self.assertGreater(len(results_no_recency["hits"]), 0)
-
-        # Recency (on both) should produce different scores than no recency
-        scores_both = {h["_id"]: h["_score"] for h in results_both["hits"]}
-        scores_no_recency = {h["_id"]: h["_score"] for h in results_no_recency["hits"]}
-        has_difference = any(
-            abs(scores_both.get(doc_id, 0) - scores_no_recency.get(doc_id, 0)) > 0.001
-            for doc_id in set(scores_both) | set(scores_no_recency)
-        )
-        self.assertTrue(has_difference,
-                        "Recency should produce different scores than no recency")
-
-    def test_apply_to_subqueries_empty_applies_to_neither(self):
-        """Test applyToSubqueries=[] applies recency to neither subquery (only global phase)."""
-        self._add_test_documents()
-
-        # With recency on neither subquery
-        results_none = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-                apply_to_subqueries=[],
-            ),
-            result_count=10,
-        )
-
-        # With recency on both subqueries
-        results_both = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-            ),
-            result_count=10,
-        )
-
-        # Verify we got results
-        self.assertGreater(len(results_none["hits"]), 0)
-        self.assertGreater(len(results_both["hits"]), 0)
-
-    def test_default_apply_to_subqueries_matches_existing_behavior(self):
-        """Test that default (None) matches existing behavior (both applied)."""
-        self._add_test_documents()
-
-        # Default (no applyToSubqueries)
-        results_default = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-            ),
-            result_count=10,
-        )
-
-        # Explicit both
-        results_explicit_both = tensor_search.search(
-            config=self.config,
-            index_name=self.main_index.name,
-            text="technology",
-            search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction,
-                rankingMethod=RankingMethod.RRF
-            ),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp",
-                scale="7d",
-                decay_to=0.5,
-                apply_to_subqueries=["tensor", "lexical"],
-            ),
-            result_count=10,
-        )
-
-        # Should produce identical results
-        self.assertEqual(len(results_default["hits"]), len(results_explicit_both["hits"]))
-        for hit_default, hit_explicit in zip(results_default["hits"], results_explicit_both["hits"]):
-            self.assertEqual(hit_default["_id"], hit_explicit["_id"])
-            self.assertAlmostEqual(hit_default["_score"], hit_explicit["_score"], places=5)
 
 
 if __name__ == '__main__':
