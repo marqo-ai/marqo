@@ -66,6 +66,7 @@ QUERY_INPUT_RECENCY_GROW_FUNCTION_TYPE = 'marqo__recency_grow_function_type'
 QUERY_INPUT_RECENCY_GROW_SCALE_SECONDS = 'marqo__recency_grow_scale_seconds'
 QUERY_INPUT_RECENCY_GROW_OFFSET_SECONDS = 'marqo__recency_grow_offset_seconds'
 MARQO_RECENCY_GROW_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.9')
+MARQO_RECENCY_CENTER_AND_SUBQUERIES_MINIMUM_VERSION = semver.VersionInfo.parse('2.25.1')
 
 # For recency center and subquery control
 QUERY_INPUT_RECENCY_CENTER_SECONDS = 'marqo__recency_center_seconds'
