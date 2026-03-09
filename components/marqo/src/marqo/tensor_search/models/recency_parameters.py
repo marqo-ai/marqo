@@ -242,19 +242,6 @@ class RecencyParameters(BaseModel):
             raise ValueError(f"center must be non-negative, got: {v}")
         return v
 
-    @validator('apply_to_subqueries')
-    def validate_apply_to_subqueries(cls, v: Optional[List[str]]) -> Optional[List[str]]:
-        """Validate that apply_to_subqueries contains only valid values."""
-        if v is not None:
-            valid_values = {"tensor", "lexical"}
-            for item in v:
-                if item not in valid_values:
-                    raise ValueError(
-                        f"Invalid value '{item}' in apply_to_subqueries. "
-                        f"Allowed values are: {sorted(valid_values)}"
-                    )
-        return v
-
     @root_validator
     def validate_grow_params_all_or_nothing(cls, values):
         """Validate that grow parameters are either all provided or all omitted.
