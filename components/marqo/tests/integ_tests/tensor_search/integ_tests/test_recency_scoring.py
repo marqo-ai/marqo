@@ -1387,37 +1387,6 @@ class TestRecencyScoring(MarqoTestCase):
             )
         self.assertIn("rrf", str(ctx.exception).lower())
 
-    def test_apply_to_subqueries_with_hybrid_rrf_succeeds(self):
-        """applyToSubqueries with HYBRID search and RRF ranking is valid."""
-        from marqo.tensor_search.models.api_models import SearchQuery
-
-        # Explicit RRF
-        query = SearchQuery(
-            q="product",
-            searchMethod="HYBRID",
-            hybridParameters={"rankingMethod": "rrf", "retrievalMethod": "disjunction"},
-            recencyParameters={
-                "recencyField": "timestamp",
-                "scale": "7d",
-                "decayTo": 0.5,
-                "applyToSubqueries": ["tensor"],
-            }
-        )
-        self.assertIsNotNone(query.recencyParameters)
-
-        # Default hybrid parameters (RRF is default)
-        query2 = SearchQuery(
-            q="product",
-            searchMethod="HYBRID",
-            recencyParameters={
-                "recencyField": "timestamp",
-                "scale": "7d",
-                "decayTo": 0.5,
-                "applyToSubqueries": ["lexical"],
-            }
-        )
-        self.assertIsNotNone(query2.recencyParameters)
-
     def test_sort_by_with_non_exclude_global_fails(self):
         """sortBy + recency should fail unless exclude-global."""
         from marqo.tensor_search.models.api_models import SearchQuery
@@ -1627,51 +1596,126 @@ class TestRecencyScoring(MarqoTestCase):
                 )
 
 
-    def test_apply_to_subqueries_accepted_and_returns_results(self):
-        """Test that various applyToSubqueries values are accepted in hybrid RRF search."""
-        now = datetime.now()
-        documents = [
-            {"_id": "doc-recent", "title": "recent document about technology",
-             "timestamp": (now - timedelta(hours=1)).timestamp()},
-            {"_id": "doc-old", "title": "old document about technology",
-             "timestamp": (now - timedelta(days=14)).timestamp()},
-            {"_id": "doc-medium", "title": "medium age document about technology",
-             "timestamp": (now - timedelta(days=3)).timestamp()},
-        ]
-        self.add_documents(
-            self.config,
-            AddDocsParams(index_name=self.main_index.name, docs=documents, tensor_fields=["title"]),
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
+    def test_apply_to_subqueries_controls_recency_application(self):
+        """Test that applyToSubqueries controls which subquery scores are modified by recency.
+
+        Uses apply_in_ranking_phase="exclude-global" to isolate the subquery effect —
+        recency only modifies first-phase subquery scores, not the global RRF score.
+        Uses rerankDepthTensor=20 to ensure all documents appear in the tensor result set.
+
+        Baseline: no recency parameters at all.
+        For each variant, verifies:
+        - _recency_score is present and correctly calculated
+        - []: _tensor_score and _lexical_score unchanged from baseline
+        - ["tensor"]: _tensor_score = baseline * recency, _lexical_score unchanged
+        - ["lexical"]: _lexical_score = baseline * recency, _tensor_score unchanged
+        - ["tensor", "lexical"]: both scores = baseline * recency
+        """
+        self._add_shared_documents()
+
+        recency_base_params = dict(
+            recency_field="timestamp",
+            scale="60d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.3,
+            grow_from=0.2,
+            grow_function="linear",
+            grow_scale="45d",
+            grow_offset="1d",
+            apply_in_ranking_phase="exclude-global",
         )
 
-        subquery_variants = [
-            ("tensor only", ["tensor"]),
-            ("lexical only", ["lexical"]),
-            ("both explicit", ["tensor", "lexical"]),
-            ("empty list", []),
-            ("default (None)", None),
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            rerankDepthTensor=20,
+        )
+
+        # Baseline: no recency at all
+        baseline_result = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="product",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=hybrid_params,
+            result_count=20,
+        )
+        baseline_scores = self._extract_scores(baseline_result['hits'])
+
+        # (apply_to, recency_on_tensor, recency_on_lexical)
+        test_cases = [
+            ([], False, False),
+            (["tensor"], True, False),
+            (["lexical"], False, True),
+            (["tensor", "lexical"], True, True),
         ]
 
-        for description, apply_to in subquery_variants:
-            with self.subTest(apply_to_subqueries=description):
-                results = tensor_search.search(
+        for apply_to, recency_on_tensor, recency_on_lexical in test_cases:
+            with self.subTest(apply_to_subqueries=apply_to):
+                recency_params = RecencyParameters(
+                    **recency_base_params,
+                    apply_to_subqueries=apply_to,
+                )
+                result = tensor_search.search(
                     config=self.config,
                     index_name=self.main_index.name,
-                    text="technology",
+                    text="product",
                     search_method=SearchMethod.HYBRID,
-                    hybrid_parameters=HybridParameters(
-                        retrievalMethod=RetrievalMethod.Disjunction,
-                        rankingMethod=RankingMethod.RRF
-                    ),
-                    recency_parameters=RecencyParameters(
-                        recency_field="timestamp",
-                        scale="7d",
-                        decay_to=0.5,
-                        apply_to_subqueries=apply_to,
-                    ),
-                    result_count=10,
+                    hybrid_parameters=hybrid_params,
+                    recency_parameters=recency_params,
+                    result_count=20,
                 )
-                self.assertGreater(len(results["hits"]), 0,
-                                   f"Should return results with apply_to_subqueries={description}")
+                hits = result['hits']
+                self.assertGreater(len(hits), 0)
+
+                # 1. Verify _recency_score is present and correct
+                self._verify_recency_behavior(hits, recency_params)
+
+                variant_scores = self._extract_scores(hits)
+
+                # Find docs that appear in both result sets and are affected by recency
+                common_affected = [
+                    doc_id for doc_id in set(baseline_scores) & set(variant_scores)
+                    if variant_scores[doc_id]['recency'] is not None
+                    and abs(variant_scores[doc_id]['recency'] - 1.0) > 0.01
+                    and baseline_scores[doc_id]['tensor'] is not None
+                    and baseline_scores[doc_id]['lexical'] is not None
+                ]
+                self.assertGreater(len(common_affected), 0, "Should have common docs affected by recency")
+
+                for doc_id in common_affected:
+                    b = baseline_scores[doc_id]
+                    v = variant_scores[doc_id]
+                    recency = v['recency']
+
+                    # 2. Check tensor scores
+                    if recency_on_tensor:
+                        expected_tensor = b['tensor'] * recency
+                        self.assertAlmostEqual(
+                            expected_tensor, v['tensor'], places=3,
+                            msg=f"Doc {doc_id}: tensor score should be baseline * recency"
+                        )
+                    else:
+                        self.assertAlmostEqual(
+                            b['tensor'], v['tensor'], places=5,
+                            msg=f"Doc {doc_id}: tensor score should match baseline"
+                        )
+
+                    # 3. Check lexical scores
+                    if recency_on_lexical:
+                        expected_lexical = b['lexical'] * recency
+                        self.assertAlmostEqual(
+                            expected_lexical, v['lexical'], places=3,
+                            msg=f"Doc {doc_id}: lexical score should be baseline * recency"
+                        )
+                    else:
+                        self.assertAlmostEqual(
+                            b['lexical'], v['lexical'], places=5,
+                            msg=f"Doc {doc_id}: lexical score should match baseline"
+                        )
 
     def test_center_produces_reproducible_scores(self):
         """Test that center parameter produces the same scores across multiple queries."""
