@@ -1384,16 +1384,15 @@ public class HybridSearcher extends Searcher {
         }
 
         // Check applyToSubqueries flags and override recency if this subquery type shouldn't get it
-        int applyRecencyToTensor =
-                query.properties().getInteger(QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, 1);
-        int applyRecencyToLexical =
-                query.properties().getInteger(QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, 1);
+        boolean applyRecencyToTensor =
+                query.properties().getBoolean(QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, true);
+        boolean applyRecencyToLexical =
+                query.properties().getBoolean(QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, true);
 
         boolean shouldDisableRecency = false;
-        if (retrievalMethod.equals(MARQO_SEARCH_METHOD_TENSOR) && applyRecencyToTensor == 0) {
+        if (retrievalMethod.equals(MARQO_SEARCH_METHOD_TENSOR) && !applyRecencyToTensor) {
             shouldDisableRecency = true;
-        } else if (retrievalMethod.equals(MARQO_SEARCH_METHOD_LEXICAL)
-                && applyRecencyToLexical == 0) {
+        } else if (retrievalMethod.equals(MARQO_SEARCH_METHOD_LEXICAL) && !applyRecencyToLexical) {
             shouldDisableRecency = true;
         }
 

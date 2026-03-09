@@ -681,7 +681,7 @@ class TestRecencyQueryInput(unittest.TestCase):
     # ============= ApplyToSubqueries Parameter Tests =============
 
     def test_apply_to_subqueries_default(self):
-        """Test apply_to_subqueries default (None) sets both flags to 1 as top-level query properties."""
+        """Test apply_to_subqueries default (None) sets both flags to True as top-level query properties."""
         recency_params = RecencyParameters(
             recency_field="timestamp",
             scale="7d",
@@ -699,13 +699,13 @@ class TestRecencyQueryInput(unittest.TestCase):
             result = self.vespa_index._to_vespa_hybrid_query(query)
 
         # Flags should be top-level query properties, not in query_features
-        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], 1)
-        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], 1)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], True)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], True)
         self.assertNotIn(constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, result['query_features'])
         self.assertNotIn(constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, result['query_features'])
 
     def test_apply_to_subqueries_tensor_only(self):
-        """Test apply_to_subqueries=['tensor'] sets only tensor flag to 1 as top-level query properties."""
+        """Test apply_to_subqueries=['tensor'] sets only tensor flag to True as top-level query properties."""
         recency_params = RecencyParameters(
             recency_field="timestamp",
             scale="7d",
@@ -722,11 +722,11 @@ class TestRecencyQueryInput(unittest.TestCase):
             mock_parent.return_value = {'query_features': {}}
             result = self.vespa_index._to_vespa_hybrid_query(query)
 
-        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], 1)
-        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], 0)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], True)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], False)
 
     def test_apply_to_subqueries_lexical_only(self):
-        """Test apply_to_subqueries=['lexical'] sets only lexical flag to 1 as top-level query properties."""
+        """Test apply_to_subqueries=['lexical'] sets only lexical flag to True as top-level query properties."""
         recency_params = RecencyParameters(
             recency_field="timestamp",
             scale="7d",
@@ -743,11 +743,11 @@ class TestRecencyQueryInput(unittest.TestCase):
             mock_parent.return_value = {'query_features': {}}
             result = self.vespa_index._to_vespa_hybrid_query(query)
 
-        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], 0)
-        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], 1)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], False)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], True)
 
     def test_apply_to_subqueries_empty_list(self):
-        """Test apply_to_subqueries=[] sets both flags to 0 as top-level query properties."""
+        """Test apply_to_subqueries=[] sets both flags to False as top-level query properties."""
         recency_params = RecencyParameters(
             recency_field="timestamp",
             scale="7d",
@@ -764,8 +764,8 @@ class TestRecencyQueryInput(unittest.TestCase):
             mock_parent.return_value = {'query_features': {}}
             result = self.vespa_index._to_vespa_hybrid_query(query)
 
-        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], 0)
-        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], 0)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], False)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], False)
 
 
 if __name__ == '__main__':
