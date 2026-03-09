@@ -1680,46 +1680,46 @@ class TestRecencyScoring(MarqoTestCase):
 
                 variant_scores = self._extract_scores(hits)
 
-                # Find docs that appear in both result sets and are affected by recency
-                common_affected = [
-                    doc_id for doc_id in set(baseline_scores) & set(variant_scores)
-                    if variant_scores[doc_id]['recency'] is not None
-                    and abs(variant_scores[doc_id]['recency'] - 1.0) > 0.01
-                    and baseline_scores[doc_id]['tensor'] is not None
-                    and baseline_scores[doc_id]['lexical'] is not None
-                ]
-                self.assertGreater(len(common_affected), 0, "Should have common docs affected by recency")
+                # Verify baseline and variant return the same doc IDs
+                baseline_ids = set(baseline_scores)
+                variant_ids = set(variant_scores)
+                self.assertEqual(baseline_ids, variant_ids,
+                    f"Baseline and variant should return the same doc IDs. "
+                    f"Only in baseline: {baseline_ids - variant_ids}, "
+                    f"Only in variant: {variant_ids - baseline_ids}")
 
-                for doc_id in common_affected:
+                for doc_id in variant_scores:
                     b = baseline_scores[doc_id]
                     v = variant_scores[doc_id]
                     recency = v['recency']
 
-                    # 2. Check tensor scores
-                    if recency_on_tensor:
-                        expected_tensor = b['tensor'] * recency
-                        self.assertAlmostEqual(
-                            expected_tensor, v['tensor'], places=3,
-                            msg=f"Doc {doc_id}: tensor score should be baseline * recency"
-                        )
-                    else:
-                        self.assertAlmostEqual(
-                            b['tensor'], v['tensor'], places=5,
-                            msg=f"Doc {doc_id}: tensor score should match baseline"
-                        )
+                    # 2. Check tensor scores (skip if baseline has no tensor score)
+                    if b['tensor'] is not None:
+                        if recency_on_tensor:
+                            expected_tensor = b['tensor'] * recency
+                            self.assertAlmostEqual(
+                                expected_tensor, v['tensor'], places=5,
+                                msg=f"Doc {doc_id}: tensor score should be baseline * recency"
+                            )
+                        else:
+                            self.assertAlmostEqual(
+                                b['tensor'], v['tensor'], places=5,
+                                msg=f"Doc {doc_id}: tensor score should match baseline"
+                            )
 
-                    # 3. Check lexical scores
-                    if recency_on_lexical:
-                        expected_lexical = b['lexical'] * recency
-                        self.assertAlmostEqual(
-                            expected_lexical, v['lexical'], places=3,
-                            msg=f"Doc {doc_id}: lexical score should be baseline * recency"
-                        )
-                    else:
-                        self.assertAlmostEqual(
-                            b['lexical'], v['lexical'], places=5,
-                            msg=f"Doc {doc_id}: lexical score should match baseline"
-                        )
+                    # 3. Check lexical scores (skip if baseline has no lexical score)
+                    if b['lexical'] is not None:
+                        if recency_on_lexical:
+                            expected_lexical = b['lexical'] * recency
+                            self.assertAlmostEqual(
+                                expected_lexical, v['lexical'], places=5,
+                                msg=f"Doc {doc_id}: lexical score should be baseline * recency"
+                            )
+                        else:
+                            self.assertAlmostEqual(
+                                b['lexical'], v['lexical'], places=5,
+                                msg=f"Doc {doc_id}: lexical score should match baseline"
+                            )
 
     def test_center_produces_reproducible_scores(self):
         """Test that center parameter produces the same scores across multiple queries.
