@@ -435,12 +435,16 @@ class TestRecencyScoring(MarqoTestCase):
 
         return max(floor_value, score)
 
-    def _get_doc_age_seconds(self, hit: Dict) -> Optional[float]:
+    def _get_doc_age_seconds(self, hit: Dict, center: Optional[float] = None) -> Optional[float]:
         """Get the age in seconds for a document based on its timestamp field.
 
+        Args:
+            hit: Search result document
+            center: Fixed reference timestamp (Unix epoch seconds). Uses now() if None.
+
         Returns:
-            - Positive value: past document (timestamp < now)
-            - Negative value: future document (timestamp > now)
+            - Positive value: past document (timestamp < reference)
+            - Negative value: future document (timestamp > reference)
             - None: document has no timestamp field
         """
         doc_id = hit.get('_id')
@@ -450,8 +454,8 @@ class TestRecencyScoring(MarqoTestCase):
         # Use the actual timestamp from the document
         timestamp = hit.get('timestamp')
         if timestamp is not None:
-            current_time = datetime.now().timestamp()
-            return current_time - timestamp  # Can be negative for future docs
+            reference_time = center if center is not None else datetime.now().timestamp()
+            return reference_time - timestamp  # Can be negative for future docs
         return None
 
     # ============== Verification Helpers ==============
@@ -471,7 +475,7 @@ class TestRecencyScoring(MarqoTestCase):
             self.assertIsNotNone(actual_score, f"Recency score should be present for {doc_id}")
 
             # Calculate expected score
-            age_seconds = self._get_doc_age_seconds(hit)
+            age_seconds = self._get_doc_age_seconds(hit, center=recency_params.center)
             if age_seconds is not None:
                 expected_score = self._calculate_expected_score(
                     age_seconds, recency_params.scale, recency_params.offset, recency_params.decay_function, recency_params.decay_to,
@@ -1718,11 +1722,17 @@ class TestRecencyScoring(MarqoTestCase):
                         )
 
     def test_center_produces_reproducible_scores(self):
-        """Test that center parameter produces the same scores across multiple queries."""
+        """Test that center parameter produces the same scores across multiple queries.
+
+        Uses center=now-20min so all three documents are in the past relative to center,
+        covering a range of ages: recent (20min), medium (4d), and old (14d).
+        """
         now = datetime.now()
         documents = [
             {"_id": "doc-recent", "title": "recent document about technology",
              "timestamp": (now - timedelta(hours=1)).timestamp()},
+            {"_id": "doc-medium", "title": "medium age document about technology",
+             "timestamp": (now - timedelta(days=4)).timestamp()},
             {"_id": "doc-old", "title": "old document about technology",
              "timestamp": (now - timedelta(days=14)).timestamp()},
         ]
@@ -1731,7 +1741,7 @@ class TestRecencyScoring(MarqoTestCase):
             AddDocsParams(index_name=self.main_index.name, docs=documents, tensor_fields=["title"]),
         )
 
-        fixed_center = now.timestamp()
+        fixed_center = (now - timedelta(minutes=20)).timestamp()
         recency_params = RecencyParameters(
             recency_field="timestamp", scale="7d", decay_to=0.5, center=fixed_center
         )
@@ -1744,7 +1754,7 @@ class TestRecencyScoring(MarqoTestCase):
             recency_parameters=recency_params, result_count=10,
         )
 
-        time.sleep(0.1)
+        time.sleep(2)
 
         results_2 = tensor_search.search(
             config=self.config, index_name=self.main_index.name,
@@ -1754,56 +1764,17 @@ class TestRecencyScoring(MarqoTestCase):
             recency_parameters=recency_params, result_count=10,
         )
 
+        # Verify recency scores are correctly calculated for both runs
+        self._verify_recency_behavior(results_1['hits'], recency_params)
+        self._verify_recency_behavior(results_2['hits'], recency_params)
+
+        # Verify both runs produce identical ordering and scores
         self.assertEqual(len(results_1["hits"]), len(results_2["hits"]))
         for hit1, hit2 in zip(results_1["hits"], results_2["hits"]):
             self.assertEqual(hit1["_id"], hit2["_id"])
+            self.assertEqual(hit1["_recency_score"], hit2["_recency_score"],
+                             f"Recency score mismatch for {hit1['_id']}")
             self.assertAlmostEqual(hit1["_score"], hit2["_score"], places=5)
-
-    def test_center_in_past_vs_present_gives_different_scores(self):
-        """Test that center in the past vs. present gives different scores."""
-        now = datetime.now()
-        documents = [
-            {"_id": "doc-recent", "title": "recent document about technology",
-             "timestamp": (now - timedelta(hours=1)).timestamp()},
-            {"_id": "doc-old", "title": "old document about technology",
-             "timestamp": (now - timedelta(days=14)).timestamp()},
-        ]
-        self.add_documents(
-            self.config,
-            AddDocsParams(index_name=self.main_index.name, docs=documents, tensor_fields=["title"]),
-        )
-
-        now_ts = now.timestamp()
-        past_center = (now - timedelta(days=30)).timestamp()
-
-        results_now = tensor_search.search(
-            config=self.config, index_name=self.main_index.name,
-            text="technology", search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp", scale="7d", decay_to=0.5, center=now_ts),
-            result_count=10,
-        )
-
-        results_past = tensor_search.search(
-            config=self.config, index_name=self.main_index.name,
-            text="technology", search_method=SearchMethod.HYBRID,
-            hybrid_parameters=HybridParameters(
-                retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF),
-            recency_parameters=RecencyParameters(
-                recency_field="timestamp", scale="7d", decay_to=0.5, center=past_center),
-            result_count=10,
-        )
-
-        scores_now = {h["_id"]: h["_score"] for h in results_now["hits"]}
-        scores_past = {h["_id"]: h["_score"] for h in results_past["hits"]}
-
-        has_difference = any(
-            abs(scores_now.get(doc_id, 0) - scores_past.get(doc_id, 0)) > 0.001
-            for doc_id in set(scores_now) | set(scores_past)
-        )
-        self.assertTrue(has_difference, "Scores should differ when using different center values")
 
 
 if __name__ == '__main__':
