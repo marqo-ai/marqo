@@ -613,5 +613,176 @@ class HybridSearcherRecencyTest {
             assertThat(features.getDouble("query(created_at)")).hasValue(1.0);
             assertThat(features.getDouble("query(updated_at)")).hasValue(0.5);
         }
+
+        @Test
+        void shouldDisableRecencyForTensorSubqueryWhenApplyToTensorIsFalse() {
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__yql.tensor", "tensor yql");
+            query.properties().set("marqo__ranking.tensor.tensor", "embedding_similarity");
+            query.properties().set("marqo__recency_apply_to_tensor", false);
+            query.properties().set("marqo__recency_apply_to_lexical", true);
+
+            // Create recency timestamp key tensor
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor recencyTensor =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("created_at"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__recency_timestamp_key)", recencyTensor);
+
+            // Create fields to rank tensor
+            Tensor fieldsToRank =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("marqo__tensor_text_field_1"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_tensor)", fieldsToRank);
+
+            Query subQuery = hybridSearcher.createSubQuery(query, "tensor", "tensor", false);
+
+            // Recency should be disabled: marqo__recency_should_apply_score set to 0.0
+            RankFeatures features = subQuery.getRanking().getFeatures();
+            assertThat(features.getDouble("query(marqo__recency_should_apply_score)"))
+                    .hasValue(0.0);
+        }
+
+        @Test
+        void shouldDisableRecencyForLexicalSubqueryWhenApplyToLexicalIsFalse() {
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__yql.lexical", "lexical yql");
+            query.properties().set("marqo__ranking.lexical.lexical", "bm25");
+            query.properties().set("marqo__recency_apply_to_tensor", true);
+            query.properties().set("marqo__recency_apply_to_lexical", false);
+
+            // Create recency timestamp key tensor
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor recencyTensor =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("created_at"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__recency_timestamp_key)", recencyTensor);
+
+            // Create fields to rank tensor
+            Tensor fieldsToRank =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("marqo__lexical_text_field_1"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_lexical)", fieldsToRank);
+
+            Query subQuery = hybridSearcher.createSubQuery(query, "lexical", "lexical", false);
+
+            // Recency should be disabled: marqo__recency_should_apply_score set to 0.0
+            RankFeatures features = subQuery.getRanking().getFeatures();
+            assertThat(features.getDouble("query(marqo__recency_should_apply_score)"))
+                    .hasValue(0.0);
+        }
+
+        @Test
+        void shouldNotDisableRecencyForTensorSubqueryWhenApplyToTensorIsTrue() {
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__yql.tensor", "tensor yql");
+            query.properties().set("marqo__ranking.tensor.tensor", "embedding_similarity");
+            query.properties().set("marqo__recency_apply_to_tensor", true);
+            query.properties().set("marqo__recency_apply_to_lexical", false);
+
+            // Create recency timestamp key tensor
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor recencyTensor =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("created_at"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__recency_timestamp_key)", recencyTensor);
+
+            // Create fields to rank tensor
+            Tensor fieldsToRank =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("marqo__tensor_text_field_1"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_tensor)", fieldsToRank);
+
+            Query subQuery = hybridSearcher.createSubQuery(query, "tensor", "tensor", false);
+
+            // Recency should NOT be disabled
+            RankFeatures features = subQuery.getRanking().getFeatures();
+            assertThat(features.getDouble("query(marqo__recency_should_apply_score)")).isEmpty();
+        }
+
+        @Test
+        void shouldNotDisableRecencyForLexicalSubqueryWhenApplyToLexicalIsTrue() {
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__yql.lexical", "lexical yql");
+            query.properties().set("marqo__ranking.lexical.lexical", "bm25");
+            query.properties().set("marqo__recency_apply_to_tensor", false);
+            query.properties().set("marqo__recency_apply_to_lexical", true);
+
+            // Create recency timestamp key tensor
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor recencyTensor =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("created_at"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__recency_timestamp_key)", recencyTensor);
+
+            // Create fields to rank tensor
+            Tensor fieldsToRank =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("marqo__lexical_text_field_1"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_lexical)", fieldsToRank);
+
+            Query subQuery = hybridSearcher.createSubQuery(query, "lexical", "lexical", false);
+
+            // Recency should NOT be disabled
+            RankFeatures features = subQuery.getRanking().getFeatures();
+            assertThat(features.getDouble("query(marqo__recency_should_apply_score)")).isEmpty();
+        }
+
+        @Test
+        void shouldDefaultToApplyRecencyToBothSubqueriesWhenFlagsNotSet() {
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__yql.tensor", "tensor yql");
+            query.properties().set("marqo__ranking.tensor.tensor", "embedding_similarity");
+            // Do NOT set apply_to_tensor or apply_to_lexical — defaults should be true
+
+            // Create recency timestamp key tensor
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor recencyTensor =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("created_at"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__recency_timestamp_key)", recencyTensor);
+
+            // Create fields to rank tensor
+            Tensor fieldsToRank =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("marqo__tensor_text_field_1"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_tensor)", fieldsToRank);
+
+            Query subQuery = hybridSearcher.createSubQuery(query, "tensor", "tensor", false);
+
+            // Recency should NOT be disabled (default is true)
+            RankFeatures features = subQuery.getRanking().getFeatures();
+            assertThat(features.getDouble("query(marqo__recency_should_apply_score)")).isEmpty();
+        }
     }
 }
