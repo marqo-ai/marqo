@@ -519,6 +519,20 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             return f'({float_field_string} OR {int_field_string})'
 
+        def generate_contains_filter_string(node: search_filter.ContainsTerm) -> str:
+            node.field = self.escape(node.field)
+            marqo_index = self.get_marqo_index()
+            if node.field not in marqo_index.field_map:
+                raise InvalidArgumentError(
+                    f"CONTAINS filter requires a lexical field, but '{node.field}' "
+                    f"is not a lexical field in index '{marqo_index.name}'. "
+                    f"Available lexical fields: {', '.join(sorted(marqo_index.lexically_searchable_fields_names))}"
+                )
+            field = marqo_index.field_map[node.field]
+            lexical_field_name = field.lexical_field_name
+            escaped_value = self.escape(node.value)
+            return f'({lexical_field_name} contains "{escaped_value}")'
+
         def tree_to_filter_string(node: search_filter.Node) -> Optional[str]:
             # Skip any terms with excluded fields first - check at node level
             if (isinstance(node, search_filter.Term) or isinstance(node, search_filter.Modifier)) and exclude_terms is not None:
@@ -565,6 +579,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     return generate_range_filter_string(node)
                 elif isinstance(node, search_filter.InTerm):
                     raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
+                elif isinstance(node, search_filter.ContainsTerm):
+                    return generate_contains_filter_string(node)
 
             raise InternalError(f'Unknown node type {type(node)}')
 

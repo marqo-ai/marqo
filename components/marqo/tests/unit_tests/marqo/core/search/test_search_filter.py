@@ -259,6 +259,96 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                     )),
                 "Many parenthesis, nested groupings"
             ),
+            # CONTAINS term divider tests
+            (
+                'a CONTAINS hello',
+                SearchFilter(
+                    ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                ),
+                'basic CONTAINS term'
+            ),
+            (
+                'a contains hello',
+                SearchFilter(
+                    ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                ),
+                'lowercase contains term'
+            ),
+            (
+                'a Contains hello',
+                SearchFilter(
+                    ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                ),
+                'mixed case Contains term'
+            ),
+            (
+                'a CONTAINS (hello world)',
+                SearchFilter(
+                    ContainsTerm('a', 'hello world', 'a CONTAINS (hello world)')
+                ),
+                'CONTAINS with grouped value'
+            ),
+            (
+                'a CONTAINS hello AND b:2',
+                SearchFilter(
+                    root=And(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=EqualityTerm('b', '2', 'b:2')
+                    )
+                ),
+                'AND with CONTAINS term'
+            ),
+            (
+                'a CONTAINS hello OR b:2',
+                SearchFilter(
+                    root=Or(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=EqualityTerm('b', '2', 'b:2')
+                    )
+                ),
+                'OR with CONTAINS term'
+            ),
+            (
+                'NOT a CONTAINS hello',
+                SearchFilter(
+                    root=Not(
+                        ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                    ),
+                ),
+                'NOT CONTAINS term'
+            ),
+            (
+                'a CONTAINS hello AND b CONTAINS world',
+                SearchFilter(
+                    root=And(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=ContainsTerm('b', 'world', 'b CONTAINS world')
+                    )
+                ),
+                'AND with two CONTAINS terms'
+            ),
+            (
+                'a CONTAINS hello AND b:(Football tournament)',
+                SearchFilter(
+                    root=And(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=EqualityTerm('b', 'Football tournament', 'b:(Football tournament)')
+                    )
+                ),
+                'CONTAINS combined with equality'
+            ),
+            (
+                'NOT (a CONTAINS hello) AND b CONTAINS world',
+                SearchFilter(
+                    root=And(
+                        left=Not(
+                            ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                        ),
+                        right=ContainsTerm('b', 'world', 'b CONTAINS world')
+                    )
+                ),
+                'NOT CONTAINS with AND'
+            ),
             # A bit of everything
             (
                 '(a:1 AND NOT (b:[1 TO 10] OR (c IN (x, y, (hello world)))))',
