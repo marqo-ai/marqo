@@ -9,7 +9,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
-from marqo.exceptions import InternalError
+from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 
@@ -830,6 +830,8 @@ class StructuredVespaIndex(VespaIndex):
                 elif isinstance(node, search_filter.InTerm):
                     return (f'{marqo_field_name} in '
                             f'{_convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type)}')
+                elif isinstance(node, search_filter.ContainsTerm):
+                    raise InvalidArgumentError("The 'CONTAINS' filter keyword is not yet supported for structured indexes")
 
             raise InternalError(f'Unknown node type {type(node)}')
 
