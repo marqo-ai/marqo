@@ -1109,9 +1109,10 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         expected_score = hit[MARQO_DOC_PRE_RERANK_SCORE] + 0.5
         self.assertAlmostEqual(hit["_score"], expected_score, delta=1e-5)
 
-    def test_pre_rerank_score_with_only_normal_modifiers(self):
+    @pytest.mark.skip_for_multinode("For multinode: exact score may not match with replicas")
+    def test_pre_rerank_score_returned_with_only_global_score_modifiers(self):
         """
-        Global score modifier (popularity) only, no custom. Modifier must affect order;
+        Tests that using global score modifiers (popularity) only, no custom. Modifier must affect order;
         when _pre_rerank_score is present, assert it equals baseline and _score = _pre_rerank_score + popularity.
         """
         docs = _tuxedo_docs_with_extras(popularity=[0.1, 0.2, 0.3, 0.4, 0.5])  # doc1=0.1 .. doc5=0.5
@@ -1146,8 +1147,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         self.assertEqual(ids_with_modifier, REVERSED_ORDER, msg="Order by popularity must be doc5, doc4, doc3, doc2, doc1")
         baseline_by_id = {h["_id"]: h["_score"] for h in res_baseline["hits"]}
         for hit in res_with_modifier["hits"]:
-            if MARQO_DOC_PRE_RERANK_SCORE not in hit:
-                continue
+            self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
             self.assertAlmostEqual(
                 hit[MARQO_DOC_PRE_RERANK_SCORE], baseline_by_id[hit["_id"]], delta=1e-5
             )
