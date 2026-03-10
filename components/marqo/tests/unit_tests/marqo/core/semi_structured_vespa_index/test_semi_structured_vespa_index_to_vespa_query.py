@@ -1525,8 +1525,8 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         query_features = vespa_query.get('query_features', {})
         self.assertIn('marqo__custom_score_add_weights_global', str(query_features))
         # Lexical YQL with Disjunction is just the retrieval lexical term (no rank with extra bm25).
-        self.assertIn('search', lexical_yql)
-        self.assertNotIn('rank(rank(', lexical_yql), 'No double rank for BM25 when only closeness is used'
+        self.assertIn('default contains "search"', lexical_yql)
+        self.assertNotIn('rank(', lexical_yql, msg='No rank for BM25 when only closeness is used')
 
     def test_facets_query_unchanged_with_custom_score_modifiers(self):
         """Facets YQL must be identical with and without custom score modifiers."""
@@ -1588,7 +1588,10 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             msg="Probe must not include custom-score extra rank() terms; it must be base lexical only",
         )
         # Probe must be the base lexical (no second rank for BM25); main is rank(base, extra).
-        self.assertNotIn("rank(rank(", probe_lexical), "Probe YQL must not contain nested rank from custom score"
+        self.assertNotIn("rank(", probe_lexical,
+                         "Probe YQL must not contain rank from custom score")
+        self.assertNotIn("marqo__lexical_title", probe_lexical,
+                         "Probe YQL must not contain anything related to title")
 
     def test_relevance_cutoff_params_unchanged_with_custom_score_modifiers(self):
         """Relevance cutoff query params must be identical with and without custom score modifiers."""

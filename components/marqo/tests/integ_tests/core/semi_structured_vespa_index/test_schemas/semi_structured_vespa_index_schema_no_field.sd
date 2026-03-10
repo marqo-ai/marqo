@@ -276,4 +276,8 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__float_fields type map<string, double> {}
         
     }
+
+    document-summary summaryfeatures {
+        summary marqo__id type string {}
+    }
 }

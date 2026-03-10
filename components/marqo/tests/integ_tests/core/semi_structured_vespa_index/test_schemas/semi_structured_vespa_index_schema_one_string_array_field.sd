@@ -283,4 +283,8 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__string_array_string_array_1 type array<string> {source: marqo__string_array_string_array_1}
         
     }
+
+    document-summary summaryfeatures {
+        summary marqo__id type string {}
+    }
 }

@@ -1,4 +1,3 @@
-from typing import Tuple, Union
 from typing import Tuple, Optional, Union
 
 from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery
@@ -6,6 +5,7 @@ from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.core.constants import CHARACTERS_TO_BE_ESCAPED_IN_VESPA
+from marqo.core import constants
 
 class VespaIndex(ABC):
     """
@@ -120,8 +120,13 @@ class VespaIndex(ABC):
 
         return mult_tensor, add_tensor
 
-    def _convert_hybrid_global_score_modifiers_to_tensors(self, score_modifiers: List[ScoreModifier]) -> Dict[
-        str, Dict[str, float]]:
+    def _convert_hybrid_global_score_modifiers_to_tensors(self, score_modifiers: List[ScoreModifier]) -> \
+        Tuple[
+            Dict[str, Dict[str, float]],
+            Dict[str, Dict[str, float]],
+            Dict[str, Dict[str, float]],
+            Dict[str, Dict[str, float]]
+        ]:
         """
         Specifically for hybrid search. Allows extraction of global score modifiers and custom score rerankers separately.
         Helper function that converts a list of raw global score modifiers into 4 dictionaries:
@@ -160,7 +165,6 @@ class VespaIndex(ABC):
             else:
                 raise InternalError(f'Unknown score modifier type {modifier.type}')
 
-        # TODO: Add validation. score type, aggregate type, field must exist.
         return global_score_modifiers_mult_tensor, global_score_modifiers_add_tensor, \
                 custom_score_rerankers_mult_tensor, custom_score_rerankers_add_tensor
 

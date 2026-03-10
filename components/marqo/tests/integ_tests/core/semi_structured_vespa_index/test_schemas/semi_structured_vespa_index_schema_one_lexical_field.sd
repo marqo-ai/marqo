@@ -316,4 +316,8 @@ schema marqo__test_00semi_00structured_00schema {
         
         summary text_field type string {source: marqo__lexical_text_field}
     }
+
+    document-summary summaryfeatures {
+        summary marqo__id type string {}
+    }
 }

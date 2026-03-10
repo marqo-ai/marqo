@@ -334,12 +334,10 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(f'expression: {embedding_similarity_expression}')
             rank_profiles.append('}')
 
-        # Global add and mult modifiers and custom score rerank features (bm25, closeness per field)
+        # Global add and mult modifiers only. Custom score reranking is unsupported on structured
+        # indexes; bm25/closeness per-field match-features are not added to avoid extra per-hit
+        # computation and query latency for all structured searches.
         match_features = ['global_mult_modifier', 'global_add_modifier']
-        for field in lexical_fields:
-            match_features.append(f'bm25({field.lexical_field_name})')
-        for field in tensor_fields:
-            match_features.append(f'closeness(field, {field.embeddings_field_name})')
         rank_profiles.append('match-features: ' + ' '.join(match_features))
 
         rank_profiles.append('}')
@@ -394,10 +392,8 @@ class StructuredVespaSchema(VespaSchema):
                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
             rank_profiles.append(
                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
-            rank_profiles.append(
-                f'query({constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
-            rank_profiles.append(
-                f'query({constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
+            # Custom score reranking is unsupported on structured indexes; do not add
+            # query(marqo__custom_score_*_weights_global) inputs.
 
             rank_profiles.append('}')
             rank_profiles.append('}')

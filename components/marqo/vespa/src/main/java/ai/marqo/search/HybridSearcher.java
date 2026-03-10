@@ -1630,11 +1630,11 @@ public class HybridSearcher extends Searcher {
             Set<String> matchFeatureKeys,
             FeatureData summaryFeatures) {
         return extractCustomScoreForHit(
-                matchFeatures, key, parsed, matchFeatureKeys, summaryFeatures, null, null);
+                matchFeatures, key, parsed, matchFeatureKeys, summaryFeatures, null, null, false);
     }
 
     /**
-     * Same as 5-arg but with optional logger and keyForLog for 4.5 logging (aggregation and read).
+     * Same as 5-arg but with optional logger, keyForLog and verbose for logging (aggregation and read).
      */
     static Double extractCustomScoreForHit(
             FeatureData matchFeatures,
@@ -1643,7 +1643,8 @@ public class HybridSearcher extends Searcher {
             Set<String> matchFeatureKeys,
             FeatureData summaryFeatures,
             Logger logger,
-            String keyForLog) {
+            String keyForLog,
+            boolean verbose) {
         if (parsed == null) {
             return null;
         }
@@ -1657,10 +1658,12 @@ public class HybridSearcher extends Searcher {
                         logger,
                         keyForLog,
                         "bm25Values",
-                        false);
+                        false,
+                        verbose);
             }
             String featName = bm25SummaryFeatureName(parsed.fieldName);
-            return getSingleFieldScoreWithLog(summaryFeatures, featName, logger, keyForLog);
+            return getSingleFieldScoreWithLog(
+                    summaryFeatures, featName, logger, keyForLog, verbose);
         }
         if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
             if (summaryFeatures == null) return null;
@@ -1674,10 +1677,12 @@ public class HybridSearcher extends Searcher {
                         logger,
                         keyForLog,
                         "closenessValues",
-                        true);
+                        true,
+                        verbose);
             }
             String featName = "ranking_closeness_metric_" + parsed.fieldName;
-            return getSingleFieldScoreWithLog(summaryFeatures, featName, logger, keyForLog);
+            return getSingleFieldScoreWithLog(
+                    summaryFeatures, featName, logger, keyForLog, verbose);
         }
         return null;
     }
@@ -1712,9 +1717,13 @@ public class HybridSearcher extends Searcher {
 
     /** Reads one summary-feature value and optionally logs; used for single-field custom score keys. */
     private static Double getSingleFieldScoreWithLog(
-            FeatureData summaryFeatures, String featureName, Logger logger, String keyForLog) {
+            FeatureData summaryFeatures,
+            String featureName,
+            Logger logger,
+            String keyForLog,
+            boolean verbose) {
         Double score = featureName != null ? getFeatureDouble(summaryFeatures, featureName) : null;
-        if (logger != null && keyForLog != null && score != null) {
+        if (verbose && logger != null && keyForLog != null && score != null) {
             logger.info(
                     "[CustomScoreRerank] read from summary-features key="
                             + keyForLog
@@ -1741,7 +1750,8 @@ public class HybridSearcher extends Searcher {
             Logger logger,
             String keyForLog,
             String logLabel,
-            boolean useZeroForMissing) {
+            boolean useZeroForMissing,
+            boolean verbose) {
         List<Double> values = new ArrayList<>();
         for (String name : summaryFeatures.featureNames()) {
             if (nameFilter.test(name)) {
@@ -1754,7 +1764,7 @@ public class HybridSearcher extends Searcher {
             }
         }
         Double result = aggregateValues(values, aggregateType);
-        if (logger != null && keyForLog != null && result != null) {
+        if (verbose && logger != null && keyForLog != null && result != null) {
             logger.info(
                     "[CustomScoreRerank] aggregation key="
                             + keyForLog
@@ -1809,7 +1819,8 @@ public class HybridSearcher extends Searcher {
             Set<String> matchFeatureKeys,
             Map<String, double[]> minMaxPerKey,
             FeatureData summaryFeatures,
-            Logger logger) {
+            Logger logger,
+            boolean verbose) {
         String key = cell.getKey().label(0);
         CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
         if (parsed == null) return null;
@@ -1821,7 +1832,8 @@ public class HybridSearcher extends Searcher {
                         matchFeatureKeys,
                         summaryFeatures,
                         logger,
-                        key);
+                        key,
+                        verbose);
         if (score == null || Double.isNaN(score)) return null;
         double weight = cell.getValue().doubleValue();
         double normalizedScore = score;
@@ -1830,7 +1842,7 @@ public class HybridSearcher extends Searcher {
             normalizedScore = minMaxNormalize(score, minMax[0], minMax[1]);
         }
         double modifierValue = weight * normalizedScore;
-        if (logger != null) {
+        if (verbose && logger != null) {
             logger.info(
                     "[CustomScoreRerank] apply modifier key="
                             + key
@@ -1876,7 +1888,8 @@ public class HybridSearcher extends Searcher {
                                 matchFeatureKeys,
                                 minMaxPerKey,
                                 summaryFeatures,
-                                logger);
+                                logger,
+                                verbose);
                 if (contrib != null) add += contrib;
             }
         }
@@ -1890,7 +1903,8 @@ public class HybridSearcher extends Searcher {
                                 matchFeatureKeys,
                                 minMaxPerKey,
                                 summaryFeatures,
-                                logger);
+                                logger,
+                                verbose);
                 if (contrib != null) mult *= contrib;
             }
         }
@@ -1971,13 +1985,14 @@ public class HybridSearcher extends Searcher {
                 (customAddWeights != null && !customAddWeights.isEmpty())
                         || (customMultWeights != null && !customMultWeights.isEmpty());
 
-        logger.info(
+        logIfVerbose(
                 "[CustomScoreRerank] customAddWeights="
                         + (customAddWeights == null ? "null" : "size=" + customAddWeights.size())
                         + " customMultWeights="
                         + (customMultWeights == null ? "null" : "size=" + customMultWeights.size())
                         + " hasCustomScores="
-                        + hasCustomScores);
+                        + hasCustomScores,
+                verbose);
         if (hasCustomScores && customAddWeights != null && !customAddWeights.isEmpty()) {
             for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
                 Cell cell = it.next();
@@ -1985,7 +2000,7 @@ public class HybridSearcher extends Searcher {
                 double weight = cell.getValue().doubleValue();
                 CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
                 if (parsed != null) {
-                    logger.info(
+                    logIfVerbose(
                             "[CustomScoreRerank] unpack add_to_score key="
                                     + key
                                     + " scoreType="
@@ -1995,7 +2010,8 @@ public class HybridSearcher extends Searcher {
                                     + " aggregateType="
                                     + (parsed.aggregateType != null ? parsed.aggregateType : "n/a")
                                     + " weight="
-                                    + weight);
+                                    + weight,
+                            verbose);
                 }
             }
         }
@@ -2006,7 +2022,7 @@ public class HybridSearcher extends Searcher {
                 double weight = cell.getValue().doubleValue();
                 CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
                 if (parsed != null) {
-                    logger.info(
+                    logIfVerbose(
                             "[CustomScoreRerank] unpack multiply_score_by key="
                                     + key
                                     + " scoreType="
@@ -2016,7 +2032,8 @@ public class HybridSearcher extends Searcher {
                                     + " aggregateType="
                                     + (parsed.aggregateType != null ? parsed.aggregateType : "n/a")
                                     + " weight="
-                                    + weight);
+                                    + weight,
+                            verbose);
                 }
             }
         }
@@ -2029,11 +2046,12 @@ public class HybridSearcher extends Searcher {
             if (firstMf != null) {
                 allMatchFeatureKeys = getMatchFeatureKeys(firstMf);
             }
-            logger.info(
+            logIfVerbose(
                     "[CustomScoreRerank] match feature keys from first hit (count="
                             + allMatchFeatureKeys.size()
                             + "): "
-                            + allMatchFeatureKeys);
+                            + allMatchFeatureKeys,
+                    verbose);
             /* Compute min and max scores for each key for use in normalization */
             minMaxPerKey = computeMinMaxPerKey(hits, customAddWeights, customMultWeights);
         }
@@ -2082,14 +2100,15 @@ public class HybridSearcher extends Searcher {
                         effectiveAdd = outAdd[0];
                         effectiveMult = outMult[0];
                         if (hitIndex == 0) {
-                            logger.info(
+                            logIfVerbose(
                                     String.format(
                                             "[CustomScoreRerank] first hit add_modifier=%.5f"
                                                 + " outAdd=%.5f outMult=%.5f minMaxPerKeySize=%d",
                                             add_modifier,
                                             outAdd[0],
                                             outMult[0],
-                                            minMaxPerKey.size()));
+                                            minMaxPerKey.size()),
+                                    verbose);
                         }
                     }
 
@@ -2122,7 +2141,7 @@ public class HybridSearcher extends Searcher {
                                     modified_score),
                             verbose);
                     if (hasCustomScores && hit.getRelevance().getScore() != modified_score) {
-                        logger.info(
+                        logIfVerbose(
                                 String.format(
                                         "[CustomScoreRerank] hit=%s original=%.7f effectiveAdd=%.5f"
                                                 + " effectiveMult=%.5f modified=%.7f",
@@ -2130,7 +2149,8 @@ public class HybridSearcher extends Searcher {
                                         original_score,
                                         effectiveAdd,
                                         effectiveMult,
-                                        modified_score));
+                                        modified_score),
+                                verbose);
                     }
                     hit.setRelevance(modified_score);
                 } else {

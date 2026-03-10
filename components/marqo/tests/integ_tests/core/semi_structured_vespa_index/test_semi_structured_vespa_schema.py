@@ -1,4 +1,5 @@
 import os
+import re
 from typing import cast
 
 from marqo.core.models.marqo_index import *
@@ -18,6 +19,15 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
     def _remove_empty_lines_in_schema(self, schema: str) -> str:
         return '\n'.join([line for line in schema.splitlines() if line.strip()])
+
+    def _remove_whitespace_in_schema(self, schema: str) -> str:
+        """Normalize whitespace so schema comparison is independent of indentation/spacing."""
+        chars = re.escape('{}=+-<>():,;[]|')
+        pattern = rf"(\s*([{chars}])\s*)"
+        schema = re.sub(pattern, r"\2", schema)
+        schema = re.sub(r' +', ' ', schema)
+        schema = re.sub(r'^\s+', '', schema, flags=re.MULTILINE)
+        return schema
 
     def test_semi_structured_index_schema_random_model(self):
         test_cases = [
@@ -50,8 +60,8 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
                 self.maxDiff = None
                 self.assertEqual(
-                    self._remove_empty_lines_in_schema(expected_schema),
-                    self._remove_empty_lines_in_schema(generated_schema)
+                    self._remove_whitespace_in_schema(expected_schema),
+                    self._remove_whitespace_in_schema(generated_schema)
                 )
 
     def test_semi_structured_index_schema_with_collapse_field(self):
@@ -74,8 +84,8 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
         self.maxDiff = None
         self.assertEqual(
-            self._remove_empty_lines_in_schema(expected_schema),
-            self._remove_empty_lines_in_schema(generated_schema)
+            self._remove_whitespace_in_schema(expected_schema),
+            self._remove_whitespace_in_schema(generated_schema)
         )
 
     def test_semi_structured_index_schema_with_pre_2_16(self):
@@ -118,8 +128,8 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
                 self.maxDiff = None
                 self.assertEqual(
-                    self._remove_empty_lines_in_schema(expected_schema),
-                    self._remove_empty_lines_in_schema(generated_schema)
+                    self._remove_whitespace_in_schema(expected_schema),
+                    self._remove_whitespace_in_schema(generated_schema)
                 )
 
                 # Verify the version was used in the index
