@@ -865,8 +865,10 @@ class TestHybridSearch(MarqoTestCase):
 
                     self.assertEqual(modified_res["hits"][0]["_id"], "doc7")
                     self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc7"] + 5*1)
-                    for hits in modified_res["hits"][1:]:
-                        self.assertEqual(hits["_score"], unmodified_scores[hits["_id"]])
+                    for hit in modified_res["hits"][1:]:
+                        # Confirm pre rerank score is in hits that used global score mods
+                        self.assertIn("_pre_rerank_score", hit)
+                        self.assertEqual(hit["_score"], unmodified_scores[hit["_id"]])
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_custom_score_rerank_single_bm25_field(self):

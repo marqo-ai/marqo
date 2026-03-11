@@ -111,4 +111,7 @@ class TestCustomScoreRerankersSearch(MarqoTestCase):
             },
             limit=5,
         )
+
         self.assertEqual([h["_id"] for h in with_modifier["hits"]], REVERSED_ORDER)
+        for hit in with_modifier["hits"]:
+            self.assertIn("_pre_rerank_score", hit)

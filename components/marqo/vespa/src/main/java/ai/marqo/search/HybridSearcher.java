@@ -112,6 +112,50 @@ public class HybridSearcher extends Searcher {
             this.fieldName = fieldName;
             this.aggregateType = aggregateType;
         }
+
+        /**
+         * Parses a custom score rerank key (no prefix) into score type, field name and aggregate type.
+         * Key formats: {scoreType}_field_{fieldName} or {scoreType}_{sum|max|avg}.
+         *
+         * @param key Key without prefix, e.g. "bm25_field_title", "bm25_sum",
+         *     "closeness_retrieval_vector_field_variantImage"
+         * @return Parsed key or null if unsupported/invalid
+         */
+        @VisibleForTesting
+        static CustomScoreKeyParsed parseCustomScoreKey(String key) {
+            if (key == null || key.isEmpty() || !key.contains("_")) {
+                return null;
+            }
+            String[] supportedScoreTypes = {"bm25", "closeness_retrieval_vector"};
+            String[] aggregateTypes = {"sum", "max", "avg"};
+            for (String scoreType : supportedScoreTypes) {
+                String prefix = scoreType + "_";
+                if (!key.startsWith(prefix)) {
+                    continue;
+                }
+                String rest = key.substring(prefix.length());
+                if (Arrays.asList(aggregateTypes).contains(rest)) {
+                    return new CustomScoreKeyParsed(scoreType, null, rest);
+                }
+                if (rest.startsWith("field_")) {
+                    String fieldName = rest.substring(6);
+                    if (fieldName.isEmpty()) {
+                        return null;
+                    }
+                    return new CustomScoreKeyParsed(scoreType, fieldName, null);
+                }
+                return null;
+            }
+            return null;
+        }
+
+        /** Summary feature name for single-field BM25: bm25(marqo__lexical_<fieldName>). One per lexical field; no bm25(marqo__ranking_strings). */
+        static String bm25SummaryFeatureName(String fieldName) {
+            if (fieldName == null || fieldName.isEmpty()) {
+                return null;
+            }
+            return "bm25(marqo__lexical_" + fieldName + ")";
+        }
     }
 
     /**
@@ -343,7 +387,7 @@ public class HybridSearcher extends Searcher {
                 query.properties().getBoolean("marqo__hasRankingLexical", false);
         if (hasRankingVector || hasRankingLexical) {
             Result resultToFill = new Result(query, hitsForPostProcessing);
-            execution.fill(resultToFill, "summaryfeatures");
+            execution.fill(resultToFill, "dummy-light-summary");
         }
 
         // Determine post-processing mode based on query parameters
@@ -1519,42 +1563,6 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Parses a custom score rerank key into score type, optional field name, and optional aggregate
-     * type. Matches Python parse_custom_score_key (prefix marqo__score_ is stripped before calling).
-     *
-     * @param key Key without prefix, e.g. "bm25_field_title", "bm25_sum",
-     *     "closeness_retrieval_vector_field_variantImage"
-     * @return Parsed key or null if unsupported/invalid
-     */
-    @VisibleForTesting
-    static CustomScoreKeyParsed parseCustomScoreKey(String key) {
-        if (key == null || key.isEmpty() || !key.contains("_")) {
-            return null;
-        }
-        String[] supportedScoreTypes = {"bm25", "closeness_retrieval_vector"};
-        String[] aggregateTypes = {"sum", "max", "avg"};
-        for (String scoreType : supportedScoreTypes) {
-            String prefix = scoreType + "_";
-            if (!key.startsWith(prefix)) {
-                continue;
-            }
-            String rest = key.substring(prefix.length());
-            if (Arrays.asList(aggregateTypes).contains(rest)) {
-                return new CustomScoreKeyParsed(scoreType, null, rest);
-            }
-            if (rest.startsWith("field_")) {
-                String fieldName = rest.substring(6);
-                if (fieldName.isEmpty()) {
-                    return null;
-                }
-                return new CustomScoreKeyParsed(scoreType, fieldName, null);
-            }
-            return null;
-        }
-        return null;
-    }
-
-    /**
      * Returns the set of match feature names from hit match features. FeatureData is not a Map;
      * it exposes featureNames(). We use that so bm25(*) and closeness(field,*) keys are available
      * for custom score extraction and aggregates.
@@ -1564,56 +1572,6 @@ public class HybridSearcher extends Searcher {
             return Collections.emptySet();
         }
         return new HashSet<>(matchFeatures.featureNames());
-    }
-
-    /**
-     * Finds the bm25 match feature name for the given Marqo field name. Tries conventional
-     * schema naming: bm25(marqo__lexical_<field>) and bm25(<field>_lexical).
-     */
-    @VisibleForTesting
-    static String findBm25MatchFeatureName(Set<String> matchFeatureKeys, String fieldName) {
-        if (fieldName == null || fieldName.isEmpty()) {
-            return null;
-        }
-        String withUnderscore = "_" + fieldName;
-        for (String key : matchFeatureKeys) {
-            if (!key.startsWith("bm25(") || !key.endsWith(")")) {
-                continue;
-            }
-            String inner = key.substring(5, key.length() - 1);
-            if (inner.endsWith(withUnderscore)
-                    || inner.equals(fieldName)
-                    || inner.endsWith("_" + fieldName)
-                    || inner.contains("lexical") && inner.contains(fieldName)) {
-                return key;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Finds the closeness(field, ...) match feature name for the given Marqo field name. Tries
-     * conventional naming: closeness(field,marqo__embeddings_<field>) and
-     * closeness(field,<field>_embeddings).
-     */
-    @VisibleForTesting
-    static String findClosenessMatchFeatureName(Set<String> matchFeatureKeys, String fieldName) {
-        if (fieldName == null || fieldName.isEmpty()) {
-            return null;
-        }
-        for (String key : matchFeatureKeys) {
-            if (!key.startsWith("closeness(field,") || !key.endsWith(")")) {
-                continue;
-            }
-            String inner = key.substring(16, key.length() - 1).trim();
-            if (inner.endsWith("_" + fieldName)
-                    || inner.equals(fieldName + "_embeddings")
-                    || inner.equals("marqo__embeddings_" + fieldName)
-                    || inner.contains("embeddings") && inner.contains(fieldName)) {
-                return key;
-            }
-        }
-        return null;
     }
 
     /**
@@ -1661,7 +1619,7 @@ public class HybridSearcher extends Searcher {
                         false,
                         verbose);
             }
-            String featName = bm25SummaryFeatureName(parsed.fieldName);
+            String featName = CustomScoreKeyParsed.bm25SummaryFeatureName(parsed.fieldName);
             return getSingleFieldScoreWithLog(
                     summaryFeatures, featName, logger, keyForLog, verbose);
         }
@@ -1685,14 +1643,6 @@ public class HybridSearcher extends Searcher {
                     summaryFeatures, featName, logger, keyForLog, verbose);
         }
         return null;
-    }
-
-    /** Summary feature name for single-field BM25: bm25(marqo__lexical_<fieldName>). One per lexical field; no bm25(marqo__ranking_strings). */
-    private static String bm25SummaryFeatureName(String fieldName) {
-        if (fieldName == null || fieldName.isEmpty()) {
-            return null;
-        }
-        return "bm25(marqo__lexical_" + fieldName + ")";
     }
 
     /**
@@ -1822,7 +1772,7 @@ public class HybridSearcher extends Searcher {
             Logger logger,
             boolean verbose) {
         String key = cell.getKey().label(0);
-        CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+        CustomScoreKeyParsed parsed = CustomScoreKeyParsed.parseCustomScoreKey(key);
         if (parsed == null) return null;
         Double score =
                 extractCustomScoreForHit(
@@ -1928,18 +1878,18 @@ public class HybridSearcher extends Searcher {
         if (customAddWeights != null) {
             for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
                 String key = it.next().getKey().label(0);
-                if (parseCustomScoreKey(key) != null) keys.add(key);
+                if (CustomScoreKeyParsed.parseCustomScoreKey(key) != null) keys.add(key);
             }
         }
         if (customMultWeights != null) {
             for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
                 String key = it.next().getKey().label(0);
-                if (parseCustomScoreKey(key) != null) keys.add(key);
+                if (CustomScoreKeyParsed.parseCustomScoreKey(key) != null) keys.add(key);
             }
         }
         Map<String, double[]> result = new HashMap<>();
         for (String key : keys) {
-            CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+            CustomScoreKeyParsed parsed = CustomScoreKeyParsed.parseCustomScoreKey(key);
             if (parsed == null) continue;
             double min = Double.POSITIVE_INFINITY;
             double max = Double.NEGATIVE_INFINITY;
@@ -1998,7 +1948,7 @@ public class HybridSearcher extends Searcher {
                 Cell cell = it.next();
                 String key = cell.getKey().label(0);
                 double weight = cell.getValue().doubleValue();
-                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+                CustomScoreKeyParsed parsed = CustomScoreKeyParsed.parseCustomScoreKey(key);
                 if (parsed != null) {
                     logIfVerbose(
                             "[CustomScoreRerank] unpack add_to_score key="
@@ -2020,7 +1970,7 @@ public class HybridSearcher extends Searcher {
                 Cell cell = it.next();
                 String key = cell.getKey().label(0);
                 double weight = cell.getValue().doubleValue();
-                CustomScoreKeyParsed parsed = parseCustomScoreKey(key);
+                CustomScoreKeyParsed parsed = CustomScoreKeyParsed.parseCustomScoreKey(key);
                 if (parsed != null) {
                     logIfVerbose(
                             "[CustomScoreRerank] unpack multiply_score_by key="

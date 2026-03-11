@@ -945,8 +945,7 @@ class TestCustomScoreRerankStructuredIndexUnsupported(MarqoTestCase):
                 ),
                 result_count=5,
             )
-        self.assertIn("semi-structured", str(ctx.exception).lower())
-        self.assertIn("structured", str(ctx.exception).lower())
+        self.assertIn("only supported for semi-structured", str(ctx.exception).lower())
 
 
 class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):

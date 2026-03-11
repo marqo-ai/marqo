@@ -608,8 +608,8 @@ schema {{ index.schema_name }} {
         {%- endfor %}
     }
 
-    {# Minimal summary used when filling to compute ranking_score_fieldN and bm25 for custom score rerank #}
-    document-summary summaryfeatures {
+    {# Minimal dummy summary used when filling to compute ranking_score_fieldN and bm25 for custom score rerank #}
+    document-summary dummy-light-summary {
         summary marqo__id type string {}
     }
 

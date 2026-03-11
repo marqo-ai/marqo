@@ -21,10 +21,6 @@ class StructuredVespaIndex(VespaIndex):
     Custom score reranking (marqo__score_*) is only supported for semi-structured indexes.
     """
 
-    def _supports_custom_score_rerank(self) -> bool:
-        """Override in SemiStructuredVespaIndex to True. Structured indexes do not support custom score rerank."""
-        return False
-
     _MARQO_TO_PYTHON_TYPE_MAP = {
         FieldType.Text: str,
         FieldType.Bool: bool,
@@ -387,15 +383,14 @@ class StructuredVespaIndex(VespaIndex):
             marqo_query.attributes_to_retrieve.append(common.FIELD_ID)
             marqo_query.attributes_to_retrieve.extend(chunk_field_names)
 
-        # Verify score modifiers, if defined (skip validation for custom score rerank keys)
+        # Verify score modifiers, if defined.
+        # No validation for custom score rerank keys, as code should never reach here
         if marqo_query.score_modifiers is not None:
             for modifier in marqo_query.score_modifiers:
                 if '.' in modifier.field:
                     root_modifier_field, subfield = modifier.field.split('.', 1)
                 else:
                     root_modifier_field = modifier.field
-                if root_modifier_field.startswith(constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX):
-                    continue
                 if root_modifier_field not in self._marqo_index.score_modifier_fields_names:
                     raise InvalidFieldNameError(
                         f'Index {self._marqo_index.name} has no score modifier field {modifier.field}. '
@@ -545,11 +540,6 @@ class StructuredVespaIndex(VespaIndex):
         select_attributes = self._get_select_attributes(marqo_query)
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
 
-        # Base lexical YQL without custom-score extra rank() terms. Used for relevance-cutoff probe only.
-        lexical_yql_for_probe = (
-            f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
-        )
-
         # Assign parameters to query
         query_inputs = {
             common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
@@ -583,57 +573,6 @@ class StructuredVespaIndex(VespaIndex):
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR])
         if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS])
-
-        # Custom score rerank (marqo__score_*) is only supported for semi-structured indexes.
-        custom_score_keys: Set[str] = set()
-        custom_score_rerank = hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)
-        if custom_score_rerank and not self._supports_custom_score_rerank():
-            add_weights = custom_score_rerank.get(constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL) or {}
-            mult_weights = custom_score_rerank.get(constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL) or {}
-            if add_weights or mult_weights:
-                raise UnsupportedFeatureError(
-                    "Custom score reranking (marqo__score_*) is only supported for semi-structured indexes, "
-                    "not for structured indexes."
-                )
-        if self._supports_custom_score_rerank() and custom_score_rerank:
-            for k, v in custom_score_rerank.items():
-                if v:
-                    query_inputs[k] = v
-            mult_key = constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL
-            add_key = constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL
-            custom_score_keys = set(custom_score_rerank.get(mult_key, {}).keys()) | set(
-                custom_score_rerank.get(add_key, {}).keys()
-            )
-            if custom_score_keys:
-                self._validate_custom_score_modifier_fields(custom_score_keys)
-            if custom_score_keys and marqo_query.hybrid_parameters.rankingMethod == RankingMethod.RRF:
-
-                # Calculate extra bm25 rank term for lexical retriever
-                bm25_fields = self._get_fields_to_bm25_rerank_by(custom_score_keys)
-                main_lexical_attrs = marqo_query.hybrid_parameters.searchableAttributesLexical
-                simplified_lexical = self._simplify_bm25_extra_fields_for_rank(bm25_fields, main_lexical_attrs)
-                simplified_tensor = bm25_fields  # tensor retriever has no main lexical term to dedupe against
-
-                extra_lexical_term = ""
-                if simplified_lexical:
-                    extra_lexical_term = self._get_lexical_search_term(
-                        marqo_query,
-                        _is_ranking_term=True,
-                        attributes_to_search=simplified_lexical,
-                    )
-                if extra_lexical_term:
-                    lexical_term = f'rank({lexical_term}, {extra_lexical_term})'
-
-                # Calculate extra bm25 rank term for tensor retriever
-                extra_tensor_term = ""
-                if bm25_fields:
-                    extra_tensor_term = self._get_lexical_search_term(
-                        marqo_query,
-                        _is_ranking_term=True,
-                        attributes_to_search=simplified_tensor,
-                    )
-                if extra_tensor_term:
-                    tensor_term = f'rank({tensor_term}, {extra_tensor_term})'
 
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
@@ -675,30 +614,12 @@ class StructuredVespaIndex(VespaIndex):
 
         query = {k: v for k, v in query.items() if v is not None}
 
-        # When relevance cutoff is used, send a separate probe lexical YQL without custom-score
-        # extra rank() terms so the probe is unchanged by custom score rerank.
-        if getattr(marqo_query, "relevance_cutoff", None) is not None:
-            query["marqo__yql.lexical.probe"] = lexical_yql_for_probe
-
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
             query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
 
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
-
-        # Tell the custom searcher to fill summaryfeatures and use them for reranking (semi-structured only)
-        if self._supports_custom_score_rerank() and custom_score_keys:
-            has_bm25 = bool(self._get_fields_to_bm25_rerank_by(custom_score_keys))
-            has_closeness = bool(self._get_fields_to_closeness_rerank_by(custom_score_keys))
-            if has_closeness:
-                query["marqo__hasRankingVector"] = True
-                # Pass distance metric so searcher can min-max normalize only for dot product (others are already [0,1] in rank profile)
-                query["marqo__custom_score_closeness_distance_metric"] = (
-                    self._marqo_index.distance_metric.value
-                )
-            if has_bm25:
-                query["marqo__hasRankingLexical"] = True
 
         return query
 
@@ -772,7 +693,7 @@ class StructuredVespaIndex(VespaIndex):
         """
         Creates YQL tensor term per field.
         When _is_ranking_term: only use searchable_attributes (required); no targetHits.
-        When _is_ranking_term False: only usemarqo_query;
+        When _is_ranking_term False: only use marqo_query;
         include targetHits/approximate/hnsw options.
         """
         if _is_ranking_term:

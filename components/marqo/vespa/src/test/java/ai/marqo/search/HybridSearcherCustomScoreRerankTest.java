@@ -12,7 +12,6 @@ import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +30,8 @@ class HybridSearcherCustomScoreRerankTest {
         @Test
         void bm25_field_returns_parsed() {
             HybridSearcher.CustomScoreKeyParsed p =
-                    HybridSearcher.parseCustomScoreKey("bm25_field_variantTitle");
+                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                            "bm25_field_variantTitle");
             assertThat(p).isNotNull();
             assertThat(p.scoreType).isEqualTo("bm25");
             assertThat(p.fieldName).isEqualTo("variantTitle");
@@ -40,19 +40,19 @@ class HybridSearcherCustomScoreRerankTest {
 
         @Test
         void bm25_aggregates_return_parsed() {
-            assertThat(HybridSearcher.parseCustomScoreKey("bm25_sum"))
+            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_sum"))
                     .satisfies(
                             p -> {
                                 assertThat(p.scoreType).isEqualTo("bm25");
                                 assertThat(p.fieldName).isNull();
                                 assertThat(p.aggregateType).isEqualTo("sum");
                             });
-            assertThat(HybridSearcher.parseCustomScoreKey("bm25_max"))
+            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_max"))
                     .satisfies(
                             p -> {
                                 assertThat(p.aggregateType).isEqualTo("max");
                             });
-            assertThat(HybridSearcher.parseCustomScoreKey("bm25_avg"))
+            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_avg"))
                     .satisfies(
                             p -> {
                                 assertThat(p.aggregateType).isEqualTo("avg");
@@ -62,7 +62,7 @@ class HybridSearcherCustomScoreRerankTest {
         @Test
         void closeness_retrieval_vector_field_returns_parsed() {
             HybridSearcher.CustomScoreKeyParsed p =
-                    HybridSearcher.parseCustomScoreKey(
+                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
                             "closeness_retrieval_vector_field_variantImage");
             assertThat(p).isNotNull();
             assertThat(p.scoreType).isEqualTo("closeness_retrieval_vector");
@@ -72,7 +72,9 @@ class HybridSearcherCustomScoreRerankTest {
 
         @Test
         void closeness_retrieval_vector_aggregates_return_parsed() {
-            assertThat(HybridSearcher.parseCustomScoreKey("closeness_retrieval_vector_sum"))
+            assertThat(
+                            HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                                    "closeness_retrieval_vector_sum"))
                     .satisfies(
                             p -> {
                                 assertThat(p.scoreType).isEqualTo("closeness_retrieval_vector");
@@ -83,70 +85,20 @@ class HybridSearcherCustomScoreRerankTest {
 
         @Test
         void unsupported_or_invalid_returns_null() {
-            assertThat(HybridSearcher.parseCustomScoreKey("closeness_ranking_vector_sum")).isNull();
-            assertThat(HybridSearcher.parseCustomScoreKey("unknown_type_field_x")).isNull();
-            assertThat(HybridSearcher.parseCustomScoreKey("")).isNull();
-            assertThat(HybridSearcher.parseCustomScoreKey("bm25")).isNull();
-            assertThat(HybridSearcher.parseCustomScoreKey("bm25_")).isNull();
-            assertThat(HybridSearcher.parseCustomScoreKey("bm25_field_")).isNull();
-            assertThat(HybridSearcher.parseCustomScoreKey(null)).isNull();
-        }
-    }
-
-    @Nested
-    class FindBm25MatchFeatureNameTest {
-
-        @Test
-        void finds_marqo_lexical_convention() {
-            Set<String> keys = new HashSet<>();
-            keys.add("bm25(marqo__lexical_title)");
-            keys.add("bm25(marqo__lexical_description)");
-            assertThat(HybridSearcher.findBm25MatchFeatureName(keys, "title"))
-                    .isEqualTo("bm25(marqo__lexical_title)");
-        }
-
-        @Test
-        void finds_suffix_lexical_convention() {
-            Set<String> keys = new HashSet<>();
-            keys.add("bm25(title_lexical)");
-            keys.add("bm25(description_lexical)");
-            assertThat(HybridSearcher.findBm25MatchFeatureName(keys, "title"))
-                    .isEqualTo("bm25(title_lexical)");
-        }
-
-        @Test
-        void returns_null_when_not_found() {
-            Set<String> keys = new HashSet<>();
-            keys.add("bm25(marqo__lexical_other)");
-            assertThat(HybridSearcher.findBm25MatchFeatureName(keys, "title")).isNull();
-        }
-    }
-
-    @Nested
-    class FindClosenessMatchFeatureNameTest {
-
-        @Test
-        void finds_marqo_embeddings_convention() {
-            Set<String> keys = new HashSet<>();
-            keys.add("closeness(field,marqo__embeddings_title)");
-            keys.add("closeness(field,marqo__embeddings_description)");
-            assertThat(HybridSearcher.findClosenessMatchFeatureName(keys, "title"))
-                    .isEqualTo("closeness(field,marqo__embeddings_title)");
-        }
-
-        @Test
-        void finds_suffix_embeddings_convention() {
-            Set<String> keys = new HashSet<>();
-            keys.add("closeness(field,title_embeddings)");
-            assertThat(HybridSearcher.findClosenessMatchFeatureName(keys, "title"))
-                    .isEqualTo("closeness(field,title_embeddings)");
-        }
-
-        @Test
-        void returns_null_when_not_found() {
-            Set<String> keys = new HashSet<>();
-            keys.add("closeness(field,marqo__embeddings_other)");
-            assertThat(HybridSearcher.findClosenessMatchFeatureName(keys, "title")).isNull();
+            assertThat(
+                            HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                                    "closeness_ranking_vector_sum"))
+                    .isNull();
+            assertThat(
+                            HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                                    "unknown_type_field_x"))
+                    .isNull();
+            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("")).isNull();
+            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25")).isNull();
+            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_")).isNull();
+            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_field_"))
+                    .isNull();
+            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(null)).isNull();
         }
     }
 
@@ -182,7 +134,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(summaryFeatures.getDouble("bm25(marqo__lexical_title)")).thenReturn(2.5);
             Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.parseCustomScoreKey("bm25_field_title");
+                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
                                     null, "bm25_field_title", parsed, keys, summaryFeatures))
@@ -196,7 +148,8 @@ class HybridSearcherCustomScoreRerankTest {
             when(summaryFeatures.getDouble("ranking_closeness_metric_title")).thenReturn(0.9);
             Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.parseCustomScoreKey("closeness_retrieval_vector_field_title");
+                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                            "closeness_retrieval_vector_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
                                     null,
@@ -217,7 +170,7 @@ class HybridSearcherCustomScoreRerankTest {
                     .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
             Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.parseCustomScoreKey("bm25_sum");
+                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_sum");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
                                     null, "bm25_sum", parsed, keys, summaryFeatures))
@@ -227,7 +180,7 @@ class HybridSearcherCustomScoreRerankTest {
         @Test
         void returns_null_when_summary_features_null() {
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.parseCustomScoreKey("bm25_field_title");
+                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
                                     null, "bm25_field_title", parsed, Set.of(), null))
@@ -456,7 +409,8 @@ class HybridSearcherCustomScoreRerankTest {
             assertThat(minMax[0]).isEqualTo(MIN_RAW);
             assertThat(minMax[1]).isEqualTo(MAX_RAW);
 
-            HybridSearcher.CustomScoreKeyParsed parsed = HybridSearcher.parseCustomScoreKey(key);
+            HybridSearcher.CustomScoreKeyParsed parsed =
+                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(key);
             assertThat(parsed).isNotNull();
             List<Double> normalized = new ArrayList<>();
             for (Hit hit : hits) {
