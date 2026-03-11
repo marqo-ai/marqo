@@ -138,6 +138,14 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query['marqo__recency_enabled'] = True
             query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL
 
+            # Set apply_to_subqueries flags as top-level query properties (not ranking features)
+            # so Java can read them via query.properties().getBoolean()
+            apply_to = marqo_query.recency_parameters.apply_to_subqueries
+            if apply_to is None:
+                apply_to = ["tensor", "lexical"]
+            query[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR] = "tensor" in apply_to
+            query[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL] = "lexical" in apply_to
+
         # add lexical specific hybrid parameters
         if marqo_query.hybrid_parameters.secondPhaseModifier:
             if marqo_query.collapse:
@@ -172,6 +180,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # Default to 0.0 for multiplicative mode (None means multiplicative)
             constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: recency_params.add_to_score_weight if recency_params.add_to_score_weight is not None else 0.0
         }
+
+        # Center timestamp: 0 means "use now()", positive value means fixed reference point
+        result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS] = recency_params.center if recency_params.center is not None else 0
 
         # grow params, the recency_params validation ensures all or nothing for these params
         if recency_params.grow_from is not None:

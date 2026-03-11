@@ -774,3 +774,21 @@ class TestMarqoIndexSchemaVersion(MarqoTestCase):
                     **index_kwargs
                 )
                 self.assertEqual(index.index_supports_recency_grow, expected_result)
+
+    def test_index_supports_recency_center_and_subqueries(self):
+        """Test index_supports_recency_center_and_subqueries with different schema_template_version and marqo_version values."""
+        test_cases = [
+            ("schema_template_version == 2.25.0 (not supported)", {"schema_template_version": "2.25.0"}, False),
+            ("schema_template_version >= 2.25.1", {"schema_template_version": "2.25.1"}, True),
+            ("schema_template_version > 2.25.1", {"schema_template_version": "2.25.2"}, True),
+            ("schema_template_version None, marqo_version >= 2.25.1", {"marqo_version": "2.25.1", "schema_template_version": None}, True),
+            ("schema_template_version None, marqo_version < 2.25.1", {"marqo_version": "2.25.0", "schema_template_version": None}, False),
+        ]
+
+        for case_name, index_kwargs, expected_result in test_cases:
+            with self.subTest(case=case_name):
+                index = self.semi_structured_marqo_index(
+                    name="test_index",
+                    **index_kwargs
+                )
+                self.assertEqual(index.index_supports_recency_center_and_subqueries, expected_result)
