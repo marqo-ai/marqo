@@ -1648,6 +1648,100 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         self.assertNotIn('targetHits', result)
         self.assertIn('hello', result)
 
+    def test_get_lexical_search_term_ranking_term_empty_attributes_returns_empty(self):
+        """When _is_ranking_term=True and attributes_to_search is empty, return "" so rank() is skipped."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['hello'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        result = self.vespa_index._get_lexical_search_term(
+            q, _is_ranking_term=True, attributes_to_search=[]
+        )
+        self.assertEqual(result, "")
+
+    def test_get_lexical_search_term_ranking_term_no_lexical_fields_survive_returns_empty(self):
+        """When _is_ranking_term=True and no attributes have lexical_field_name (e.g. tags), return ""."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['hello'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        # 'tags' is a string-array field with no lexical_field_name in this index
+        result = self.vespa_index._get_lexical_search_term(
+            q, _is_ranking_term=True, attributes_to_search=['tags']
+        )
+        self.assertEqual(result, "")
+
+    def test_get_lexical_search_term_ranking_term_valid_attributes_returns_weak_and(self):
+        """When _is_ranking_term=True and attributes survive, return valid weakAnd (no invalid YQL)."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['hello', 'world'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        result = self.vespa_index._get_lexical_search_term(
+            q, _is_ranking_term=True, attributes_to_search=['title']
+        )
+        self.assertIn('weakAnd', result)
+        self.assertIn('hello', result)
+        self.assertIn('world', result)
+        # Must not be invalid YQL (no empty slots like weakAnd(, , ))
+        self.assertNotRegex(result, r'weakAnd\(\s*,\s*,')
+
+    def test_generate_or_terms_ranking_term_all_empty_terms_returns_empty(self):
+        """_generate_or_terms with _is_ranking_term and all empty terms returns "" (defensive guard)."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['a', 'b'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        # attributes_to_search=['tags'] yields no lexical fields, so each term is ""
+        result = self.vespa_index._generate_or_terms(
+            q, _is_ranking_term=True, attributes_to_search=['tags']
+        )
+        self.assertEqual(result, "")
+
     def test_hybrid_query_with_bm25_custom_score_includes_rank_in_yql(self):
         """With BM25 custom score modifiers, lexical and tensor YQL must wrap in rank() with extra BM25 term
         if not already included in the main lexical query."""

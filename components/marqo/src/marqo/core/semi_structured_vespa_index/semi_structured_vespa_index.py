@@ -191,6 +191,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             for phrase in marqo_query.or_phrases
         ]
 
+        # Avoid invalid YQL (e.g. weakAnd(, , ...)) when all terms are empty (e.g. no attrs survived).
+        if _is_ranking_term and terms and not any(terms):
+            return ""
+
         if is_facets_term:
             return ' OR '.join(terms)
         if _is_ranking_term:
@@ -214,6 +218,17 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return 'false'
         if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
             return 'true'
+
+        # When building a ranking term, if no attributes survive filtering, return "" so callers
+        # can skip rank(); avoids producing invalid YQL like weakAnd(, , ...).
+        if _is_ranking_term and attributes_to_search is not None and attributes_to_search != ["*"]:
+            searchable = [
+                f for f in attributes_to_search
+                if f in self._marqo_index.field_map
+                and self._marqo_index.field_map[f].lexical_field_name is not None
+            ]
+            if not searchable:
+                return ""
 
         or_terms = self._generate_or_terms(
             marqo_query,
