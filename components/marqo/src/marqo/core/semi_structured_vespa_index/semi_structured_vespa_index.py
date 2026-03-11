@@ -365,6 +365,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         """Remove redundancy between main lexical term and BM25 extra term for rank()."""
         if not bm25_fields:
             return []
+        # When main lexical attrs is None, the main term is "default contains ..." (all fields).
+        # No extra BM25 rank term is needed; the main term already covers all lexical fields.
         if main_lexical_searchable_attributes is None:
             return []
         if bm25_fields == ["*"]:
