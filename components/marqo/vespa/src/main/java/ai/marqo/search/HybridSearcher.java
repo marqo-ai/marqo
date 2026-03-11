@@ -80,6 +80,12 @@ public class HybridSearcher extends Searcher {
     /** Hit field for the score before applying custom/global modifiers (RRF score). Exposed as _pre_rerank_score in API. */
     private static final String MARQO_PRE_RERANK_SCORE = "marqo__pre_rerank_score";
 
+    /**
+     * Document-summary name used for filling rank features (must match schema template
+     * dummy-light-summary). Package-private for tests.
+     */
+    static final String DOCUMENT_SUMMARY_FEATURES = "dummy-light-summary";
+
     @VisibleForTesting
     @JsonInclude(Include.NON_NULL)
     record MarqoMetadataFields(
@@ -387,7 +393,7 @@ public class HybridSearcher extends Searcher {
                 query.properties().getBoolean("marqo__hasRankingLexical", false);
         if (hasRankingVector || hasRankingLexical) {
             Result resultToFill = new Result(query, hitsForPostProcessing);
-            execution.fill(resultToFill, "dummy-light-summary");
+            execution.fill(resultToFill, DOCUMENT_SUMMARY_FEATURES);
         }
 
         // Determine post-processing mode based on query parameters
@@ -1587,20 +1593,20 @@ public class HybridSearcher extends Searcher {
             CustomScoreKeyParsed parsed,
             Set<String> matchFeatureKeys,
             FeatureData summaryFeatures) {
-        return extractCustomScoreForHit(
-                matchFeatures, key, parsed, matchFeatureKeys, summaryFeatures, null, null, false);
+        return new HybridSearcher()
+                .extractCustomScoreForHit(
+                        matchFeatures, key, parsed, matchFeatureKeys, summaryFeatures, null, false);
     }
 
     /**
-     * Same as 5-arg but with optional logger, keyForLog and verbose for logging (aggregation and read).
+     * Same as 5-arg but with optional keyForLog and verbose for logging (aggregation and read).
      */
-    static Double extractCustomScoreForHit(
+    Double extractCustomScoreForHit(
             FeatureData matchFeatures,
             String key,
             CustomScoreKeyParsed parsed,
             Set<String> matchFeatureKeys,
             FeatureData summaryFeatures,
-            Logger logger,
             String keyForLog,
             boolean verbose) {
         if (parsed == null) {
@@ -1613,15 +1619,13 @@ public class HybridSearcher extends Searcher {
                         summaryFeatures,
                         name -> name.startsWith("bm25(") && name.endsWith(")"),
                         parsed.aggregateType,
-                        logger,
                         keyForLog,
                         "bm25Values",
                         false,
                         verbose);
             }
             String featName = CustomScoreKeyParsed.bm25SummaryFeatureName(parsed.fieldName);
-            return getSingleFieldScoreWithLog(
-                    summaryFeatures, featName, logger, keyForLog, verbose);
+            return getSingleFieldScoreWithLog(summaryFeatures, featName, keyForLog, verbose);
         }
         if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
             if (summaryFeatures == null) return null;
@@ -1632,15 +1636,13 @@ public class HybridSearcher extends Searcher {
                         summaryFeatures,
                         name -> name.startsWith("ranking_closeness_metric_"),
                         parsed.aggregateType,
-                        logger,
                         keyForLog,
                         "closenessValues",
                         true,
                         verbose);
             }
             String featName = "ranking_closeness_metric_" + parsed.fieldName;
-            return getSingleFieldScoreWithLog(
-                    summaryFeatures, featName, logger, keyForLog, verbose);
+            return getSingleFieldScoreWithLog(summaryFeatures, featName, keyForLog, verbose);
         }
         return null;
     }
@@ -1666,21 +1668,18 @@ public class HybridSearcher extends Searcher {
     }
 
     /** Reads one summary-feature value and optionally logs; used for single-field custom score keys. */
-    private static Double getSingleFieldScoreWithLog(
-            FeatureData summaryFeatures,
-            String featureName,
-            Logger logger,
-            String keyForLog,
-            boolean verbose) {
+    private Double getSingleFieldScoreWithLog(
+            FeatureData summaryFeatures, String featureName, String keyForLog, boolean verbose) {
         Double score = featureName != null ? getFeatureDouble(summaryFeatures, featureName) : null;
-        if (verbose && logger != null && keyForLog != null && score != null) {
-            logger.info(
+        if (keyForLog != null && score != null) {
+            logIfVerbose(
                     "[CustomScoreRerank] read from summary-features key="
                             + keyForLog
                             + " featureName="
                             + featureName
                             + " value="
-                            + score);
+                            + score,
+                    verbose);
         }
         return score;
     }
@@ -1693,11 +1692,10 @@ public class HybridSearcher extends Searcher {
      *     contributes (e.g. closeness over all index tensor fields; schema lists all
      *     ranking_closeness_metric_*). When false, skip null/NaN (BM25 behavior).
      */
-    private static Double aggregateFromSummaryFeatures(
+    private Double aggregateFromSummaryFeatures(
             FeatureData summaryFeatures,
             Predicate<String> nameFilter,
             String aggregateType,
-            Logger logger,
             String keyForLog,
             String logLabel,
             boolean useZeroForMissing,
@@ -1714,8 +1712,8 @@ public class HybridSearcher extends Searcher {
             }
         }
         Double result = aggregateValues(values, aggregateType);
-        if (verbose && logger != null && keyForLog != null && result != null) {
-            logger.info(
+        if (keyForLog != null && result != null) {
+            logIfVerbose(
                     "[CustomScoreRerank] aggregation key="
                             + keyForLog
                             + " aggregateType="
@@ -1725,7 +1723,8 @@ public class HybridSearcher extends Searcher {
                             + "="
                             + values
                             + " result="
-                            + result);
+                            + result,
+                    verbose);
         }
         return result;
     }
@@ -1781,7 +1780,6 @@ public class HybridSearcher extends Searcher {
                         parsed,
                         matchFeatureKeys,
                         summaryFeatures,
-                        logger,
                         key,
                         verbose);
         if (score == null || Double.isNaN(score)) return null;
@@ -1792,19 +1790,18 @@ public class HybridSearcher extends Searcher {
             normalizedScore = minMaxNormalize(score, minMax[0], minMax[1]);
         }
         double modifierValue = weight * normalizedScore;
-        if (verbose && logger != null) {
-            logger.info(
-                    "[CustomScoreRerank] apply modifier key="
-                            + key
-                            + " weight="
-                            + weight
-                            + " scoreValue="
-                            + score
-                            + " normalizedScore="
-                            + normalizedScore
-                            + " modifierValue="
-                            + modifierValue);
-        }
+        logIfVerbose(
+                "[CustomScoreRerank] apply modifier key="
+                        + key
+                        + " weight="
+                        + weight
+                        + " scoreValue="
+                        + score
+                        + " normalizedScore="
+                        + normalizedScore
+                        + " modifierValue="
+                        + modifierValue,
+                verbose);
         return modifierValue;
     }
 
@@ -1894,11 +1891,17 @@ public class HybridSearcher extends Searcher {
             double min = Double.POSITIVE_INFINITY;
             double max = Double.NEGATIVE_INFINITY;
             for (Hit hit : hits) {
-                FeatureData summaryFeatures = (FeatureData) hit.getField("summaryfeatures");
+                FeatureData summaryFeatures = (FeatureData) hit.getField(DOCUMENT_SUMMARY_FEATURES);
                 if (summaryFeatures == null) continue;
                 Double v =
                         extractCustomScoreForHit(
-                                null, key, parsed, Collections.emptySet(), summaryFeatures);
+                                null,
+                                key,
+                                parsed,
+                                Collections.emptySet(),
+                                summaryFeatures,
+                                null,
+                                false);
                 if (v != null && !Double.isNaN(v)) {
                     min = Math.min(min, v);
                     max = Math.max(max, v);
@@ -2032,7 +2035,8 @@ public class HybridSearcher extends Searcher {
                         if (hitMatchFeatureKeys.isEmpty()) {
                             hitMatchFeatureKeys = allMatchFeatureKeys;
                         }
-                        FeatureData summaryFeatures = (FeatureData) hit.getField("summaryfeatures");
+                        FeatureData summaryFeatures =
+                                (FeatureData) hit.getField(DOCUMENT_SUMMARY_FEATURES);
                         double[] outAdd = new double[1];
                         double[] outMult = new double[1];
                         applyCustomScoreContributions(
