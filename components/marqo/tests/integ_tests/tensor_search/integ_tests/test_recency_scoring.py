@@ -1594,6 +1594,19 @@ class TestRecencyScoring(MarqoTestCase):
                     f"Error for '{description}' should contain '{expected_error}'"
                 )
 
+    def test_apply_to_subqueries_deduplicates(self):
+        """Duplicate values in applyToSubqueries are deduplicated."""
+        params = RecencyParameters(
+            recency_field="timestamp",
+            apply_to_subqueries=["tensor", "tensor"]
+        )
+        self.assertEqual(["tensor"], params.apply_to_subqueries)
+
+        params2 = RecencyParameters(
+            recency_field="timestamp",
+            apply_to_subqueries=["lexical", "tensor", "lexical"]
+        )
+        self.assertEqual(["lexical", "tensor"], params2.apply_to_subqueries)
 
     @pytest.mark.skip_for_multinode(
         "Multi-nodes will return different lexical results so we can not assert on the results.")

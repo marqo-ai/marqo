@@ -236,6 +236,13 @@ class RecencyParameters(BaseModel):
 
         return v
 
+    @validator('apply_to_subqueries')
+    def deduplicate_apply_to_subqueries(cls, v):
+        """Remove duplicate values while preserving order."""
+        if v is not None:
+            return list(dict.fromkeys(v))
+        return v
+
     @root_validator
     def validate_grow_params_all_or_nothing(cls, values):
         """Validate that grow parameters are either all provided or all omitted.
