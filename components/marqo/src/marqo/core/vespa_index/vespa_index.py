@@ -120,13 +120,12 @@ class VespaIndex(ABC):
 
         return mult_tensor, add_tensor
 
-    def _convert_hybrid_global_score_modifiers_to_tensors(self, score_modifiers: List[ScoreModifier]) -> \
-        Tuple[
-            Dict[str, Dict[str, float]],
-            Dict[str, Dict[str, float]],
-            Dict[str, Dict[str, float]],
-            Dict[str, Dict[str, float]]
-        ]:
+    def _convert_hybrid_global_score_modifiers_to_tensors(self, score_modifiers: List[ScoreModifier]) -> Tuple[
+        Dict[str, float],
+        Dict[str, float],
+        Dict[str, float],
+        Dict[str, float],
+    ]:
         """
         Specifically for hybrid search. Allows extraction of global score modifiers and custom score rerankers separately.
         Helper function that converts a list of raw global score modifiers into 4 dictionaries:
