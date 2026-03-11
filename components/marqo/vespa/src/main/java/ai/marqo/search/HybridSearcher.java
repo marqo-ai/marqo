@@ -80,11 +80,14 @@ public class HybridSearcher extends Searcher {
     /** Hit field for the score before applying custom/global modifiers (RRF score). Exposed as _pre_rerank_score in API. */
     private static final String MARQO_PRE_RERANK_SCORE = "marqo__pre_rerank_score";
 
-    /**
-     * Document-summary name used for filling rank features (must match schema template
-     * dummy-light-summary). Package-private for tests.
-     */
-    static final String DOCUMENT_SUMMARY_FEATURES = "dummy-light-summary";
+    /** Key under which Vespa attaches rank profile summary-features to a hit. */
+    private static final String SUMMARY_FEATURES_FIELD = "summaryfeatures";
+
+    /** Returns FeatureData for custom score (bm25, ranking_closeness_metric_*) from hit summaryfeatures. */
+    private static FeatureData getSummaryFeaturesForHit(Hit hit) {
+        Object o = hit.getField(SUMMARY_FEATURES_FIELD);
+        return o instanceof FeatureData ? (FeatureData) o : null;
+    }
 
     @VisibleForTesting
     @JsonInclude(Include.NON_NULL)
@@ -393,7 +396,7 @@ public class HybridSearcher extends Searcher {
                 query.properties().getBoolean("marqo__hasRankingLexical", false);
         if (hasRankingVector || hasRankingLexical) {
             Result resultToFill = new Result(query, hitsForPostProcessing);
-            execution.fill(resultToFill, DOCUMENT_SUMMARY_FEATURES);
+            execution.fill(resultToFill, "dummy-light-summary");
         }
 
         // Determine post-processing mode based on query parameters
@@ -1891,7 +1894,7 @@ public class HybridSearcher extends Searcher {
             double min = Double.POSITIVE_INFINITY;
             double max = Double.NEGATIVE_INFINITY;
             for (Hit hit : hits) {
-                FeatureData summaryFeatures = (FeatureData) hit.getField(DOCUMENT_SUMMARY_FEATURES);
+                FeatureData summaryFeatures = getSummaryFeaturesForHit(hit);
                 if (summaryFeatures == null) continue;
                 Double v =
                         extractCustomScoreForHit(
@@ -2035,8 +2038,7 @@ public class HybridSearcher extends Searcher {
                         if (hitMatchFeatureKeys.isEmpty()) {
                             hitMatchFeatureKeys = allMatchFeatureKeys;
                         }
-                        FeatureData summaryFeatures =
-                                (FeatureData) hit.getField(DOCUMENT_SUMMARY_FEATURES);
+                        FeatureData summaryFeatures = getSummaryFeaturesForHit(hit);
                         double[] outAdd = new double[1];
                         double[] outMult = new double[1];
                         applyCustomScoreContributions(

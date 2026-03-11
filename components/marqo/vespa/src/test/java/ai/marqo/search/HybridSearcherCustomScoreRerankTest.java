@@ -219,7 +219,7 @@ class HybridSearcherCustomScoreRerankTest {
                 when(summaryFeatures.getDouble("ranking_closeness_metric_title")).thenReturn(value);
                 when(summaryFeatures.featureNames())
                         .thenReturn(Set.of("ranking_closeness_metric_title"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, summaryFeatures);
+                hit.setField("summaryfeatures", summaryFeatures);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
@@ -249,7 +249,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(sf1.featureNames())
                     .thenReturn(
                             Set.of("ranking_closeness_metric_f1", "ranking_closeness_metric_f2"));
-            hit1.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf1);
+            hit1.setField("summaryfeatures", sf1);
             hits.add(hit1);
             Hit hit2 = new Hit("doc2", 1.0);
             FeatureData sf2 = mock(FeatureData.class);
@@ -258,7 +258,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(sf2.featureNames())
                     .thenReturn(
                             Set.of("ranking_closeness_metric_f1", "ranking_closeness_metric_f2"));
-            hit2.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf2);
+            hit2.setField("summaryfeatures", sf2);
             hits.add(hit2);
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
             Tensor addWeights =
@@ -283,7 +283,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(sf.featureNames())
                     .thenReturn(
                             Set.of("bm25(marqo__lexical_title)", "ranking_closeness_metric_title"));
-            hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+            hit.setField("summaryfeatures", sf);
             hits.add(hit);
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
             Tensor addWeights =
@@ -320,7 +320,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(sf1.getDouble("bm25(marqo__lexical_b)")).thenReturn(2.0);
             when(sf1.featureNames())
                     .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
-            hit1.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf1);
+            hit1.setField("summaryfeatures", sf1);
             hits.add(hit1);
             // Hit2: bm25_a=2, bm25_b=4 -> sum=6
             Hit hit2 = new Hit("doc2", 1.0);
@@ -329,7 +329,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(sf2.getDouble("bm25(marqo__lexical_b)")).thenReturn(4.0);
             when(sf2.featureNames())
                     .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
-            hit2.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf2);
+            hit2.setField("summaryfeatures", sf2);
             hits.add(hit2);
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
             Tensor addWeights =
@@ -357,7 +357,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(sf1.featureNames())
                     .thenReturn(
                             Set.of("ranking_closeness_metric_f1", "ranking_closeness_metric_f2"));
-            hit1.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf1);
+            hit1.setField("summaryfeatures", sf1);
             hits.add(hit1);
             // Hit2: f1=0.5, f2=0.5 -> sum=1.0
             Hit hit2 = new Hit("doc2", 1.0);
@@ -367,7 +367,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(sf2.featureNames())
                     .thenReturn(
                             Set.of("ranking_closeness_metric_f1", "ranking_closeness_metric_f2"));
-            hit2.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf2);
+            hit2.setField("summaryfeatures", sf2);
             hits.add(hit2);
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
             Tensor addWeights =
@@ -414,8 +414,7 @@ class HybridSearcherCustomScoreRerankTest {
             assertThat(parsed).isNotNull();
             List<Double> normalized = new ArrayList<>();
             for (Hit hit : hits) {
-                FeatureData summaryFeatures =
-                        (FeatureData) hit.getField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES);
+                FeatureData summaryFeatures = (FeatureData) hit.getField("summaryfeatures");
                 Double raw =
                         HybridSearcher.extractCustomScoreForHit(
                                 null, key, parsed, Set.of(), summaryFeatures);
@@ -449,7 +448,7 @@ class HybridSearcherCustomScoreRerankTest {
                 FeatureData sf = mock(FeatureData.class);
                 when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
                 when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+                hit.setField("summaryfeatures", sf);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
@@ -472,7 +471,7 @@ class HybridSearcherCustomScoreRerankTest {
                 when(sf.getDouble("bm25(marqo__lexical_b)")).thenReturn(0.0);
                 when(sf.featureNames())
                         .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+                hit.setField("summaryfeatures", sf);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
@@ -492,7 +491,7 @@ class HybridSearcherCustomScoreRerankTest {
                 FeatureData sf = mock(FeatureData.class);
                 when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
                 when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+                hit.setField("summaryfeatures", sf);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
@@ -512,7 +511,7 @@ class HybridSearcherCustomScoreRerankTest {
                 FeatureData sf = mock(FeatureData.class);
                 when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
                 when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+                hit.setField("summaryfeatures", sf);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
@@ -532,7 +531,7 @@ class HybridSearcherCustomScoreRerankTest {
                 FeatureData sf = mock(FeatureData.class);
                 when(sf.getDouble("ranking_closeness_metric_title")).thenReturn(raw);
                 when(sf.featureNames()).thenReturn(Set.of("ranking_closeness_metric_title"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+                hit.setField("summaryfeatures", sf);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
@@ -562,7 +561,7 @@ class HybridSearcherCustomScoreRerankTest {
                                 Set.of(
                                         "ranking_closeness_metric_f1",
                                         "ranking_closeness_metric_f2"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+                hit.setField("summaryfeatures", sf);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
@@ -584,7 +583,7 @@ class HybridSearcherCustomScoreRerankTest {
                 FeatureData sf = mock(FeatureData.class);
                 when(sf.getDouble("ranking_closeness_metric_title")).thenReturn(raw);
                 when(sf.featureNames()).thenReturn(Set.of("ranking_closeness_metric_title"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+                hit.setField("summaryfeatures", sf);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
@@ -606,7 +605,7 @@ class HybridSearcherCustomScoreRerankTest {
                 FeatureData sf = mock(FeatureData.class);
                 when(sf.getDouble("ranking_closeness_metric_title")).thenReturn(raw);
                 when(sf.featureNames()).thenReturn(Set.of("ranking_closeness_metric_title"));
-                hit.setField(HybridSearcher.DOCUMENT_SUMMARY_FEATURES, sf);
+                hit.setField("summaryfeatures", sf);
                 hits.add(hit);
             }
             TensorType tensorType = new TensorType.Builder().mapped("p").build();
