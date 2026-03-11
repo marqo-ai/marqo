@@ -452,7 +452,7 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__embeddings_tensor_field2 type tensor<float>(p{}, x[32]) {}
     }
 
-    document-summary summaryfeatures {
+    document-summary dummy-light-summary {
         summary marqo__id type string {}
     }
 }
