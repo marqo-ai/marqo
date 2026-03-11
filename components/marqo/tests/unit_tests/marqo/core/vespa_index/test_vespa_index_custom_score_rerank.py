@@ -220,6 +220,88 @@ class TestValidateCustomScoreModifierFieldsAggregates(unittest.TestCase):
                 self.assertIn("no tensor fields", str(ctx.exception))
 
 
+class TestValidateCustomScoreModifierFieldsGeodegrees(unittest.TestCase):
+    """_validate_custom_score_modifier_fields must raise 400 when using closeness_retrieval_vector with geodegrees."""
+
+    def _create_semi_structured_vespa_index_geodegrees(self):
+        """SemiStructuredVespaIndex with distance_metric=Geodegrees and one tensor field."""
+        import time
+        from marqo.core.models.marqo_index import (
+            SemiStructuredMarqoIndex,
+            Model,
+            Field,
+            FieldType,
+            FieldFeature,
+            TensorField,
+            HnswConfig,
+            DistanceMetric,
+            TextPreProcessing,
+            TextSplitMethod,
+            ImagePreProcessing,
+        )
+        from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+        lexical_fields = [
+            Field(
+                name="title",
+                type=FieldType.Text,
+                features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
+                lexical_field_name="marqo__lexical_title",
+                filter_field_name="title_filter",
+            ),
+        ]
+        tensor_fields = [
+            TensorField(
+                name="title",
+                embeddings_field_name="marqo__embeddings_title",
+                chunk_field_name="marqo__chunks_title",
+            ),
+        ]
+        marqo_index = SemiStructuredMarqoIndex(
+            name="test",
+            schema_name="test",
+            model=Model(name="test"),
+            normalize_embeddings=True,
+            distance_metric=DistanceMetric.Geodegrees,
+            vector_numeric_type="float",
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            marqo_version="2.16.0",
+            created_at=time.time(),
+            updated_at=time.time(),
+            text_preprocessing=TextPreProcessing(
+                split_length=2, split_overlap=0, split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing=ImagePreProcessing(patch_method=None),
+            treat_urls_and_pointers_as_images=False,
+            treat_urls_and_pointers_as_media=False,
+            filter_string_max_length=50,
+            lexical_fields=lexical_fields,
+            tensor_fields=tensor_fields,
+            string_array_fields=[],
+        )
+        return SemiStructuredVespaIndex(marqo_index)
+
+    def test_closeness_retrieval_vector_with_geodegrees_raises_400(self):
+        """Using closeness_retrieval_vector (field or aggregate) with index distance_metric=geodegrees must raise InvalidArgumentError (400)."""
+        vespa_index = self._create_semi_structured_vespa_index_geodegrees()
+        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        for custom_score_keys in [
+            {f"{prefix}closeness_retrieval_vector_field_title"},
+            {f"{prefix}closeness_retrieval_vector_sum"},
+        ]:
+            with self.subTest(keys=custom_score_keys):
+                with self.assertRaises(InvalidArgumentError) as ctx:
+                    vespa_index._validate_custom_score_modifier_fields(custom_score_keys)
+                self.assertIn("geodegrees", str(ctx.exception).lower())
+                self.assertIn("closeness_retrieval_vector", str(ctx.exception).lower())
+                self.assertIn("not supported", str(ctx.exception).lower())
+
+    def test_bm25_with_geodegrees_index_succeeds(self):
+        """BM25 custom score keys are allowed when index uses geodegrees (only closeness is rejected)."""
+        vespa_index = self._create_semi_structured_vespa_index_geodegrees()
+        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        vespa_index._validate_custom_score_modifier_fields({f"{prefix}bm25_field_title"})
+
+
 class TestValidateCustomScoreModifierFieldsSingleField(unittest.TestCase):
     """_validate_custom_score_modifier_fields must raise for nonexistent or invalid single-field keys."""
 

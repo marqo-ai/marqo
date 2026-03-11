@@ -6,7 +6,7 @@ from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod
-from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
+from marqo.core.models.marqo_index import DistanceMetric, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.search import search_filter
 from marqo.core.semi_structured_vespa_index import common
@@ -274,6 +274,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     def _validate_custom_score_modifier_fields(self, custom_score_keys: Set[str]) -> None:
         """Validate custom score keys reference valid index fields (lexical for bm25, tensor for closeness)."""
         prefix = constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+        has_closeness = False
         has_bm25_aggregate = False
         has_closeness_aggregate = False
         for key in custom_score_keys:
@@ -284,8 +285,16 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             score_type, field_name, aggregate_type = parsed
             if score_type == "bm25" and aggregate_type is not None:
                 has_bm25_aggregate = True
-            elif score_type == "closeness_retrieval_vector" and aggregate_type is not None:
-                has_closeness_aggregate = True
+            elif score_type == "closeness_retrieval_vector":
+                has_closeness = True
+                if aggregate_type is not None:
+                    has_closeness_aggregate = True
+        if has_closeness and self._marqo_index.distance_metric == DistanceMetric.Geodegrees:
+            raise InvalidArgumentError(
+                "Custom score reranking with closeness_retrieval_vector is not supported for indexes using the "
+                "geodegrees distance metric. Use a different distance metric (e.g. angular, euclidean, dotproduct) "
+                "for the index if you need closeness-based score modifiers."
+            )
         if has_bm25_aggregate and not self._marqo_index.lexically_searchable_fields_names:
             raise InvalidArgumentError(
                 "Cannot use BM25 aggregate (marqo__score_bm25_sum, marqo__score_bm25_max, or marqo__score_bm25_avg) "

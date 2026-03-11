@@ -271,6 +271,9 @@ schema marqo__test_00semi_00structured_00schema {
             recency_score
             
         }
+        summary-features {
+            bm25(marqo__lexical_text_field)
+        }
     }
 
     rank-profile bm25 inherits base_rank_profile {

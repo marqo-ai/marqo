@@ -379,7 +379,7 @@ schema {{ index.schema_name }} {
             {% if collapse_field %}collapse_field_hash{% endif %}
         }
 
-        {# Per-field ranking score (similarity to marqo__query_embedding), normalized to [0,1] where 1=closest. Output as scalar double (like bm25) via reduce(..., sum). Named by field so searcher can look up ranking_closeness_metric_<field_name>. Geodegrees not supported. #}
+        {# Per-field ranking score (similarity to marqo__query_embedding), bounded to [0,1] where 1=closest. Output as scalar double (like bm25) via reduce(..., sum). Named by field so searcher can look up ranking_closeness_metric_<field_name>. Geodegrees not supported. #}
         {% if index.tensor_fields and index.distance_metric.value != 'geodegrees' -%}
         {% for field in index.tensor_fields %}
         function ranking_closeness_metric_{{ field.name }}() {
@@ -394,10 +394,14 @@ schema {{ index.schema_name }} {
             {%- endif %}
         }
         {% endfor %}
+        {% endif -%}
+        {% if (index.tensor_fields and index.distance_metric.value != 'geodegrees') or index.lexical_fields -%}
         summary-features {
+        {% if index.tensor_fields and index.distance_metric.value != 'geodegrees' %}
         {% for field in index.tensor_fields %}
             ranking_closeness_metric_{{ field.name }}
         {% endfor %}
+        {% endif %}
         {% for lexical_field in index.lexical_fields %}
             bm25({{ lexical_field.lexical_field_name }})
         {% endfor %}
