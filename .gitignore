@@ -166,4 +166,5 @@ components/marqo/scripts/vespa_local/multinode/hosts.xml
 # However, we include the root .env file as it is used to set environment variables for docker runs.
 */.env
 
+# Plan/design docs (kept out of version control)
 components/marqo/.plans/
