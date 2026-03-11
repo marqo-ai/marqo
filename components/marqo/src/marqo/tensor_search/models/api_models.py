@@ -228,15 +228,14 @@ class SearchQuery(BaseMarqoModel):
                 f"Search method is {search_method}."
             )
 
-        # Must be RRF ranking method (or default which is RRF)
+        # Must be Disjunction retrieval method (or default which is Disjunction)
         hybrid_parameters = values.get('hybridParameters')
         if hybrid_parameters is not None:
-            from marqo.core.models.hybrid_parameters import RankingMethod
-            ranking_method = hybrid_parameters.rankingMethod
-            if ranking_method is not None and ranking_method != RankingMethod.RRF:
+            retrieval_method = hybrid_parameters.retrievalMethod
+            if retrieval_method is not None and retrieval_method != RetrievalMethod.Disjunction:
                 raise ValueError(
-                    f"'applyToSubqueries' can only be used with 'rrf' ranking method. "
-                    f"Ranking method is '{ranking_method}'."
+                    f"'applyToSubqueries' can only be used with 'disjunction' retrieval method. "
+                    f"Retrieval method is '{retrieval_method}'."
                 )
 
         return values

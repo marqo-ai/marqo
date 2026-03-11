@@ -109,6 +109,7 @@ class RecencyParameters(BaseModel):
 
     center: Optional[float] = Field(
         default=None,
+        ge=0,
         alias="center",
         description=(
             "Fixed Unix epoch timestamp (seconds) to use as the reference point instead of now(). "
@@ -233,13 +234,6 @@ class RecencyParameters(BaseModel):
         if seconds < 0:
             raise ValueError(f"grow_offset must be greater than or equal to 0, got: {v} ({seconds} seconds)")
 
-        return v
-
-    @validator('center')
-    def validate_center(cls, v: Optional[float]) -> Optional[float]:
-        """Validate that center is non-negative if provided."""
-        if v is not None and v < 0:
-            raise ValueError(f"center must be non-negative, got: {v}")
         return v
 
     @root_validator

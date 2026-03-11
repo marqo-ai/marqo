@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 import math
 import pytest
 
+from pydantic.v1 import ValidationError
+
 from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
@@ -18,6 +20,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
+from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase
 from marqo.tensor_search.models.relevance_cutoff_model import (
     RelevanceCutoffModel, RelevanceCutoffMethod
@@ -1332,11 +1335,9 @@ class TestRecencyScoring(MarqoTestCase):
 
     def test_non_hybrid_search_method_not_supported(self):
         """Recency requires HYBRID search method (validated at API layer)."""
-        from marqo.tensor_search.models.api_models import SearchQuery
-
         for search_method in ["TENSOR", "LEXICAL"]:
             with self.subTest(search_method=search_method):
-                with self.assertRaises(ValueError) as ctx:
+                with self.assertRaises(ValidationError) as ctx:
                     SearchQuery(
                         q="product",
                         searchMethod=search_method,
@@ -1356,11 +1357,9 @@ class TestRecencyScoring(MarqoTestCase):
 
     def test_apply_to_subqueries_non_hybrid_fails(self):
         """applyToSubqueries requires HYBRID search method."""
-        from marqo.tensor_search.models.api_models import SearchQuery
-
         for search_method in ["TENSOR", "LEXICAL"]:
             with self.subTest(search_method=search_method):
-                with self.assertRaises(ValueError) as ctx:
+                with self.assertRaises(ValidationError) as ctx:
                     SearchQuery(
                         q="product",
                         searchMethod=search_method,
@@ -1373,15 +1372,13 @@ class TestRecencyScoring(MarqoTestCase):
                     )
                 self.assertIn("HYBRID", str(ctx.exception))
 
-    def test_apply_to_subqueries_non_rrf_fails(self):
-        """applyToSubqueries requires RRF ranking method."""
-        from marqo.tensor_search.models.api_models import SearchQuery
-
-        with self.assertRaises(ValueError) as ctx:
+    def test_apply_to_subqueries_non_disjunction_fails(self):
+        """applyToSubqueries requires disjunction retrieval method."""
+        with self.assertRaises(ValidationError) as ctx:
             SearchQuery(
                 q="product",
                 searchMethod="HYBRID",
-                hybridParameters={"rankingMethod": "tensor", "retrievalMethod": "lexical"},
+                hybridParameters={"retrievalMethod": "lexical", "rankingMethod": "lexical"},
                 recencyParameters={
                     "recencyField": "timestamp",
                     "scale": "7d",
@@ -1389,15 +1386,13 @@ class TestRecencyScoring(MarqoTestCase):
                     "applyToSubqueries": ["tensor"],
                 }
             )
-        self.assertIn("rrf", str(ctx.exception).lower())
+        self.assertIn("disjunction", str(ctx.exception).lower())
 
     def test_sort_by_with_non_exclude_global_fails(self):
         """sortBy + recency should fail unless exclude-global."""
-        from marqo.tensor_search.models.api_models import SearchQuery
-
         for phase in ["all", "only-global"]:
             with self.subTest(phase=phase):
-                with self.assertRaises(ValueError) as ctx:
+                with self.assertRaises(ValidationError) as ctx:
                     SearchQuery(
                         q="product",
                         searchMethod="HYBRID",
@@ -1575,7 +1570,7 @@ class TestRecencyScoring(MarqoTestCase):
             (
                 "negative center value",
                 {"recency_field": "timestamp", "center": -1.0},
-                "center must be non-negative"
+                "ensure this value is greater than or equal to 0"
             ),
             (
                 "invalid apply_to_subqueries value",
@@ -1591,7 +1586,7 @@ class TestRecencyScoring(MarqoTestCase):
 
         for description, kwargs, expected_error in validation_cases:
             with self.subTest(case=description):
-                with self.assertRaises(ValueError) as ctx:
+                with self.assertRaises(ValidationError) as ctx:
                     RecencyParameters(**kwargs)
                 self.assertIn(
                     expected_error,
@@ -1721,6 +1716,8 @@ class TestRecencyScoring(MarqoTestCase):
                                 msg=f"Doc {doc_id}: lexical score should match baseline"
                             )
 
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
     def test_center_produces_reproducible_scores(self):
         """Test that center parameter produces the same scores across multiple queries.
 

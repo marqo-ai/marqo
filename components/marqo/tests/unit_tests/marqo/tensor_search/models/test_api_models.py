@@ -612,13 +612,13 @@ class TestSearchQuery(unittest.TestCase):
             )
             self.assertIsNotNone(search_query.recencyParameters)
 
-        # Invalid: non-RRF ranking methods
-        non_rrf_methods = [
-            ("tensor_ranking", RankingMethod.Tensor, RetrievalMethod.Lexical),
-            ("lexical_ranking", RankingMethod.Lexical, RetrievalMethod.Tensor),
+        # Invalid: non-Disjunction retrieval methods
+        non_disjunction_methods = [
+            ("lexical_retrieval", RankingMethod.Lexical, RetrievalMethod.Lexical),
+            ("tensor_retrieval", RankingMethod.Tensor, RetrievalMethod.Tensor),
         ]
 
-        for test_name, ranking_method, retrieval_method in non_rrf_methods:
+        for test_name, ranking_method, retrieval_method in non_disjunction_methods:
             with self.subTest(test_name):
                 with self.assertRaises(ValidationError) as cm:
                     SearchQuery(
@@ -630,9 +630,9 @@ class TestSearchQuery(unittest.TestCase):
                         ),
                         recencyParameters=recency_params
                     )
-                self.assertIn("rrf", str(cm.exception).lower())
+                self.assertIn("disjunction", str(cm.exception).lower())
 
-        # Valid: applyToSubqueries is None (no restriction even with non-RRF)
+        # Valid: applyToSubqueries is None (no restriction even with non-Disjunction)
         with self.subTest("apply_to_subqueries_none_with_tensor_ranking"):
             recency_params_no_apply = RecencyParameters(recency_field="created_at")
             search_query = SearchQuery(
