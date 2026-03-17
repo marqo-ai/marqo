@@ -350,6 +350,109 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         self.assertEqual(ids, BASE_RRF_ORDER, msg="Base RRF order must be doc1, doc2, doc3, doc4, doc5")
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
+    def test_non_existent_custom_score_field_add_to_score_leaves_score_unchanged(self):
+        """add_to_score with a non-existent custom score field does not error; scores stay exactly as baseline."""
+        self._add_tuxedo_docs()
+        res_baseline = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            result_count=10,
+        )
+        res_with_modifier = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            score_modifiers=ScoreModifierLists(
+                add_to_score=[
+                    {"field_name": "marqo__score_bm25_field_non_existent_field", "weight": 1.0}
+                ]
+            ),
+            result_count=10,
+        )
+        baseline_scores = {h["_id"]: h["_score"] for h in res_baseline["hits"]}
+        for hit in res_with_modifier["hits"]:
+            self.assertAlmostEqual(
+                hit["_score"],
+                baseline_scores[hit["_id"]],
+                places=9,
+                msg=f"Doc {hit['_id']}: score with non-existent add_to_score should equal baseline",
+            )
+
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
+    def test_non_existent_custom_score_field_multiply_score_by_leaves_score_unchanged(self):
+        """multiply_score_by with a non-existent custom score field does not error; scores stay exactly as baseline."""
+        self._add_tuxedo_docs()
+        res_baseline = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            result_count=10,
+        )
+        res_with_modifier = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            score_modifiers=ScoreModifierLists(
+                multiply_score_by=[
+                    {"field_name": "marqo__score_bm25_field_non_existent_field", "weight": 2.0}
+                ]
+            ),
+            result_count=10,
+        )
+        baseline_scores = {h["_id"]: h["_score"] for h in res_baseline["hits"]}
+        for hit in res_with_modifier["hits"]:
+            self.assertAlmostEqual(
+                hit["_score"],
+                baseline_scores[hit["_id"]],
+                places=9,
+                msg=f"Doc {hit['_id']}: score with non-existent multiply_score_by should equal baseline",
+            )
+
+    def test_document_with_marqo_reserved_field_name_cannot_be_created(self):
+        """A document cannot be created if it contains a field whose name is the reserved custom score key.
+        Field names starting with marqo__ are protected; the document is rejected at add time."""
+        doc_with_reserved_field = {
+            "_id": "doc_reserved_field",
+            "marqo__score_bm25_field_lex_ranking_field": "attempted value",
+            "lex_retrieval_field": "a",
+            "tensor_retrieval_field": "a",
+            "lex_ranking_field": "a",
+            "tensor_ranking_field": "a",
+        }
+        res = self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index.name,
+                docs=[doc_with_reserved_field],
+                tensor_fields=TENSOR_FIELDS_PLAN,
+            ),
+        )
+        self.assertTrue(res.errors, "Adding a doc with marqo__ field name should report errors")
+        self.assertEqual(1, len(res.items))
+        item = res.items[0]
+        self.assertNotEqual(200, item.status, "Document with reserved field name should fail")
+        error_message = (item.message or item.error or "")
+        self.assertIn(
+            "marqo__",
+            error_message,
+            msg="Error should mention the reserved prefix marqo__",
+        )
+        self.assertIn(
+            "must not start",
+            error_message,
+            msg="Error should state that field name must not start with reserved prefix",
+        )
+
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_bm25_single_field_modifies_scores_and_reverses_order(self):
         """
         add_to_score with bm25 lex_ranking_field: (1) modifies final score so doc with highest

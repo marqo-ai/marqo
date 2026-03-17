@@ -320,34 +320,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 "Cannot use closeness aggregate (marqo__score_closeness_retrieval_vector_sum, _max, or _avg) "
                 "when the index has no tensor fields."
             )
-        for key in custom_score_keys:
-            key_stripped = key[len(prefix):] if key.startswith(prefix) else key
-            parsed = VespaIndex.parse_custom_score_key(key_stripped)
-            if parsed is None:
-                continue
-            score_type, field_name, aggregate_type = parsed
-            if aggregate_type is not None or field_name is None:
-                continue
-            if score_type == "bm25":
-                if field_name not in self._marqo_index.field_map:
-                    raise InvalidArgumentError(
-                        f"Custom score modifier bm25_field_{field_name} references field '{field_name}' "
-                        f"which is not in the index. Lexically searchable fields for this index are: "
-                        f"{sorted(self._marqo_index.field_map.keys())}."
-                    )
-                lex = self._marqo_index.field_map[field_name].lexical_field_name
-                if lex is None:
-                    raise InvalidArgumentError(
-                        f"Custom score modifier bm25_field_{field_name} references field '{field_name}' "
-                        f"which is not a lexically searchable field (no BM25). Use a text field."
-                    )
-            elif score_type == "closeness_retrieval_vector":
-                if field_name not in self._marqo_index.tensor_field_map:
-                    raise InvalidArgumentError(
-                        f"Custom score modifier closeness_retrieval_vector_field_{field_name} references field "
-                        f"'{field_name}' which is not a tensor field in the index. Tensor fields are: "
-                        f"{sorted(self._marqo_index.tensor_field_map.keys())}."
-                    )
+        # Per-field keys that reference non-existent fields are allowed: the searcher treats
+        # missing summary-features as no contribution (add 0, multiply by 1), so score is unchanged.
 
     def _get_fields_to_bm25_rerank_by(self, custom_score_keys: Set[str]) -> List[str]:
         """Return Marqo field names for BM25 custom rerank (or ['*'] for aggregate)."""
