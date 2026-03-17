@@ -19,6 +19,12 @@ class Settings(BaseSettings):
         "The S3 bucket from which Marqo downloads default models."
     )
 
+    marqo_search_random_connection_close_rate: float = Field(
+        0, ge=0.0, le=1.0, alias="MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE",
+        description="The rate of search requests that will randomly close the connection to enforce a new connect "
+                    "instantiation. ",
+    )
+
     @field_validator("marqo_default_models_s3_bucket")
     def validate_marqo_default_models_s3_bucket(cls, value):
         if not value:

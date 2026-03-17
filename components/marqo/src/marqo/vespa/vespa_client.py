@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
 from typing import Dict, Any, List, Optional, Union, Tuple
+import random
 from urllib.parse import urlparse
 
 import httpcore
@@ -30,9 +31,11 @@ from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, 
     DeleteBatchResponse, DeleteAllDocumentsResponse
 from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
     GetBatchDocumentResponse
+from marqo.settings.settings import get_settings, Settings
 
 logger = marqo.logging.get_logger(__name__)
 
+settings: Settings = get_settings()
 
 class VespaClient:
     _VESPA_ERROR_CODE_TO_EXCEPTION = {
@@ -303,8 +306,22 @@ class VespaClient:
 
         logger.debug(f'Query: {query}')
 
+        should_drop_connection = False
+        if settings.marqo_search_random_connection_close_rate > 0.0:
+            should_drop_connection = (random.random() < settings.marqo_search_random_connection_close_rate)
+
+        if should_drop_connection:
+            logger.debug(f'Query will drop connection to enforce new connection instantiation ')
+            headers = {
+                'Connection': 'close'
+            }
+        else:
+            headers = None
+
         try:
-            resp = self.http_client.post(f'{self.query_url}/search/', json=query, timeout=httpx_client_timeout)
+            resp = self.http_client.post(
+                f'{self.query_url}/search/', json=query, timeout=httpx_client_timeout, headers=headers
+            )
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
