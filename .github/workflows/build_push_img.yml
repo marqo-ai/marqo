@@ -13,7 +13,7 @@ on:
         type: string
         default: 'mainline'
       push_to:
-        description: 'image destination. Options: "OS-ECR", "AMI-ECR"'
+        description: 'image destination. Options: "OS-ECR", "STAGING-ECR"'
         required: true
         type: string
         default: OS-ECR
@@ -52,12 +52,12 @@ on:
         type: string
         default: 'mainline'
       push_to:
-        description: 'image destination. Options: "OS-ECR", "AMI-ECR"'
+        description: 'image destination. Options: "OS-ECR", "STAGING-ECR"'
         required: true
         type: choice
         options:
           - OS-ECR
-          - AMI-ECR
+          - STAGING-ECR
         default: OS-ECR
       image_namespace:
         description: 'The prefix of the image repository, by default "marqoai-dev". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
@@ -91,7 +91,7 @@ jobs:
       inference_orchestrator_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.inference_orchestrator_image_identifier }}
       model_management_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.model_management_image_identifier}}
     environment:
-      name: ${{ (inputs.image_namespace || github.event.inputs.image_namespace) == 'marqoai' && 'production' || 'non-prod' }}
+      name: ${{ (inputs.push_to || github.event.inputs.push_to) == 'OS-ECR' && 'os' || 'staging' }}
 
     steps:
       - name: Set input variables
@@ -114,33 +114,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to OS-ECR
-        uses: docker/login-action@v2
-        if: env.PUSH_TO == 'OS-ECR'
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@master
         with:
-          registry: 424082663841.dkr.ecr.us-east-1.amazonaws.com
-          username: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
+          role-session-name: build-push-marqo-image
+          aws-region: us-east-1
 
-      - name: Login to AMI-ECR
-        uses: docker/login-action@v2
-        if: env.PUSH_TO == 'AMI-ECR'
-        with:
-          registry: 975050213659.dkr.ecr.us-east-1.amazonaws.com
-          username: ${{ secrets.AMI_ECR_PUSHER_AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.AMI_ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set registry and image repo
+      - name: Set registry
         id: prepare
         run: |
-          if [[ "${{ env.PUSH_TO }}" == "OS-ECR" ]]; then
-            echo "registry=424082663841.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
-          elif [[ "${{ env.PUSH_TO }}" == "AMI-ECR" ]]; then
-            echo "registry=975050213659.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
-          else
-            echo "Error: Unknown PUSH_TO value '${{ env.PUSH_TO }}'. Must be 'OS-ECR' or 'AMI-ECR'." >&2
-            exit 1
-          fi
+          echo "registry=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_OUTPUT
 
       - name: Build and push api image
         id: build-and-push-api
