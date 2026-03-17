@@ -265,6 +265,16 @@ class VespaClient:
             f"{status_info}"
         )
 
+    def _should_drop_connection(self) -> bool:
+        """
+        Whether to drop the connection or not, based on a random value and the configured drop rate.
+        :return: True if the connection should be dropped, False otherwise
+        """
+        if settings.marqo_search_random_connection_close_rate <= 0:
+            return False
+        else:
+            return random.random() < settings.marqo_search_random_connection_close_rate
+
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, timeout: Optional[float] = None, **kwargs) -> QueryResult:
         """
@@ -306,15 +316,9 @@ class VespaClient:
 
         logger.debug(f'Query: {query}')
 
-        should_drop_connection = False
-        if settings.marqo_search_random_connection_close_rate > 0.0:
-            should_drop_connection = (random.random() < settings.marqo_search_random_connection_close_rate)
-
-        if should_drop_connection:
-            logger.debug(f'Query will drop connection to enforce new connection instantiation ')
-            headers = {
-                'Connection': 'close'
-            }
+        if self._should_drop_connection():
+            logger.debug('Dropping connection for this query according to a set rate ')
+            headers = {"Connection": "close"}
         else:
             headers = None
 
