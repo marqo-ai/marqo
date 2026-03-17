@@ -47,7 +47,7 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
         #     "_id": "2"
         # },
         {
-            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
             "_id": "3"
         },
         {

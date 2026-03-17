@@ -9,7 +9,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.api import search
 from marqo.tensor_search.enums import SearchMethod
-from tests.integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 @pytest.mark.skip_for_multinode("Multi-nodes will return different lexical results so we can not assert on the results.")
@@ -1068,7 +1068,7 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         cls.create_indexes([index_request])
         cls.index_name = index_request.name
 
-        image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg"
+        image_url = TestImageUrls.IMAGE1
 
         # 30 fashion documents with various fields, tags, and multimodal content
         # We categorize them into 3 categories: Glasses, Hats, and Shoes.

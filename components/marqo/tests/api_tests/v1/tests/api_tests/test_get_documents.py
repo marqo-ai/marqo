@@ -2,7 +2,7 @@ import uuid
 
 import requests
 from marqo.client import Client
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 def get_documents_by_ids_via_get(client, index_name, document_ids, expose_facets=False):
@@ -66,17 +66,17 @@ class TestGetDocuments(MarqoTestCase):
         documents = [
             {
                 "_id": "1",
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field_1": TestImageUrls.IMAGE1,
                 "text_field_1": "hello world"
             },
             {
                 "_id": "2",
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": TestImageUrls.IMAGE2,
                 "text_field_1": "This is a test"
             },
             {
                 "_id": "3",
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
+                "image_field_1": TestImageUrls.IMAGE3,
                 "text_field_1": "Another test"
             }
         ]

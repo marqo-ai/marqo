@@ -3,7 +3,7 @@ import uuid
 import numpy as np
 from marqo.errors import MarqoWebError
 
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestScoreModifierSearch(MarqoTestCase):
@@ -50,7 +50,7 @@ class TestScoreModifierSearch(MarqoTestCase):
                     np.round(np.random.uniform(-10, 10, 8), 2)
 
                 doc = {
-                    "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png",
+                    "image_field": TestImageUrls.HIPPO_STATUE,
                     "text_field": "Marqo can support vector search",
                     "multiply_1": multiply_1_value,
                     "multiply_2": multiply_2_value,
