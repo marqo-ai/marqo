@@ -350,72 +350,44 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         self.assertEqual(ids, BASE_RRF_ORDER, msg="Base RRF order must be doc1, doc2, doc3, doc4, doc5")
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
-    def test_non_existent_custom_score_field_add_to_score_leaves_score_unchanged(self):
-        """add_to_score with a non-existent custom score field does not error; scores stay exactly as baseline."""
+    def test_non_existent_custom_score_field_add_to_score_raises(self):
+        """add_to_score with a non-existent custom score field must raise InvalidArgumentError."""
         self._add_tuxedo_docs()
-        res_baseline = tensor_search.search(
-            config=self.config,
-            index_name=self.index.name,
-            text="tuxedo",
-            search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            result_count=10,
-        )
-        res_with_modifier = tensor_search.search(
-            config=self.config,
-            index_name=self.index.name,
-            text="tuxedo",
-            search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            score_modifiers=ScoreModifierLists(
-                add_to_score=[
-                    {"field_name": "marqo__score_bm25_field_non_existent_field", "weight": 1.0}
-                ]
-            ),
-            result_count=10,
-        )
-        baseline_scores = {h["_id"]: h["_score"] for h in res_baseline["hits"]}
-        for hit in res_with_modifier["hits"]:
-            self.assertAlmostEqual(
-                hit["_score"],
-                baseline_scores[hit["_id"]],
-                places=9,
-                msg=f"Doc {hit['_id']}: score with non-existent add_to_score should equal baseline",
+        with self.assertRaises(InvalidArgumentError) as ctx:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.index.name,
+                text="tuxedo",
+                search_method="HYBRID",
+                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                score_modifiers=ScoreModifierLists(
+                    add_to_score=[
+                        {"field_name": "marqo__score_bm25_field_non_existent_field", "weight": 1.0}
+                    ]
+                ),
+                result_count=10,
             )
+        self.assertIn("non_existent_field", str(ctx.exception))
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
-    def test_non_existent_custom_score_field_multiply_score_by_leaves_score_unchanged(self):
-        """multiply_score_by with a non-existent custom score field does not error; scores stay exactly as baseline."""
+    def test_non_existent_custom_score_field_multiply_score_by_raises(self):
+        """multiply_score_by with a non-existent custom score field must raise InvalidArgumentError."""
         self._add_tuxedo_docs()
-        res_baseline = tensor_search.search(
-            config=self.config,
-            index_name=self.index.name,
-            text="tuxedo",
-            search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            result_count=10,
-        )
-        res_with_modifier = tensor_search.search(
-            config=self.config,
-            index_name=self.index.name,
-            text="tuxedo",
-            search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            score_modifiers=ScoreModifierLists(
-                multiply_score_by=[
-                    {"field_name": "marqo__score_bm25_field_non_existent_field", "weight": 2.0}
-                ]
-            ),
-            result_count=10,
-        )
-        baseline_scores = {h["_id"]: h["_score"] for h in res_baseline["hits"]}
-        for hit in res_with_modifier["hits"]:
-            self.assertAlmostEqual(
-                hit["_score"],
-                baseline_scores[hit["_id"]],
-                places=9,
-                msg=f"Doc {hit['_id']}: score with non-existent multiply_score_by should equal baseline",
+        with self.assertRaises(InvalidArgumentError) as ctx:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.index.name,
+                text="tuxedo",
+                search_method="HYBRID",
+                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                score_modifiers=ScoreModifierLists(
+                    multiply_score_by=[
+                        {"field_name": "marqo__score_bm25_field_non_existent_field", "weight": 2.0}
+                    ]
+                ),
+                result_count=10,
             )
+        self.assertIn("non_existent_field", str(ctx.exception))
 
     def test_document_with_marqo_reserved_field_name_cannot_be_created(self):
         """A document cannot be created if it contains a field whose name is the reserved custom score key.

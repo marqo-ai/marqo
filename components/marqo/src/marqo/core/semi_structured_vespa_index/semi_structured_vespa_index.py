@@ -300,10 +300,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             score_type, field_name, aggregate_type = parsed
             if score_type == "bm25" and aggregate_type is not None:
                 has_bm25_aggregate = True
+            elif score_type == "bm25":
+                if field_name not in self._marqo_index.field_map:
+                    raise InvalidArgumentError(
+                        f"Custom score bm25 field '{field_name}' is not in the index."
+                    )
+                if self._marqo_index.field_map[field_name].lexical_field_name is None:
+                    raise InvalidArgumentError(
+                        f"Custom score bm25 field '{field_name}' is not a lexically searchable field."
+                    )
             elif score_type == "closeness_retrieval_vector":
                 has_closeness = True
                 if aggregate_type is not None:
                     has_closeness_aggregate = True
+                elif field_name not in self._marqo_index.tensor_field_map:
+                    raise InvalidArgumentError(
+                        f"Custom score closeness_retrieval_vector field '{field_name}' is not a tensor field."
+                    )
         if has_closeness and self._marqo_index.distance_metric == DistanceMetric.Geodegrees:
             raise InvalidArgumentError(
                 "Custom score reranking with closeness_retrieval_vector is not supported for indexes using the "
@@ -320,8 +333,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 "Cannot use closeness aggregate (marqo__score_closeness_retrieval_vector_sum, _max, or _avg) "
                 "when the index has no tensor fields."
             )
-        # Per-field keys that reference non-existent fields are allowed: the searcher treats
-        # missing summary-features as no contribution (add 0, multiply by 1), so score is unchanged.
 
     def _get_fields_to_bm25_rerank_by(self, custom_score_keys: Set[str]) -> List[str]:
         """Return Marqo field names for BM25 custom rerank (or ['*'] for aggregate)."""
