@@ -86,10 +86,6 @@ jobs:
   Docker-Build:
     name: Build docker image
     runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
-    outputs:
-      api_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.api_image_identifier }}
-      inference_orchestrator_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.inference_orchestrator_image_identifier }}
-      model_management_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.model_management_image_identifier}}
     environment:
       name: ${{ (inputs.push_to || github.event.inputs.push_to) == 'OS-ECR' && 'os' || 'staging' }}
 
@@ -159,29 +155,42 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management:${{ env.IMAGE_TAG }}
 
-      - name: Output image_identifier
-        # By image_identifier, we refer to the complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)
-        id: set-image-identifier-in-output
+      - name: Write image identifiers to file
+        # Write identifiers to a file and upload as artifact to avoid GitHub Actions
+        # suppressing outputs from jobs that use an environment in reusable workflows.
         run: |
-          echo "api_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api@${{ steps.build-and-push-api.outputs.digest }}" >> $GITHUB_OUTPUT
-          echo "inference_orchestrator_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator@${{ steps.build-and-push-inference-orchestrator.outputs.digest }}" >> $GITHUB_OUTPUT
-          echo "model_management_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management@${{ steps.build-and-push-model-management.outputs.digest }}" >> $GITHUB_OUTPUT
+          mkdir -p /tmp/image-identifiers
+          echo "${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api@${{ steps.build-and-push-api.outputs.digest }}" > /tmp/image-identifiers/api_image_identifier.txt
+          echo "${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator@${{ steps.build-and-push-inference-orchestrator.outputs.digest }}" > /tmp/image-identifiers/inference_orchestrator_image_identifier.txt
+          echo "${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management@${{ steps.build-and-push-model-management.outputs.digest }}" > /tmp/image-identifiers/model_management_image_identifier.txt
 
-  # This job re-exports the image identifiers without an environment.
+      - name: Upload image identifiers
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-identifiers
+          path: /tmp/image-identifiers/
+
+  # This job reads image identifiers from artifacts instead of job outputs.
   # GitHub Actions suppresses outputs from jobs that use an environment in reusable workflows,
-  # so we need this intermediary job to pass them to the caller.
+  # so we use artifacts to pass the values through without secret masking.
   expose-outputs:
     name: Expose image identifiers
     needs: Docker-Build
     runs-on: ubuntu-latest
     outputs:
-      api_image_identifier: ${{ steps.forward.outputs.api_image_identifier }}
-      inference_orchestrator_image_identifier: ${{ steps.forward.outputs.inference_orchestrator_image_identifier }}
-      model_management_image_identifier: ${{ steps.forward.outputs.model_management_image_identifier }}
+      api_image_identifier: ${{ steps.read.outputs.api_image_identifier }}
+      inference_orchestrator_image_identifier: ${{ steps.read.outputs.inference_orchestrator_image_identifier }}
+      model_management_image_identifier: ${{ steps.read.outputs.model_management_image_identifier }}
     steps:
-      - name: Forward outputs
-        id: forward
+      - name: Download image identifiers
+        uses: actions/download-artifact@v4
+        with:
+          name: image-identifiers
+          path: /tmp/image-identifiers/
+
+      - name: Read and export identifiers
+        id: read
         run: |
-          echo "api_image_identifier=${{ needs.Docker-Build.outputs.api_image_identifier }}" >> $GITHUB_OUTPUT
-          echo "inference_orchestrator_image_identifier=${{ needs.Docker-Build.outputs.inference_orchestrator_image_identifier }}" >> $GITHUB_OUTPUT
-          echo "model_management_image_identifier=${{ needs.Docker-Build.outputs.model_management_image_identifier }}" >> $GITHUB_OUTPUT
+          echo "api_image_identifier=$(cat /tmp/image-identifiers/api_image_identifier.txt)" >> $GITHUB_OUTPUT
+          echo "inference_orchestrator_image_identifier=$(cat /tmp/image-identifiers/inference_orchestrator_image_identifier.txt)" >> $GITHUB_OUTPUT
+          echo "model_management_image_identifier=$(cat /tmp/image-identifiers/model_management_image_identifier.txt)" >> $GITHUB_OUTPUT
