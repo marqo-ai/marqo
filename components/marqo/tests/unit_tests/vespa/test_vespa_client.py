@@ -622,38 +622,27 @@ class TestVespaClient(unittest.TestCase):
 
         mock_logger.warning.assert_not_called()
 
-    @patch('marqo.vespa.vespa_client.settings')
-    def test_query_sends_connection_close_header_when_random_below_rate(self, mock_settings):
-        """Test that query sends 'Connection: close' header when seeded random value is below the configured rate."""
-        mock_settings.marqo_search_random_connection_close_rate = 0.5
-        # Seed 0 produces random.Random(0).random() ≈ 0.844, seed 3 produces ≈ 0.236
-        # Find a seed that produces a value below 0.5
-        import random as random_module
-        seed = next(s for s in range(100) if random_module.Random(s).random() < 0.5)
-
+    def test_query_sends_connection_close_header_when_should_drop(self):
+        """Test that query sends 'Connection: close' header when _should_drop_connection returns True."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
 
-        with patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
-            self.vespa_client.query(yql="select * from sources * where test;", drop_connection_random_seed=seed)
+        with patch.object(self.vespa_client, '_should_drop_connection', return_value=True), \
+             patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
+            self.vespa_client.query(yql="select * from sources * where test;")
             headers = mock_post.call_args.kwargs["headers"]
             self.assertEqual(headers, {"Connection": "close"})
 
-    @patch('marqo.vespa.vespa_client.settings')
-    def test_query_no_connection_close_header_when_random_above_rate(self, mock_settings):
-        """Test that query does not send 'Connection: close' header when seeded random value is above the configured rate."""
-        mock_settings.marqo_search_random_connection_close_rate = 0.5
-        # Find a seed that produces a value above 0.5
-        import random as random_module
-        seed = next(s for s in range(100) if random_module.Random(s).random() >= 0.5)
-
+    def test_query_no_connection_close_header_when_should_not_drop(self):
+        """Test that query does not send 'Connection: close' header when _should_drop_connection returns False."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
 
-        with patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
-            self.vespa_client.query(yql="select * from sources * where test;", drop_connection_random_seed=seed)
+        with patch.object(self.vespa_client, '_should_drop_connection', return_value=False), \
+             patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
+            self.vespa_client.query(yql="select * from sources * where test;")
             headers = mock_post.call_args.kwargs["headers"]
             if headers:
                 self.assertNotIn("Connection", headers)
