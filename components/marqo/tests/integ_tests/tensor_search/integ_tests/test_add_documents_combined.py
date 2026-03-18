@@ -114,7 +114,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
         cls.unstructured_text_index_unnormalized_name = unstructured_text_index_request_unnormalized.name
 
         cls.image_indexes = cls.indexes[:3]
-        cls.languagebind_indexes = cls.indexes[3:6]
 
     def setUp(self) -> None:
         super().setUp()
@@ -213,7 +212,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
             }
         ]
 
-        # Expected vector for the LanguageBind model (adjust these values based on actual output)
         expected_vector = [-0.06504671275615692, -0.03672310709953308, -0.06603428721427917,
                            -0.032505638897418976, -0.06116769462823868, -0.03929287940263748]
 
