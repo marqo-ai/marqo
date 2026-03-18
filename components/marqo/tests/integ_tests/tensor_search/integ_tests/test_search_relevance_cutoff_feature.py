@@ -1068,7 +1068,7 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         cls.create_indexes([index_request])
         cls.index_name = index_request.name
 
-        image_url = TestImageUrls.IMAGE1
+        image_url = TestImageUrls.IMAGE0
 
         # 30 fashion documents with various fields, tags, and multimodal content
         # We categorize them into 3 categories: Glasses, Hats, and Shoes.
