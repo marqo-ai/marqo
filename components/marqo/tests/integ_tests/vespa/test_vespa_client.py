@@ -1,16 +1,18 @@
+from importlib import reload
+
 import asyncio
 import functools
-import json
-import os
-import time
-import unittest
-from unittest.mock import Mock, patch
-
 import httpcore
 import httpx
+import json
 import orjson
+import os
 import pytest
+import sys
+import time
+import unittest
 import vespa.application as pyvespa
+from unittest.mock import Mock, patch
 
 from marqo.tensor_search.api import generate_config
 from marqo.tensor_search.enums import EnvVars
@@ -22,8 +24,6 @@ from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
 from tests.integ_tests.marqo_test import AsyncMarqoTestCase
-from importlib import reload
-import sys
 
 
 class TestVespaClient(AsyncMarqoTestCase):

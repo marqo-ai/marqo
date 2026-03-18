@@ -1,20 +1,20 @@
+from concurrent.futures import ThreadPoolExecutor
+from json import JSONDecodeError
+
 import asyncio
+import certifi
+import httpcore
+import httpx
 import io
+import orjson
 import os
+import random
+import ssl
 import tarfile
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
-from json import JSONDecodeError
 from typing import Dict, Any, List, Optional, Union, Tuple
-import random
 from urllib.parse import urlparse
-
-import httpcore
-import httpx
-import orjson
-import ssl
-import certifi
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
@@ -22,16 +22,16 @@ from marqo.core.models import MarqoIndex
 from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.marqo_docs import update_documents_response
+from marqo.settings.settings import get_settings, Settings
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
-from marqo.vespa.models import VespaDocument, QueryResult, Error, FeedBatchDocumentResponse, FeedBatchResponse, \
+from marqo.vespa.models import VespaDocument, QueryResult, Error, FeedBatchResponse, \
     FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
     DeleteBatchResponse, DeleteAllDocumentsResponse
 from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
     GetBatchDocumentResponse
-from marqo.settings.settings import get_settings, Settings
 
 logger = marqo.logging.get_logger(__name__)
 
