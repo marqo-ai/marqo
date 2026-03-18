@@ -70,12 +70,6 @@ class TestEmbed(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
-        unstructured_languagebind_index = cls.unstructured_marqo_index_request(
-            model=Model(name='LanguageBind/Video_V1.5_FT_Audio_FT_Image'),
-            treat_urls_and_pointers_as_images=True,
-            treat_urls_and_pointers_as_media=True
-        )
-
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
             model=Model(name="hf/all-MiniLM-L6-v2"),
@@ -147,29 +141,17 @@ class TestEmbed(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
         )
 
-        structured_languagebind_index = cls.structured_marqo_index_request(
-            model=Model(name='LanguageBind/Video_V1.5_FT_Audio_FT_Image'),
-            fields=[
-                FieldRequest(name="text_field_1", type=FieldType.Text),
-                FieldRequest(name="text_field_2", type=FieldType.Text),
-                FieldRequest(name="image_field_1", type=FieldType.ImagePointer)
-            ],
-            tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
-        )
-
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_image_index,
             unstructured_image_index_with_random_model,
             unstructured_image_index_with_test_prefix,
             unstructured_image_index_request,
-            unstructured_languagebind_index,
             structured_default_text_index,
             structured_default_image_index,
             structured_image_index_request,
             structured_image_index_with_random_model,
-            structured_image_index_with_test_prefix,
-            structured_languagebind_index
+            structured_image_index_with_test_prefix
         ])
 
         # Assign to objects so they can be used in tests
@@ -178,13 +160,11 @@ class TestEmbed(MarqoTestCase):
         cls.unstructured_image_index_with_random_model = cls.indexes[2]
         cls.unstructured_image_index_with_test_prefix = cls.indexes[3]
         cls.unstructured_image_index_request = cls.indexes[4]
-        cls.unstructured_languagebind_index = cls.indexes[5]
-        cls.structured_default_text_index = cls.indexes[6]
-        cls.structured_default_image_index = cls.indexes[7]
-        cls.structured_image_index_request = cls.indexes[8]
-        cls.structured_image_index_with_random_model = cls.indexes[9]
-        cls.structured_image_index_with_test_prefix = cls.indexes[10]
-        cls.structured_languagebind_index = cls.indexes[11]
+        cls.structured_default_text_index = cls.indexes[5]
+        cls.structured_default_image_index = cls.indexes[6]
+        cls.structured_image_index_request = cls.indexes[7]
+        cls.structured_image_index_with_random_model = cls.indexes[8]
+        cls.structured_image_index_with_test_prefix = cls.indexes[9]
 
     def setUp(self) -> None:
         super().setUp()

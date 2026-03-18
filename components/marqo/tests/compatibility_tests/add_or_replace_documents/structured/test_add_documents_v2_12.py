@@ -35,17 +35,6 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
         }]
 
     documents = [
-        # These documents cannot be added right now, because the model open_clip/ViT-B-32/laion2b_s34b_b79k, does not support audio and video. We could change the model to something like LanguageBind/Video_V1.5_FT_Audio_FT_Image, but that fails with
-        # marqo.api.exceptions.ModelCacheManagementError: ModelCacheManagementError: You are trying to load a model with size = `8` into device = `cpu`, which is larger than the device threshold = `1.6`.Marqo CANNOT find enough space for the model.Please change the threshold by adjusting the environment variables.
-        # Since these tests are currently running on a non GPU machine, we will skip these documents for now.
-        # {
-        #     "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
-        #     "_id": "1"
-        # },
-        # {
-        #     "audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
-        #     "_id": "2"
-        # },
         {
             "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
             "_id": "3"
