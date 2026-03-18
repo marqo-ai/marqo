@@ -949,13 +949,14 @@ class TestVespaClient(AsyncMarqoTestCase):
         with self.help_mock_environment_variables_in_settings({"MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE": "0.3"}):
             reload(sys.modules["marqo.vespa.vespa_client"])
             counter = 0
-            for _ in range(10):  # run multiple times to check that Connection: close is not sent
+            for seed in range(10):  # run multiple times to check that Connection: close is not sent
                 with patch.object(httpx.Client, "post", wraps=httpx.post) as mock_post:
                     self.client.query(
                         yql="select * from sources * where title contains 'Title 1';",
-                        model_restrict=self.TEST_SCHEMA
+                        model_restrict=self.TEST_SCHEMA, drop_connection_random_seed=seed
                     )
                     headers = mock_post.call_args.kwargs.get("headers")
                     if headers and headers.get("Connection") == "close":
                         counter += 1
-            self.assertTrue(0 < counter < 10, f"Expected some requests to have 'Connection: close' but got {counter}/10")
+            self.assertEqual(4, counter)
+

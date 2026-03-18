@@ -265,7 +265,7 @@ class VespaClient:
             f"{status_info}"
         )
 
-    def _should_drop_connection(self) -> bool:
+    def _should_drop_connection(self, seed: Optional[int] = None) -> bool:
         """
         Whether to drop the connection or not, based on a random value and the configured drop rate.
         :return: True if the connection should be dropped, False otherwise
@@ -273,10 +273,12 @@ class VespaClient:
         if settings.marqo_search_random_connection_close_rate <= 0:
             return False
         else:
-            return random.random() < settings.marqo_search_random_connection_close_rate
+            rng = random.Random(seed)
+            return  rng.random()< settings.marqo_search_random_connection_close_rate
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
-              query_features: Dict[str, Any] = None, timeout: Optional[float] = None, **kwargs) -> QueryResult:
+              query_features: Dict[str, Any] = None, timeout: Optional[float] = None,
+              drop_connection_random_seed: Optional[int]=None, **kwargs) -> QueryResult:
         """
         Query Vespa.
         Args:
@@ -286,6 +288,9 @@ class VespaClient:
             model_restrict: Schema to restrict the query to
             query_features: Query features
             timeout: The Vespa query timeout in milliseconds. If not set, the default timeout will be used.
+            drop_connection_random_seed: An optional random seed for dropping connection randomly.
+                This is for testing purpose to make the random behavior deterministic.
+                If not set, the random seed will be truly random.
             **kwargs: Additional query parameters
         Returns:
             Query result as a VespaQueryResult object
@@ -316,7 +321,7 @@ class VespaClient:
 
         logger.debug(f'Query: {query}')
 
-        if self._should_drop_connection():
+        if self._should_drop_connection(seed=drop_connection_random_seed):
             logger.debug('Dropping connection for this query according to a set rate ')
             headers = {"Connection": "close"}
         else:

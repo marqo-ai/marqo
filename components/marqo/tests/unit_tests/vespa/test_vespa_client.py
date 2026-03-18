@@ -623,34 +623,37 @@ class TestVespaClient(unittest.TestCase):
         mock_logger.warning.assert_not_called()
 
     @patch('marqo.vespa.vespa_client.settings')
-    @patch('marqo.vespa.vespa_client.random')
-    def test_query_sends_connection_close_header_when_random_below_rate(self, mock_random, mock_settings):
-        """Test that query sends 'Connection: close' header when random value is below the configured rate."""
+    def test_query_sends_connection_close_header_when_random_below_rate(self, mock_settings):
+        """Test that query sends 'Connection: close' header when seeded random value is below the configured rate."""
         mock_settings.marqo_search_random_connection_close_rate = 0.5
-        mock_random.random.return_value = 0.3
+        # Seed 0 produces random.Random(0).random() ≈ 0.844, seed 3 produces ≈ 0.236
+        # Find a seed that produces a value below 0.5
+        import random as random_module
+        seed = next(s for s in range(100) if random_module.Random(s).random() < 0.5)
 
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
 
         with patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
-            self.vespa_client.query(yql="select * from sources * where test;")
+            self.vespa_client.query(yql="select * from sources * where test;", drop_connection_random_seed=seed)
             headers = mock_post.call_args.kwargs["headers"]
             self.assertEqual(headers, {"Connection": "close"})
 
     @patch('marqo.vespa.vespa_client.settings')
-    @patch('marqo.vespa.vespa_client.random')
-    def test_query_no_connection_close_header_when_random_above_rate(self, mock_random, mock_settings):
-        """Test that query does not send 'Connection: close' header when random value is above the configured rate."""
+    def test_query_no_connection_close_header_when_random_above_rate(self, mock_settings):
+        """Test that query does not send 'Connection: close' header when seeded random value is above the configured rate."""
         mock_settings.marqo_search_random_connection_close_rate = 0.5
-        mock_random.random.return_value = 0.7
+        # Find a seed that produces a value above 0.5
+        import random as random_module
+        seed = next(s for s in range(100) if random_module.Random(s).random() >= 0.5)
 
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
 
         with patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
-            self.vespa_client.query(yql="select * from sources * where test;")
+            self.vespa_client.query(yql="select * from sources * where test;", drop_connection_random_seed=seed)
             headers = mock_post.call_args.kwargs["headers"]
             if headers:
                 self.assertNotIn("Connection", headers)
@@ -671,20 +674,26 @@ class TestVespaClient(unittest.TestCase):
                 self.assertNotIn("Connection", headers)
 
     @patch('marqo.vespa.vespa_client.settings')
-    @patch('marqo.vespa.vespa_client.random')
-    def test_query_connection_close_header_with_rate_1(self, mock_random, mock_settings):
+    def test_query_connection_close_header_with_rate_1(self, mock_settings):
         """Test that query always sends 'Connection: close' header when rate is 1.0."""
         mock_settings.marqo_search_random_connection_close_rate = 1.0
-        mock_random.random.return_value = 0.999
 
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
 
         with patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
-            self.vespa_client.query(yql="select * from sources * where test;")
+            self.vespa_client.query(yql="select * from sources * where test;", drop_connection_random_seed=42)
             headers = mock_post.call_args.kwargs["headers"]
             self.assertEqual(headers, {"Connection": "close"})
+
+    @patch('marqo.vespa.vespa_client.settings')
+    def test_should_drop_connection_is_reproducible_with_same_seed(self, mock_settings):
+        """Test that _should_drop_connection returns the same result for the same seed."""
+        mock_settings.marqo_search_random_connection_close_rate = 0.5
+        result1 = self.vespa_client._should_drop_connection(seed=42)
+        result2 = self.vespa_client._should_drop_connection(seed=42)
+        self.assertEqual(result1, result2)
 
     @patch('marqo.vespa.vespa_client.logger')
     def test_wait_for_convergence_retries_on_httpx_timeout(self, mock_logger):
