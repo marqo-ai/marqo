@@ -36,13 +36,13 @@ on:
         # By image_identifier, we refer to the
         # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).      image_identifier:
         description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/api@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.api_image_identifier }}
+        value: ${{ jobs.expose-outputs.outputs.api_image_identifier }}
       inference_orchestrator_image_identifier:
         description: "The inference_orchestrator_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.inference_orchestrator_image_identifier }}
+        value: ${{ jobs.expose-outputs.outputs.inference_orchestrator_image_identifier }}
       model_management_image_identifier:
         description: "The model_management_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/model-management@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.model_management_image_identifier }}
+        value: ${{ jobs.expose-outputs.outputs.model_management_image_identifier }}
 
   workflow_dispatch: #for manual triggers
     inputs:
@@ -166,3 +166,22 @@ jobs:
           echo "api_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api@${{ steps.build-and-push-api.outputs.digest }}" >> $GITHUB_OUTPUT
           echo "inference_orchestrator_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator@${{ steps.build-and-push-inference-orchestrator.outputs.digest }}" >> $GITHUB_OUTPUT
           echo "model_management_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management@${{ steps.build-and-push-model-management.outputs.digest }}" >> $GITHUB_OUTPUT
+
+  # This job re-exports the image identifiers without an environment.
+  # GitHub Actions suppresses outputs from jobs that use an environment in reusable workflows,
+  # so we need this intermediary job to pass them to the caller.
+  expose-outputs:
+    name: Expose image identifiers
+    needs: Docker-Build
+    runs-on: ubuntu-latest
+    outputs:
+      api_image_identifier: ${{ steps.forward.outputs.api_image_identifier }}
+      inference_orchestrator_image_identifier: ${{ steps.forward.outputs.inference_orchestrator_image_identifier }}
+      model_management_image_identifier: ${{ steps.forward.outputs.model_management_image_identifier }}
+    steps:
+      - name: Forward outputs
+        id: forward
+        run: |
+          echo "api_image_identifier=${{ needs.Docker-Build.outputs.api_image_identifier }}" >> $GITHUB_OUTPUT
+          echo "inference_orchestrator_image_identifier=${{ needs.Docker-Build.outputs.inference_orchestrator_image_identifier }}" >> $GITHUB_OUTPUT
+          echo "model_management_image_identifier=${{ needs.Docker-Build.outputs.model_management_image_identifier }}" >> $GITHUB_OUTPUT
