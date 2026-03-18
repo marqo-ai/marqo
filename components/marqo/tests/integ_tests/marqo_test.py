@@ -46,15 +46,6 @@ class TestImageUrls(str, Enum):
     HIPPO_REALISTIC_LARGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
     HIPPO_STATUE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png'
 
-    # --- Image URLs for testing different image formats ---
-    # These images are tested with OpenCLIP Encode
-    BMP_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_bmp_image.bmp'
-    TIFF_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_tiff_image.tiff'
-    GIF_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_gif_image.gif'
-    PNG_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_png_image.png'
-    JPG_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_jpg_image.jpg'
-    WEBP_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_webp_image.webp'
-
 
 class TestAudioUrls(str, Enum):
     __test__ = False
@@ -62,22 +53,12 @@ class TestAudioUrls(str, Enum):
     AUDIO2 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115545-C-48.wav"
     AUDIO3 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-119125-A-45.wav"
 
-    MP3_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.mp3"
-    ACC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.aac"
-    OGG_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.ogg"
-
-    FLAC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.flac"
-
 
 class TestVideoUrls(str, Enum):
     __test__ = False
     VIDEO1 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
     VIDEO2 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4"
     VIDEO3 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--mI_-gaZLk_000018_000028.mp4"
-
-    MKV_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.mkv"
-    WEBM_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.webm"
-    AVI_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.avi"
 
 
 class MarqoTestCase(unittest.TestCase):
