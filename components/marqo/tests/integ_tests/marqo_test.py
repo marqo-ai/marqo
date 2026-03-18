@@ -1,7 +1,10 @@
+from importlib import reload
+
 import contextlib
 import dotenv
 import os
 import socket
+import sys
 import threading
 import time
 import unittest
@@ -413,6 +416,23 @@ class MarqoTestCase(unittest.TestCase):
         Assert that a specific exception is raised. Will not pass for subclasses of the expected exception.
         """
         return self._AssertRaisesContext(expected_exception)
+
+    @contextlib.contextmanager
+    def help_mock_environment_variables_in_settings(self, env_vars: dict):
+        """
+        A help function to mock environment variables in settings.
+        It reloads the settings module to make sure the new env vars are picked up, and then reloads it again
+        after the test to restore the original env vars.
+        :param env_vars: A dictionary of environment variables to mock.
+        The keys are the env var names, and the values are the env var values.
+        """
+        try:
+            with patch.dict("os.environ", env_vars, clear=True):
+                reload(sys.modules["marqo.settings.settings"])
+                yield
+        finally:
+            # os.environ is restored by patch.dict before this runs,
+            reload(sys.modules["marqo.settings.settings"])
 
 
 class AsyncMarqoTestCase(unittest.IsolatedAsyncioTestCase, MarqoTestCase):
