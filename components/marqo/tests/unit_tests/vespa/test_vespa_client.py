@@ -672,7 +672,7 @@ class TestVespaClient(unittest.TestCase):
         mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
 
         with patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
-            self.vespa_client.query(yql="select * from sources * where test;", drop_connection_random_seed=42)
+            self.vespa_client.query(yql="select * from sources * where test;", drop_connection_random_seed=12)
             headers = mock_post.call_args.kwargs["headers"]
             self.assertEqual(headers, {"Connection": "close"})
 
