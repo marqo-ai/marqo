@@ -709,3 +709,112 @@ class TestRecencyParameters(unittest.TestCase):
         self.assertEqual(params.grow_function, "gaussian")
         self.assertEqual(params.grow_scale, "21d")
         self.assertEqual(params.grow_offset, "3d")
+
+    # ============= Center Parameter Tests =============
+
+    def test_center_validation(self):
+        """Test center field validation."""
+        # Valid center values
+        valid_values = [
+            ("positive_float", 1709232000.0),
+            ("zero", 0),
+            ("large_value", 9999999999.9),
+        ]
+
+        for test_name, center in valid_values:
+            with self.subTest(test_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    center=center
+                )
+                self.assertEqual(params.center, center)
+
+        # Invalid center values
+        invalid_values = [
+            ("negative", -1.0),
+            ("negative_large", -1709232000.0),
+        ]
+
+        for test_name, center in invalid_values:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError) as exc_info:
+                    RecencyParameters(
+                        recency_field="created_at",
+                        center=center
+                    )
+                error_str = str(exc_info.exception)
+                self.assertIn("center", error_str.lower())
+
+    def test_center_default_none(self):
+        """Test center defaults to None."""
+        params = RecencyParameters(recency_field="created_at")
+        self.assertIsNone(params.center)
+
+    def test_center_alias(self):
+        """Test center alias works."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            center=1709232000.0
+        )
+        self.assertEqual(params.center, 1709232000.0)
+
+        # Test dict serialization with alias
+        result = params.dict(by_alias=True)
+        self.assertIn('center', result)
+        self.assertEqual(result['center'], 1709232000.0)
+
+    # ============= ApplyToSubqueries Parameter Tests =============
+
+    def test_apply_to_subqueries_validation(self):
+        """Test apply_to_subqueries field validation."""
+        # Valid values
+        valid_values = [
+            ("tensor_only", ["tensor"]),
+            ("lexical_only", ["lexical"]),
+            ("both", ["tensor", "lexical"]),
+            ("empty_list", []),
+        ]
+
+        for test_name, apply_to in valid_values:
+            with self.subTest(test_name):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    apply_to_subqueries=apply_to
+                )
+                self.assertEqual(params.apply_to_subqueries, apply_to)
+
+        # Invalid values
+        invalid_values = [
+            ("invalid_string", ["invalid"]),
+            ("mixed_invalid", ["tensor", "invalid"]),
+            ("uppercase", ["TENSOR"]),
+        ]
+
+        for test_name, apply_to in invalid_values:
+            with self.subTest(test_name):
+                with self.assertRaises(ValidationError) as exc_info:
+                    RecencyParameters(
+                        recency_field="created_at",
+                        apply_to_subqueries=apply_to
+                    )
+                error_str = str(exc_info.exception)
+                self.assertIn("apply_to_subqueries", error_str.lower().replace(" ", "_")
+                              .replace("applytosubqueries", "apply_to_subqueries"))
+
+    def test_apply_to_subqueries_default_none(self):
+        """Test apply_to_subqueries defaults to None."""
+        params = RecencyParameters(recency_field="created_at")
+        self.assertIsNone(params.apply_to_subqueries)
+
+    def test_apply_to_subqueries_alias(self):
+        """Test applyToSubqueries alias works."""
+        params = RecencyParameters(
+            recency_field="created_at",
+            applyToSubqueries=["tensor"]
+        )
+        self.assertEqual(params.apply_to_subqueries, ["tensor"])
+
+        # Test dict serialization with alias
+        result = params.dict(by_alias=True)
+        self.assertIn('applyToSubqueries', result)
+        self.assertEqual(result['applyToSubqueries'], ["tensor"])
