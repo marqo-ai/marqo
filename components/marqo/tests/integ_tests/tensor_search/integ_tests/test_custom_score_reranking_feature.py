@@ -10,6 +10,7 @@ or closeness tensor_ranking_field reverses order to (doc5..doc1). Each test show
 (3) _score vs _pre_rerank_score known by modifier and field scores.
 """
 import os
+from typing import Any, Dict, List
 from unittest import mock
 
 from marqo.core.constants import (
@@ -30,7 +31,7 @@ from marqo.tensor_search.models.relevance_cutoff_model import (
     RelativeMaxScoreParameters,
 )
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
-from marqo.tensor_search.models.collapse_model import CollapseModel
+from marqo.tensor_search.models.collapse_model import CollapseModel, CollapseSortBy, CollapseSortByField
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
@@ -265,14 +266,6 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         cls.index_closeness_aggregates = cls.indexes[3]
         cls.index_lexical_only = cls.indexes[4]
 
-    def setUp(self) -> None:
-        super().setUp()
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        self.device_patcher.start()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        self.device_patcher.stop()
 
     def _add_tuxedo_docs(self) -> None:
         """Add the 5 plan docs to the index (used by each test)."""
@@ -333,6 +326,30 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 delta=tolerance,
                 msg=f"Doc {doc_id}: _pre_rerank_score should equal baseline score",
             )
+
+    def _custom_score_add_contributions_by_doc_id(
+        self, add_to_score_ops: List[Dict[str, Any]]
+    ) -> Dict[str, float]:
+        """
+        Run hybrid search with only the given marqo__score_* add_to_score modifiers (same query/index as plan).
+        Returns doc_id -> (_score - _pre_rerank_score) for each hit.
+
+        Used to compare single-modifier vs combined-modifier behavior in one test method (no state shared
+        across pytest test cases, which avoids ordering flakiness).
+        """
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            score_modifiers=ScoreModifierLists(add_to_score=add_to_score_ops),
+            result_count=10,
+        )
+        return {
+            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE]
+            for h in res["hits"]
+        }
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_base_rrf_order_deterministic(self):
@@ -486,7 +503,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         )
         self._assert_pre_rerank_score_matches_baseline(res_with_rerank, res_no_rerank)
         ids = [h["_id"] for h in res_with_rerank["hits"]]
-        self.assertEqual(ids, REVERSED_ORDER, msg="add_to_score bm25 lex_ranking_field: order must be doc5, doc4, doc3, doc2, doc1")
+        self.assertEqual(REVERSED_ORDER, ids, msg="add_to_score bm25 lex_ranking_field: order must be doc5, doc4, doc3, doc2, doc1")
         scores_with = {h["_id"]: h["_score"] for h in res_with_rerank["hits"]}
         self.assertGreater(scores_with["doc5"], scores_with["doc1"], msg="doc5 (highest bm25 lex_ranking_field) should have higher score than doc1")
         any_changed = any(h["_score"] != h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"])
@@ -528,28 +545,16 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         )
         self._assert_pre_rerank_score_matches_baseline(res_with_rerank, res_no_rerank)
         ids = [h["_id"] for h in res_with_rerank["hits"]]
-        self.assertEqual(ids, REVERSED_ORDER, msg="add_to_score closeness: order must be doc5, doc4, doc3, doc2, doc1")
-        # Backend: final_score = pre_rerank + weight * raw_closeness (no min-max for closeness).
-        # Assert exact formula with weight=1: contribution = score - pre_rerank must equal 1 * closeness.
-        weight = 1.0
+        self.assertEqual(REVERSED_ORDER, ids, msg="add_to_score closeness: order must be doc5, doc4, doc3, doc2, doc1")
+        # Backend adds weight * (normalized or raw) closeness; Vespa's output can differ from plan's hardcoded values.
+        # Assert contribution order: doc5 (highest closeness) gets largest add, then doc4, ..., doc1.
         for hit in res_with_rerank["hits"]:
-            doc_id = hit["_id"]
-            pre = hit[MARQO_DOC_PRE_RERANK_SCORE]
-            contribution = hit["_score"] - pre
-            expected = pre + weight * contribution
-            self.assertAlmostEqual(
-                hit["_score"],
-                expected,
-                delta=1e-5,
-                msg=f"Doc {doc_id}: _score must equal pre_rerank + weight * contribution",
-            )
-            # Contribution order must match plan closeness order (doc5 > doc4 > doc3 > doc2 > doc1).
+            contribution = hit["_score"] - hit[MARQO_DOC_PRE_RERANK_SCORE]
             self.assertGreaterEqual(
                 contribution,
                 0.0,
-                msg=f"Doc {doc_id}: add_to_score contribution should be non-negative for weight 1",
+                msg=f"Doc {hit['_id']}: add_to_score contribution should be non-negative for weight 1",
             )
-        # Strict: contributions must decrease in order doc5, doc4, doc3, doc2, doc1.
         contributions = [res_with_rerank["hits"][i]["_score"] - res_with_rerank["hits"][i][MARQO_DOC_PRE_RERANK_SCORE] for i in range(len(ids))]
         for i in range(len(contributions) - 1):
             self.assertGreaterEqual(
@@ -557,6 +562,91 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 contributions[i + 1],
                 msg=f"Closeness contributions should decrease in order doc5..doc1: {contributions}",
             )
+
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
+    def test_rrf_with_multiple_custom_score_modifiers_add_to_score(self):
+        """
+        add_to_score with both bm25 lex_ranking_field and closeness tensor_ranking_field (each weight 1.0).
+
+        BM25-only and closeness-only contributions are measured in this test; combined contribution
+        must equal their sum exactly per doc
+        """
+        self._add_tuxedo_docs()
+        res_no_rerank = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            result_count=10,
+        )
+        bm25_only = [{"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0}]
+        closeness_only = [
+            {"field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field", "weight": 1.0}
+        ]
+        contrib_bm25 = self._custom_score_add_contributions_by_doc_id(bm25_only)
+        contrib_closeness = self._custom_score_add_contributions_by_doc_id(closeness_only)
+        res_both = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            score_modifiers=ScoreModifierLists(add_to_score=bm25_only + closeness_only),
+            result_count=10,
+        )
+        self._assert_pre_rerank_score_matches_baseline(res_both, res_no_rerank)
+        ids = [h["_id"] for h in res_both["hits"]]
+        self.assertEqual(REVERSED_ORDER, ids, msg="With both modifiers order must be doc5, doc4, doc3, doc2, doc1")
+        contrib_both = {
+            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_both["hits"]
+        }
+        for doc_id in BASE_RRF_ORDER:
+            self.assertIn(doc_id, contrib_bm25)
+            self.assertIn(doc_id, contrib_closeness)
+            self.assertIn(doc_id, contrib_both)
+            expected_sum = contrib_bm25[doc_id] + contrib_closeness[doc_id]
+            self.assertAlmostEqual(
+                contrib_both[doc_id],
+                expected_sum,
+                places=12,
+                msg=(
+                    f"Doc {doc_id}: combined add_to_score contribution must equal bm25 + closeness "
+                    f"({contrib_both[doc_id]} vs {contrib_bm25[doc_id]} + {contrib_closeness[doc_id]})"
+                ),
+            )
+
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
+    def test_custom_score_bm25_rerank_with_attributes_to_retrieve(self):
+        """
+        With attributes_to_retrieve set, BM25 add_to_score still reverses order (doc5..doc1);
+        each hit contains only _id, _score, requested attributes (and _highlights if enabled).
+        """
+        self._add_tuxedo_docs()
+        requested_attrs = ["lex_ranking_field"]
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+            score_modifiers=ScoreModifierLists(
+                add_to_score=[{"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0}]
+            ),
+            result_count=10,
+            attributes_to_retrieve=requested_attrs,
+        )
+        ids = [h["_id"] for h in res["hits"]]
+        self.assertEqual(REVERSED_ORDER, ids, msg="BM25 add_to_score must reverse order with attributes_to_retrieve")
+        allowed_keys = {"_id", "_score", "_highlights"}.union(requested_attrs)
+        for hit in res["hits"]:
+            self.assertLessEqual(
+                set(hit.keys()),
+                allowed_keys,
+                msg=f"Hit {hit.get('_id')} should only have requested attributes and metadata; keys: {sorted(hit.keys())}",
+            )
+            for attr in requested_attrs:
+                self.assertIn(attr, hit, msg=f"Requested attribute {attr} must be present in hit {hit.get('_id')}")
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_closeness_weighted_exact_final_score(self):
@@ -859,59 +949,13 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         ids_double = [h["_id"] for h in res_double["hits"]]
         self.assertEqual(ids_double, REVERSED_ORDER, msg="Weight 2.0 should give reversed order doc5..doc1")
 
-    def test_validation_closeness_field_not_in_tensor_fields_raises(self):
-        """Requesting closeness for a field that is not a tensor field in the index must raise InvalidArgumentError."""
-        self._add_tuxedo_docs()
-        with self.assertRaises(InvalidArgumentError) as ctx:
-            tensor_search.search(
-                config=self.config,
-                index_name=self.index.name,
-                text="tuxedo",
-                search_method="HYBRID",
-                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-                score_modifiers=ScoreModifierLists(
-                    add_to_score=[
-                        {
-                            "field_name": f"marqo__score_closeness_retrieval_vector_field_nonexistent_tensor_field",
-                            "weight": 1.0,
-                        }
-                    ]
-                ),
-                result_count=5,
-            )
-        self.assertIn("nonexistent_tensor_field", str(ctx.exception))
-        self.assertIn("tensor field", str(ctx.exception).lower())
-
-    def test_validation_bm25_field_not_lexically_searchable_raises(self):
-        """Requesting bm25 for a field that is not in the index (or not lexically searchable) must raise InvalidArgumentError."""
-        self._add_tuxedo_docs()
-        with self.assertRaises(InvalidArgumentError) as ctx:
-            tensor_search.search(
-                config=self.config,
-                index_name=self.index.name,
-                text="tuxedo",
-                search_method="HYBRID",
-                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-                score_modifiers=ScoreModifierLists(
-                    add_to_score=[
-                        {
-                            "field_name": f"marqo__score_bm25_field_nonexistent_lex_field",
-                            "weight": 1.0,
-                        }
-                    ]
-                ),
-                result_count=5,
-            )
-        self.assertIn("nonexistent_lex_field", str(ctx.exception))
-
-    def test_validation_bm25_aggregate_with_no_lexical_fields_raises(self):
+    def test_bm25_aggregate_with_no_lexical_fields_ignored(self):
         """
-        Requesting a BM25 aggregate (sum/max/avg) when the index has no lexically searchable fields
-        must raise InvalidArgumentError (400). We use an index that has only the tensor retrieval
-        field (no lexical fields), so searchable-attributes validation passes but custom score
-        validation raises.
+        Requesting a BM25 aggregate when the index has no lexically searchable fields is ignored
+        (no Python error for the modifier). The inapplicable modifier is filtered out; we may still
+        get an error from Vespa because the index does not support hybrid. We only assert that we
+        do not raise the custom-score validation error.
         """
-        # Ensure index has tensor_retrieval_field so searchable-attributes validation passes
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
@@ -921,40 +965,35 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             ),
         )
 
-        with self.assertRaises(InvalidArgumentError) as ctx:
+        try:
             tensor_search.search(
                 config=self.config,
                 index_name=self.index_number_only.name,
                 text="anything",
                 search_method="HYBRID",
                 score_modifiers=ScoreModifierLists(
-                    add_to_score=[
-                        {
-                            "field_name": f"marqo__score_bm25_sum",
-                            "weight": 1.0,
-                        }
-                    ]
+                    add_to_score=[{"field_name": "marqo__score_bm25_sum", "weight": 1.0}]
                 ),
                 result_count=5,
             )
-        self.assertIn("BM25 aggregate", str(ctx.exception))
-        self.assertIn("no lexically searchable fields", str(ctx.exception))
+        except InvalidArgumentError as e:
+            # Modifier is ignored; we must not raise the custom-score aggregate error
+            self.assertNotIn("BM25 aggregate", str(e))
+            self.assertNotIn("no lexically searchable fields", str(e))
 
-    def test_validation_closeness_aggregate_with_no_tensor_fields_raises(self):
+    def test_closeness_aggregate_with_no_tensor_fields_ignored(self):
         """
-        Requesting a closeness aggregate (sum/max/avg) when the index has no tensor fields
-        must raise InvalidArgumentError (400). We use an index that has only the lexical
-        retrieval field (no tensor fields), so searchable-attributes validation passes but
-        custom score validation raises.
+        Requesting a closeness aggregate when the index has no tensor fields is ignored
+        (no Python error for the modifier). The inapplicable modifier is filtered out; we may still
+        get an error from Vespa because the index does not support hybrid. We only assert that we
+        do not raise the custom-score validation error.
         """
-        # Ensure index has lex_retrieval_field so searchable-attributes validation passes.
-        # Use a separate index so it has only lexical (no tensor) and doesn't conflict with BM25 test.
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.index_lexical_only.name,
                 docs=[{"_id": "seed_lex", "lex_retrieval_field": "anything"}],
-                tensor_fields=[],  # no tensor fields in this index
+                tensor_fields=[],
             ),
         )
         params_lexical_only = HybridParameters(
@@ -962,10 +1001,10 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             rankingMethod=RankingMethod.RRF,
             alpha=0.5001,
             rrfK=60,
-            searchableAttributesTensor=[],  # no tensor fields in this index
+            searchableAttributesTensor=[],
             searchableAttributesLexical=["lex_retrieval_field"],
         )
-        with self.assertRaises(InvalidArgumentError) as ctx:
+        try:
             tensor_search.search(
                 config=self.config,
                 index_name=self.index_lexical_only.name,
@@ -974,16 +1013,15 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 hybrid_parameters=params_lexical_only,
                 score_modifiers=ScoreModifierLists(
                     add_to_score=[
-                        {
-                            "field_name": f"marqo__score_closeness_retrieval_vector_sum",
-                            "weight": 1.0,
-                        }
+                        {"field_name": "marqo__score_closeness_retrieval_vector_sum", "weight": 1.0}
                     ]
                 ),
                 result_count=5,
             )
-        self.assertIn("closeness aggregate", str(ctx.exception))
-        self.assertIn("no tensor fields", str(ctx.exception))
+        except InvalidArgumentError as e:
+            # Modifier is ignored; we must not raise the custom-score aggregate error
+            self.assertNotIn("closeness aggregate", str(e))
+            self.assertNotIn("no tensor fields", str(e))
 
 
 class TestCustomScoreRerankStructuredIndexUnsupported(MarqoTestCase):
@@ -1005,15 +1043,6 @@ class TestCustomScoreRerankStructuredIndexUnsupported(MarqoTestCase):
         )
         cls.indexes = cls.create_indexes([index_request])
         cls.index = cls.indexes[0]
-
-    def setUp(self) -> None:
-        super().setUp()
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        self.device_patcher.start()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        self.device_patcher.stop()
 
     def test_custom_score_rerank_on_structured_index_raises_unsupported_feature_error(self):
         """Using marqo__score_* modifiers on a structured index must raise UnsupportedFeatureError."""
@@ -1076,15 +1105,6 @@ class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):
         cls.indexes = cls.create_indexes(requests)
         cls.index_by_metric = {cls.DISTANCE_METRICS[i]: cls.indexes[i] for i in range(len(cls.DISTANCE_METRICS))}
 
-    def setUp(self) -> None:
-        super().setUp()
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        self.device_patcher.start()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        self.device_patcher.stop()
-
     def test_custom_score_rerank_closeness_per_distance_metric(self):
         """For each distance metric, closeness add_to_score must apply: doc5 first, 5 hits, _pre_rerank_score present."""
         for metric in self.DISTANCE_METRICS:
@@ -1116,7 +1136,7 @@ class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):
                 )
                 self.assertEqual(len(res["hits"]), 5, msg=f"distance_metric={metric.value}: expect 5 hits")
                 ids = [h["_id"] for h in res["hits"]]
-                self.assertEqual(ids, REVERSED_ORDER, msg=f"distance_metric={metric.value}: order must be doc5, doc4, doc3, doc2, doc1")
+                self.assertEqual(REVERSED_ORDER, ids, msg=f"distance_metric={metric.value}: order must be doc5, doc4, doc3, doc2, doc1")
                 for hit in res["hits"]:
                     self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit, msg=f"distance_metric={metric.value}: each hit must have _pre_rerank_score")
 
@@ -1141,15 +1161,6 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         cls.indexes = cls.create_indexes([index_request, collapse_index_request])
         cls.index = cls.indexes[0]
         cls.collapse_index = cls.indexes[1]
-
-    def setUp(self) -> None:
-        super().setUp()
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        self.device_patcher.start()
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        self.device_patcher.stop()
 
     def _add_tuxedo_docs(self, **extras):
         """Add tuxedo plan docs (optionally with popularity, category, etc.) to self.index."""
@@ -1297,7 +1308,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         tensor_yql = captured_query.get("marqo__yql.tensor") or ""
         self.assertIn(f"targetHits:{rerank_depth_tensor}", tensor_yql)
         ids = [h["_id"] for h in res["hits"]]
-        self.assertEqual(ids, REVERSED_ORDER, msg="add_to_score closeness with rerankDepthTensor: order must be doc5, doc4, doc3, doc2, doc1")
+        self.assertEqual(REVERSED_ORDER, ids, msg="add_to_score closeness with rerankDepthTensor: order must be doc5, doc4, doc3, doc2, doc1")
         for hit in res["hits"]:
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
 
@@ -1479,7 +1490,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
 
         # Results must still be in correct order: add_to_score bm25 lex_ranking_field -> doc5, doc4, doc3, doc2, doc1.
         ids = [h["_id"] for h in res["hits"]]
-        self.assertEqual(ids, REVERSED_ORDER, msg="add_to_score bm25 lex_ranking_field: order must be doc5, doc4, doc3, doc2, doc1")
+        self.assertEqual(REVERSED_ORDER, ids, msg="add_to_score bm25 lex_ranking_field: order must be doc5, doc4, doc3, doc2, doc1")
         for hit in res["hits"]:
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
 
@@ -1585,6 +1596,140 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 self.assertNotIn(pid, seen_parents, msg="Collapse: one hit per parent_id")
                 seen_parents.add(pid)
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
+
+    @pytest.mark.skip_for_multinode("Lexical/RRF scores can differ between nodes")
+    def test_collapse_sort_by_with_custom_score_rerank_both_features(self):
+        """
+        Show that collapse.sortBy feature (higher price = better) works alongside custom score rerank:
+
+        - Relevance collapse winners per group are g1_lo, g2_lo (strong hybrid with rerankers). Expensive variants
+          g1_hi, g2_hi have weak retrieval so they would get negligible custom BM25 add if ranked.
+        - Group order follows reranked relevance among those winners: BM25(lex_ranking) favors
+          g2_lo over g1_lo → order [g2_lo, g1_lo].
+        - sortBy price desc picks strictly higher price per group → visible docs g2_hi, g1_hi.
+        - merge_hit copies all _* metadata from the relevance hit: _score and _pre_rerank_score
+          stay with g2_lo / g1_lo while _id (and fields like price) come from the hi variants.
+        """
+        # g*_lo: win per-group relevance. g*_hi: weak RRF, high price (strictly better on desc sort).
+        # Only tensor_retrieval_field is needed for hybrid retrieval; lex_ranking_field for custom BM25 rerank.
+        docs = [
+            {
+                "_id": "g1_lo",
+                "parent_id": "p1",
+                "price": 1.0,
+                "lex_retrieval_field": "tuxedo tuxedo tuxedo",
+                "tensor_retrieval_field": "tuxedo",
+                "lex_ranking_field": "nomatch",
+            },
+            {
+                "_id": "g1_hi",
+                "parent_id": "p1",
+                "price": 100.0,
+                "lex_retrieval_field": "other",
+                "tensor_retrieval_field": "unrelated",
+                "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo tuxedo",
+            },
+            {
+                "_id": "g2_lo",
+                "parent_id": "p2",
+                "price": 2.0,
+                "lex_retrieval_field": "tuxedo tuxedo",
+                "tensor_retrieval_field": "tuxedo",
+                "lex_ranking_field": "tuxedo tuxedo tuxedo tuxedo tuxedo tuxedo tuxedo tuxedo tuxedo tuxedo",
+            },
+            {
+                "_id": "g2_hi",
+                "parent_id": "p2",
+                "price": 200.0,
+                "lex_retrieval_field": "suit",
+                "tensor_retrieval_field": "suit",
+                "lex_ranking_field": "tuxedo tuxedo tuxedo",
+            },
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.collapse_index.name,
+                docs=docs,
+                tensor_fields=["tensor_retrieval_field"],
+            ),
+        )
+        hybrid = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5001,
+            rrfK=60,
+            searchableAttributesTensor=["tensor_retrieval_field"],
+            searchableAttributesLexical=["lex_retrieval_field"],
+        )
+        collapse_rel = CollapseModel(name="parent_id")
+        collapse_sort_desc = CollapseModel(
+            name="parent_id",
+            sort_by=CollapseSortBy(
+                fields=[CollapseSortByField(fieldName="price", order="desc")]
+            ),
+        )
+        rerank_mods = ScoreModifierLists(
+            add_to_score=[
+                {
+                    "field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_lex_ranking_field",
+                    "weight": 4.0,
+                }
+            ]
+        )
+
+        res_rel_rerank = tensor_search.search(
+            config=self.config,
+            index_name=self.collapse_index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=hybrid,
+            collapse=collapse_rel,
+            score_modifiers=rerank_mods,
+            result_count=10,
+        )
+        lo_by_id = {h["_id"]: h for h in res_rel_rerank["hits"]}
+        self.assertCountEqual(["g1_lo", "g2_lo"], list(lo_by_id.keys()))
+        rerank_order = [h["_id"] for h in res_rel_rerank["hits"]]
+        self.assertEqual(
+            ["g2_lo", "g1_lo"],
+            rerank_order,
+            msg="custom BM25 on lex_ranking: g2_lo >> g1_lo (nomatch)",
+        )
+
+        res_combined = tensor_search.search(
+            config=self.config,
+            index_name=self.collapse_index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=hybrid,
+            collapse=collapse_sort_desc,
+            score_modifiers=rerank_mods,
+            result_count=10,
+        )
+        self.assertEqual(len(res_combined["hits"]), 2)
+        combined_order = [h["_id"] for h in res_combined["hits"]]
+        self.assertEqual(
+            ["g2_hi", "g1_hi"],
+            combined_order,
+            msg="group order = reranked relevance winners; body = highest price per group",
+        )
+        for hid, orig in [("g1_hi", "g1_lo"), ("g2_hi", "g2_lo")]:
+            hit = next(h for h in res_combined["hits"] if h["_id"] == hid)
+            self.assertEqual(hit.get("_originalId"), orig)
+            self.assertAlmostEqual(
+                hit["_score"],
+                lo_by_id[orig]["_score"],
+                delta=1e-4,
+                msg=f"{hid}: _score from relevance winner {orig}",
+            )
+            self.assertAlmostEqual(
+                hit[MARQO_DOC_PRE_RERANK_SCORE],
+                lo_by_id[orig][MARQO_DOC_PRE_RERANK_SCORE],
+                delta=1e-4,
+                msg=f"{hid}: _pre_rerank_score copied like _score from {orig}",
+            )
+            self.assertEqual(hit["price"], 100.0 if hid == "g1_hi" else 200.0)
 
     def test_custom_score_rerank_with_relevance_cutoff(self):
         """

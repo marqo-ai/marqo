@@ -1479,35 +1479,149 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             relevance_cutoff=relevance_cutoff,
         )
 
-    def test_get_fields_to_bm25_rerank_by(self):
-        """_get_fields_to_bm25_rerank_by returns fields or ['*'] for aggregate."""
-        self.assertEqual(
-            self.vespa_index._get_fields_to_bm25_rerank_by(
-                {f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title'}
+    def test_hybrid_query_with_custom_score_rerank_full_query(self):
+        """
+        Full generated Vespa query with custom score rerank and with collapse, facets, track_total_hits
+        (BM25 aggregate mult + closeness aggregate add).
+        """
+        marqo_index = MarqoTestCase.semi_structured_marqo_index(
+            'test_index',
+            collapse_fields=[CollapseField(name='parent_id')],
+            lexical_field_names=('title', 'description'),
+            tensor_field_names=('title', 'description'),
+        )
+        vespa_index = SemiStructuredVespaIndex(marqo_index)
+        marqo_query = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=HybridParameters(retrievalMethod=RetrievalMethod.Disjunction),
+            collapse=CollapseModel(name='parent_id'),
+            facets=FacetsParameters(
+                fields={
+                    'price': FieldFacetsConfiguration(
+                        type='number',
+                        ranges=[{'from': 0, 'to': 1}, {'from': 1, 'to': 3}],
+                    ),
+                    'color': FieldFacetsConfiguration(type='string'),
+                }
             ),
+            track_total_hits=True,
+            score_modifiers=[
+                ScoreModifier(
+                    field=f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum',
+                    weight=2.0,
+                    type=ScoreModifierType.Multiply,
+                ),
+                ScoreModifier(
+                    field=f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_sum',
+                    weight=0.5,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = vespa_index.to_vespa_query(marqo_query)
+
+        self.assertEqual('parent_id', vespa_query['collapsefield'])
+        self.assertEqual(1, vespa_query['collapsesize'])
+        self.assertEqual('collapse-minimal-summary', vespa_query['collapse.summary'])
+        self.assertTrue(vespa_query['FieldFiller.disable'])
+
+        self.assertEqual(common.RANK_PROFILE_BM25 + '_diversity',
+                         vespa_query['marqo__ranking.lexical.lexical'])
+        self.assertEqual(common.RANK_PROFILE_EMBEDDING_SIMILARITY + '_diversity',
+                         vespa_query['marqo__ranking.tensor.tensor'])
+        self.assertEqual(common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY + '_diversity',
+                         vespa_query['marqo__ranking.lexical.tensor'])
+        self.assertEqual(common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25 + '_diversity',
+                         vespa_query['marqo__ranking.tensor.lexical'])
+
+        # Assert facets query does not have extra rank() term for custom score reranker
+        self.assertEqual(
+            'select * from test_index where (default contains "search" OR (({targetHits:10, approximate:True, '
+            'hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR '
+            '({targetHits:10, approximate:True, hnsw.exploreAdditionalHits:1990}nearestNeighbor('
+            'marqo__embeddings_description, marqo__query_embedding)))) limit 0 | all(group(1.1) '
+            'each(group(parent_id) output(count())))\n'
+            '---MARQO-YQL-QUERY-DELIMITER---\n'
+            'select * from test_index where (default contains "search" OR (({targetHits:10, approximate:True, '
+            'hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR '
+            '({targetHits:10, approximate:True, hnsw.exploreAdditionalHits:1990}nearestNeighbor('
+            'marqo__embeddings_description, marqo__query_embedding)))) limit 0 | all( '
+            'all(group(predefined(marqo__int_fields{"price"}, bucket(0.0, 1.0), bucket(1.0, 3.0))) max(100) '
+            'order(-count()) each(group(parent_id) output(count()))) '
+            'all(group(predefined(marqo__float_fields{"price"}, bucket(0.0, 1.0), bucket(1.0, 3.0))) max(100) '
+            'order(-count()) each(group(parent_id) output(count()))) '
+            'all(group(marqo__short_string_fields{"color"}) max(100) order(-count()) '
+            'each(group(parent_id) output(count()))) )',
+            vespa_query['marqo__yql.facets'],
+        )
+
+        # Assert lexical yql remains the same
+        self.assertEqual(
+            'select * from test_index where (weakAnd(default contains "search"))',
+            vespa_query['marqo__yql.lexical'],
+        )
+        # Assert tensor yql has the extra weakAnd (for bm25 sum)
+        self.assertEqual(
+            'select * from test_index where rank((({targetHits:10, approximate:True, '
+            'hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR '
+            '({targetHits:10, approximate:True, hnsw.exploreAdditionalHits:1990}nearestNeighbor('
+            'marqo__embeddings_description, marqo__query_embedding))), weakAnd(default contains "search"))',
+            vespa_query['marqo__yql.tensor'],
+        )
+
+        self.assertEqual('hybrid_custom_searcher', vespa_query['ranking'])
+        self.assertEqual(10, vespa_query['hits'])
+        self.assertEqual(0, vespa_query['offset'])
+        self.assertEqual('test_index', vespa_query['model_restrict'])
+        self.assertEqual('all-non-vector-summary', vespa_query['presentation.summary'])
+        self.assertEqual(10, vespa_query['ranking.rerankCount'])
+        self.assertEqual(RetrievalMethod.Disjunction, vespa_query['marqo__hybrid.retrievalMethod'])
+        self.assertEqual(RankingMethod.RRF, vespa_query['marqo__hybrid.rankingMethod'])
+        self.assertEqual(0.5, vespa_query['marqo__hybrid.alpha'])
+        self.assertEqual(60, vespa_query['marqo__hybrid.rrf_k'])
+
+        # Assert hasRankingLexical and hasRankingVector flags are set
+        self.assertTrue(vespa_query['marqo__hasRankingLexical'])
+        self.assertTrue(vespa_query['marqo__hasRankingVector'])
+        self.assertEqual(DistanceMetric.Angular.value, vespa_query['marqo__custom_score_closeness_distance_metric'])
+
+        qf = vespa_query['query_features']
+        self.assertEqual({'bm25_sum': 2.0}, qf['marqo__custom_score_mult_weights_global'])
+        self.assertEqual({'closeness_retrieval_vector_sum': 0.5}, qf['marqo__custom_score_add_weights_global'])
+        self.assertEqual(
+            {'marqo__lexical_description': 1, 'marqo__lexical_title': 1},
+            qf['marqo__fields_to_rank_lexical'],
+        )
+        self.assertEqual(
+            {'marqo__embeddings_description': 1, 'marqo__embeddings_title': 1},
+            qf['marqo__fields_to_rank_tensor'],
+        )
+        self.assertEqual([0.1, 0.2, 0.3, 0.4], qf['marqo__query_embedding'])
+
+    def test_get_fields_to_bm25_rerank_by(self):
+        """_get_fields_to_bm25_rerank_by returns fields or ['*'] for aggregate (internal suffix keys)."""
+        self.assertEqual(
+            self.vespa_index._get_fields_to_bm25_rerank_by({'bm25_field_title'}),
             ['title'],
         )
         self.assertEqual(
             self.vespa_index._get_fields_to_bm25_rerank_by(
-                {
-                    f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title',
-                    f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_description',
-                }
+                {'bm25_field_title', 'bm25_field_description'}
             ),
             ['description', 'title'],
         )
         self.assertEqual(
-            self.vespa_index._get_fields_to_bm25_rerank_by(
-                {f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum'}
-            ),
+            self.vespa_index._get_fields_to_bm25_rerank_by({'bm25_sum'}),
             ['*'],
         )
         self.assertEqual(
             self.vespa_index._get_fields_to_bm25_rerank_by(
-                {
-                    f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title',
-                    f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_max',
-                }
+                {'bm25_field_title', 'bm25_max'}
             ),
             ['*'],
         )
@@ -1552,16 +1666,16 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         )
 
     def test_get_fields_to_closeness_rerank_by(self):
-        """_get_fields_to_closeness_rerank_by returns tensor fields or all for aggregate."""
+        """_get_fields_to_closeness_rerank_by returns tensor fields or all for aggregate (internal suffix keys)."""
         self.assertEqual(
             self.vespa_index._get_fields_to_closeness_rerank_by(
-                {f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_title'}
+                {'closeness_retrieval_vector_field_title'}
             ),
             ['title'],
         )
         self.assertCountEqual(
             self.vespa_index._get_fields_to_closeness_rerank_by(
-                {f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_sum'}
+                {'closeness_retrieval_vector_sum'}
             ),
             ['description', 'title'],
         )
@@ -2035,7 +2149,7 @@ class TestAppendCustomScoreRerankTerms(unittest.TestCase):
             ranking_method=RankingMethod.Lexical,
             retrieval_method=RetrievalMethod.Lexical,
         )
-        custom_score_keys = {f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title'}
+        custom_score_keys = {'bm25_field_title'}
         lexical_term, tensor_term = self.vespa_index._append_custom_score_rerank_terms(
             marqo_query, 'base_lex', 'base_tensor', custom_score_keys
         )
@@ -2048,7 +2162,7 @@ class TestAppendCustomScoreRerankTerms(unittest.TestCase):
             ranking_method=RankingMethod.RRF,
             searchable_attributes_lexical=['description'],  # title not in main lexical -> extra term for title
         )
-        custom_score_keys = {f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title'}
+        custom_score_keys = {'bm25_field_title'}
         lexical_term, tensor_term = self.vespa_index._append_custom_score_rerank_terms(
             marqo_query, 'base_lex', 'base_tensor', custom_score_keys
         )
@@ -2060,7 +2174,7 @@ class TestAppendCustomScoreRerankTerms(unittest.TestCase):
     def test_returns_unchanged_when_only_closeness_keys(self):
         """When custom score keys contain only closeness (no BM25), no extra rank terms are added."""
         marqo_query = self._hybrid_query(ranking_method=RankingMethod.RRF)
-        custom_score_keys = {f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}closeness_retrieval_vector_field_title'}
+        custom_score_keys = {'closeness_retrieval_vector_field_title'}
         lexical_term, tensor_term = self.vespa_index._append_custom_score_rerank_terms(
             marqo_query, 'base_lex', 'base_tensor', custom_score_keys
         )

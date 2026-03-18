@@ -1,6 +1,7 @@
 from typing import Tuple, Optional, Union
 
 from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery
+from marqo.core.models.custom_score_rerank import ParsedCustomScoreKey
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError, InvalidArgumentError
@@ -134,6 +135,10 @@ class VespaIndex(ABC):
         2. global score modifiers 'add' weights
         3. custom score reranker 'mult' weights
         4. custom score reranker 'add' weights
+
+        Custom score rerank dicts (3 and 4) use **internal keys**: the part of the API field name after
+        ``marqo__score_`` (e.g. ``bm25_field_title``). Callers must not strip again; semi-structured
+        hybrid query code expects suffix keys only.
         """
         global_score_modifiers_mult_tensor = {}
         global_score_modifiers_add_tensor = {}
@@ -143,7 +148,7 @@ class VespaIndex(ABC):
         for modifier in score_modifiers:
             if modifier.field.startswith(constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX):
                 field_name_to_use = modifier.field[len(constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX):]
-                if VespaIndex.parse_custom_score_key(field_name_to_use) is None:
+                if ParsedCustomScoreKey.parse(field_name_to_use) is None:
                     raise InvalidArgumentError(
                         "Attempted to use custom score reranker with invalid format. "
                         f"Field name '{modifier.field}' does not match expected patterns (e.g. marqo__score_bm25_field_<field>, "
@@ -166,37 +171,6 @@ class VespaIndex(ABC):
 
         return global_score_modifiers_mult_tensor, global_score_modifiers_add_tensor, \
                 custom_score_rerankers_mult_tensor, custom_score_rerankers_add_tensor
-
-    @staticmethod
-    def parse_custom_score_key(key: str) -> Optional[Tuple[str, Optional[str], Optional[str]]]:
-        """
-        Parse a custom score rerank key into (score_type, field_name, aggregate_type).
-
-        Key formats (only bm25 and closeness_retrieval_vector per plan):
-        - {score_type}_field_{FIELD_NAME} -> (score_type, "FIELD_NAME", None)
-        - {score_type}_{sum|max|avg} -> (score_type, None, aggregate)
-
-        Returns None for unsupported score types or invalid keys.
-        """
-        supported_score_types = ("bm25", "closeness_retrieval_vector")
-        aggregate_types = ("sum", "max", "avg")
-
-        if not key or "_" not in key:
-            return None
-
-        for score_type in supported_score_types:
-            prefix = score_type + "_"
-            if not key.startswith(prefix):
-                continue
-            rest = key[len(prefix):]
-            if rest in aggregate_types:
-                return (score_type, None, rest)
-            if rest.startswith("field_"):
-                field_name = rest[6:]  # len("field_") == 6
-                return None if not field_name else (score_type, field_name, None)
-            return None
-
-        return None
 
     def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
         """

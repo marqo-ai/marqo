@@ -107,7 +107,7 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Parsed custom score rerank key. Matches Python parse_custom_score_key.
+     * Parsed custom score rerank key. Matches Python ParsedCustomScoreKey.parse.
      * Key formats: {scoreType}_field_{fieldName} or {scoreType}_{sum|max|avg}.
      */
     @VisibleForTesting

@@ -9,48 +9,6 @@ from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InvalidArgumentError
 
 
-class TestParseCustomScoreKey(unittest.TestCase):
-    """Tests for VespaIndex.parse_custom_score_key."""
-
-    def test_bm25_field(self):
-        self.assertEqual(
-            VespaIndex.parse_custom_score_key("bm25_field_variantTitle"),
-            ("bm25", "variantTitle", None),
-        )
-        self.assertEqual(
-            VespaIndex.parse_custom_score_key("bm25_field_title"),
-            ("bm25", "title", None),
-        )
-
-    def test_bm25_aggregates(self):
-        for agg in ("sum", "max", "avg"):
-            self.assertEqual(
-                VespaIndex.parse_custom_score_key(f"bm25_{agg}"),
-                ("bm25", None, agg),
-            )
-
-    def test_closeness_retrieval_vector_field(self):
-        self.assertEqual(
-            VespaIndex.parse_custom_score_key("closeness_retrieval_vector_field_variantImage"),
-            ("closeness_retrieval_vector", "variantImage", None),
-        )
-
-    def test_closeness_retrieval_vector_aggregates(self):
-        for agg in ("sum", "max", "avg"):
-            self.assertEqual(
-                VespaIndex.parse_custom_score_key(f"closeness_retrieval_vector_{agg}"),
-                ("closeness_retrieval_vector", None, agg),
-            )
-
-    def test_unsupported_or_invalid_returns_none(self):
-        self.assertIsNone(VespaIndex.parse_custom_score_key("closeness_ranking_vector_sum"))
-        self.assertIsNone(VespaIndex.parse_custom_score_key("unknown_type_field_x"))
-        self.assertIsNone(VespaIndex.parse_custom_score_key(""))
-        self.assertIsNone(VespaIndex.parse_custom_score_key("bm25"))
-        self.assertIsNone(VespaIndex.parse_custom_score_key("bm25_"))
-        self.assertIsNone(VespaIndex.parse_custom_score_key("bm25_field_"))
-
-
 class TestConvertHybridGlobalScoreModifiersToTensors(unittest.TestCase):
     """Tests for _convert_hybrid_global_score_modifiers_to_tensors (custom vs global split and keys)."""
 
@@ -180,9 +138,9 @@ class TestConvertHybridGlobalScoreModifiersToTensors(unittest.TestCase):
 
 class TestValidateCustomScoreModifierFieldsAggregates(unittest.TestCase):
     """
-    _validate_custom_score_modifier_fields must raise InvalidArgumentError (400) when requesting
-    a BM25 aggregate (sum/max/avg) but the index has no lexically searchable fields, or when
-    requesting a closeness aggregate but the index has no tensor fields.
+    BM25 aggregate with no lexical fields and closeness aggregate with no tensor fields are
+    ignored (filtered out by _filter_applicable_custom_score_keys); _validate_custom_score_modifier_fields
+    is not called with those keys and does not raise for them.
     """
 
     def _create_semi_structured_vespa_index_with_empty_lexical_and_tensor(self):
@@ -195,29 +153,33 @@ class TestValidateCustomScoreModifierFieldsAggregates(unittest.TestCase):
         mock_index.index_supports_partial_updates = False
         return SemiStructuredVespaIndex(mock_index)
 
-    def test_bm25_aggregate_with_no_lexically_searchable_fields_raises(self):
-        """Requesting marqo__score_bm25_sum (or max/avg) with no lexical fields in index must raise 400."""
+    def test_filter_applicable_bm25_aggregate_with_no_lexical_fields_excluded(self):
+        """bm25_sum/max/avg (internal keys) with no lexical fields in index is filtered out (ignored)."""
         vespa_index = self._create_semi_structured_vespa_index_with_empty_lexical_and_tensor()
-        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
         for agg in ("sum", "max", "avg"):
             with self.subTest(aggregate=agg):
-                custom_score_keys = {f"{prefix}bm25_{agg}"}
-                with self.assertRaises(InvalidArgumentError) as ctx:
-                    vespa_index._validate_custom_score_modifier_fields(custom_score_keys)
-                self.assertIn("BM25 aggregate", str(ctx.exception))
-                self.assertIn("no lexically searchable fields", str(ctx.exception))
+                custom_score_keys = {f"bm25_{agg}"}
+                applicable = vespa_index._filter_applicable_custom_score_keys(custom_score_keys)
+                self.assertEqual(applicable, set(), msg="BM25 aggregate should be excluded when no lexical fields")
 
-    def test_closeness_aggregate_with_no_tensor_fields_raises(self):
-        """Requesting closeness_retrieval_vector sum/max/avg with no tensor fields in index must raise 400."""
+    def test_filter_applicable_closeness_aggregate_with_no_tensor_fields_excluded(self):
+        """closeness_retrieval_vector sum/max/avg (internal keys) with no tensor fields is filtered out."""
         vespa_index = self._create_semi_structured_vespa_index_with_empty_lexical_and_tensor()
-        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
         for agg in ("sum", "max", "avg"):
             with self.subTest(aggregate=agg):
-                custom_score_keys = {f"{prefix}closeness_retrieval_vector_{agg}"}
-                with self.assertRaises(InvalidArgumentError) as ctx:
-                    vespa_index._validate_custom_score_modifier_fields(custom_score_keys)
-                self.assertIn("closeness aggregate", str(ctx.exception))
-                self.assertIn("no tensor fields", str(ctx.exception))
+                custom_score_keys = {f"closeness_retrieval_vector_{agg}"}
+                applicable = vespa_index._filter_applicable_custom_score_keys(custom_score_keys)
+                self.assertEqual(applicable, set(), msg="Closeness aggregate should be excluded when no tensor fields")
+
+    def test_validate_custom_score_modifier_fields_does_not_raise_for_bm25_aggregate_no_lexical(self):
+        """_validate_custom_score_modifier_fields no longer raises for BM25 aggregate when no lexical fields."""
+        vespa_index = self._create_semi_structured_vespa_index_with_empty_lexical_and_tensor()
+        vespa_index._validate_custom_score_modifier_fields({"bm25_sum"})
+
+    def test_validate_custom_score_modifier_fields_does_not_raise_for_closeness_aggregate_no_tensor(self):
+        """_validate_custom_score_modifier_fields no longer raises for closeness aggregate when no tensor fields."""
+        vespa_index = self._create_semi_structured_vespa_index_with_empty_lexical_and_tensor()
+        vespa_index._validate_custom_score_modifier_fields({"closeness_retrieval_vector_sum"})
 
 
 class TestValidateCustomScoreModifierFieldsGeodegrees(unittest.TestCase):
@@ -283,10 +245,9 @@ class TestValidateCustomScoreModifierFieldsGeodegrees(unittest.TestCase):
     def test_closeness_retrieval_vector_with_geodegrees_raises_400(self):
         """Using closeness_retrieval_vector (field or aggregate) with index distance_metric=geodegrees must raise InvalidArgumentError (400)."""
         vespa_index = self._create_semi_structured_vespa_index_geodegrees()
-        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
         for custom_score_keys in [
-            {f"{prefix}closeness_retrieval_vector_field_title"},
-            {f"{prefix}closeness_retrieval_vector_sum"},
+            {"closeness_retrieval_vector_field_title"},
+            {"closeness_retrieval_vector_sum"},
         ]:
             with self.subTest(keys=custom_score_keys):
                 with self.assertRaises(InvalidArgumentError) as ctx:
@@ -298,8 +259,7 @@ class TestValidateCustomScoreModifierFieldsGeodegrees(unittest.TestCase):
     def test_bm25_with_geodegrees_index_succeeds(self):
         """BM25 custom score keys are allowed when index uses geodegrees (only closeness is rejected)."""
         vespa_index = self._create_semi_structured_vespa_index_geodegrees()
-        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
-        vespa_index._validate_custom_score_modifier_fields({f"{prefix}bm25_field_title"})
+        vespa_index._validate_custom_score_modifier_fields({"bm25_field_title"})
 
 
 class TestValidateCustomScoreModifierFieldsSingleField(unittest.TestCase):
@@ -360,35 +320,6 @@ class TestValidateCustomScoreModifierFieldsSingleField(unittest.TestCase):
             string_array_fields=[],
         )
         return SemiStructuredVespaIndex(marqo_index)
-
-    def test_bm25_field_nonexistent_raises(self):
-        """bm25_field_<name> for field not in index must raise InvalidArgumentError."""
-        vespa_index = self._create_semi_structured_vespa_index_with_lexical_and_tensor()
-        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
-        with self.assertRaises(InvalidArgumentError) as ctx:
-            vespa_index._validate_custom_score_modifier_fields({f"{prefix}bm25_field_nonexistent"})
-        self.assertIn("nonexistent", str(ctx.exception))
-        self.assertIn("not in the index", str(ctx.exception))
-
-    def test_bm25_field_not_lexically_searchable_raises(self):
-        """bm25_field_<name> for field without lexical search (e.g. description here) must raise."""
-        vespa_index = self._create_semi_structured_vespa_index_with_lexical_and_tensor()
-        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
-        with self.assertRaises(InvalidArgumentError) as ctx:
-            vespa_index._validate_custom_score_modifier_fields({f"{prefix}bm25_field_description"})
-        self.assertIn("not a lexically searchable field", str(ctx.exception))
-        self.assertIn("description", str(ctx.exception))
-
-    def test_closeness_field_nonexistent_raises(self):
-        """closeness_retrieval_vector_field_<name> for non-tensor field must raise InvalidArgumentError."""
-        vespa_index = self._create_semi_structured_vespa_index_with_lexical_and_tensor()
-        prefix = MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
-        with self.assertRaises(InvalidArgumentError) as ctx:
-            vespa_index._validate_custom_score_modifier_fields(
-                {f"{prefix}closeness_retrieval_vector_field_nonexistent"}
-            )
-        self.assertIn("nonexistent", str(ctx.exception))
-        self.assertIn("not a tensor field", str(ctx.exception))
 
 
 if __name__ == "__main__":

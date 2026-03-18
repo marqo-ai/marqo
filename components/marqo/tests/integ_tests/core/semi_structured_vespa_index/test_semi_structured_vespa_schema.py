@@ -135,6 +135,30 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
                 # Verify the version was used in the index
                 self.assertEqual("2.15.0", marqo_index.marqo_version)
 
+    def test_semi_structured_index_schema_all_distance_metrics(self):
+        """Semi-structured Vespa schema generation for each distance metric (2 lexical + 2 tensor fields)."""
+        lexical_fields = ['text_field1', 'text_field2']
+        tensor_fields = ['tensor_field1', 'tensor_field2']
+
+        for distance_metric in DistanceMetric:
+            with self.subTest(f"Semi-structured index with distance metric: {distance_metric.value}"):
+                test_marqo_index_request = self.unstructured_marqo_index_request(
+                    name="test_semi_structured_schema",
+                    hnsw_config=HnswConfig(ef_construction=512, m=16),
+                    distance_metric=distance_metric,
+                )
+                _, index = SemiStructuredVespaSchema(test_marqo_index_request).generate_schema()
+                marqo_index = self._populate_fields(index, lexical_fields, tensor_fields)
+                generated_schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+                expected_schema = self._read_schema_from_file(
+                    f'test_schemas/semi_structured_vespa_index_schema_distance_metric_{distance_metric.value}.sd'
+                )
+                self.maxDiff = None
+                self.assertEqual(
+                    self._remove_whitespace_in_schema(expected_schema),
+                    self._remove_whitespace_in_schema(generated_schema),
+                )
+
     def _populate_fields(self, index, lexical_fields, tensor_fields, string_array_fields=None):
         marqo_index = cast(SemiStructuredMarqoIndex, index)
         for lexical_field in lexical_fields:
