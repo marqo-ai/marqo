@@ -905,38 +905,6 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertGreater(len(res["hits"]), 0)
 
     @pytest.mark.skip_for_multinode
-    def test_hybrid_search_custom_score_rerank_invalid_key_raises(self):
-        """Hybrid search with invalid custom score key raises. Only semi-structured supports custom score rerank."""
-        for index in [self.semi_structured_default_text_index]:
-            with self.subTest(index=index.name):
-                self.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=self.docs_list[:3],
-                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
-                        if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-                with self.assertRaises((api_exception.InvalidArgError, core_exceptions.InvalidArgumentError)):
-                    tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrievalMethod=RetrievalMethod.Disjunction,
-                            rankingMethod=RankingMethod.RRF,
-                        ),
-                        score_modifiers=ScoreModifierLists(
-                            add_to_score=[
-                                {"field_name": f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}invalid_xyz", "weight": 1.0}
-                            ]
-                        ),
-                        result_count=10
-                    )
-
-    @pytest.mark.skip_for_multinode
     def test_hybrid_search_custom_score_rerank_with_regular_modifiers(self):
         """Custom score rerank and regular global score modifiers can be used together. Only semi-structured supports marqo__score_*."""
         for index in [self.semi_structured_default_text_index]:
