@@ -1479,6 +1479,31 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             relevance_cutoff=relevance_cutoff,
         )
 
+    def test_global_score_modifiers_with_attributes_to_retrieve_does_not_force_select_star(self):
+        """Global-only scoreModifiers must not widen hybrid YQL to select * (performance regression guard)."""
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            searchableAttributesLexical=['title'],
+            searchableAttributesTensor=['title'],
+        )
+        marqo_query = MarqoHybridQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_parameters,
+            attributes_to_retrieve=['title'],
+            score_modifiers=[
+                ScoreModifier(field='popularity', weight=1.0, type=ScoreModifierType.Add),
+            ],
+        )
+        q = self.vespa_index._get_base_vespa_hybrid_query(marqo_query)
+        self.assertNotIn('select * from', q['marqo__yql.tensor'])
+        self.assertNotIn('select * from', q['marqo__yql.lexical'])
+
     def test_hybrid_query_with_custom_score_rerank_full_query(self):
         """
         Full generated Vespa query with custom score rerank and with collapse, facets, track_total_hits

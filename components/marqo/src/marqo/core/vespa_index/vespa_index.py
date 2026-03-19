@@ -205,7 +205,8 @@ class VespaIndex(ABC):
 
         """
         Specifically for hybrid queries.
-        Returns a dictionary with 4 keys: 'lexical', 'tensor', 'global', and 'custom_score_rerank'.
+        Returns a dictionary with keys 'lexical', 'tensor', 'global', and optionally
+        ``custom_score_rerank`` (only present when at least one ``marqo__score_*`` modifier exists).
         Each key points to a dictionary containing the score modifiers for the respective field types.
 
         Example:
@@ -274,17 +275,22 @@ class VespaIndex(ABC):
                 custom_score_rerankers_mult_tensor, custom_score_rerankers_add_tensor \
                 = self._convert_hybrid_global_score_modifiers_to_tensors(hybrid_query.score_modifiers)
 
-            # Query input for global score modifiers
-            result[constants.MARQO_GLOBAL_SCORE_MODIFIERS] = {
-                constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL: global_score_modifiers_mult_tensor,
-                constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL: global_score_modifiers_add_tensor
-            }
+            # Global score modifier tensors only for non-marqo__score_* fields. Omit when empty so the
+            # result['global'] entry is not truthy with only empty inner dicts (e.g. custom-only lists).
+            if global_score_modifiers_mult_tensor or global_score_modifiers_add_tensor:
+                result[constants.MARQO_GLOBAL_SCORE_MODIFIERS] = {
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL: global_score_modifiers_mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL: global_score_modifiers_add_tensor
+                }
 
-            # Query input for custom score rerankers (separate from global score modifiers)
-            result[constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS] = {
-                constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL: custom_score_rerankers_mult_tensor,
-                constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL: custom_score_rerankers_add_tensor
-            }
+            # Custom score rerank tensors only when there are marqo__score_* modifiers. Omitting the key
+            # when empty avoids truthy empty dict pairs (callers must not treat "any global modifiers"
+            # as "custom score rerank active").
+            if custom_score_rerankers_mult_tensor or custom_score_rerankers_add_tensor:
+                result[constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS] = {
+                    constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL: custom_score_rerankers_mult_tensor,
+                    constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL: custom_score_rerankers_add_tensor
+                }
 
         return result
 

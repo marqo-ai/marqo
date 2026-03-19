@@ -3,7 +3,13 @@ import unittest
 from typing import List
 from unittest.mock import Mock
 
-from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
+from marqo.core.constants import (
+    MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX,
+    MARQO_CUSTOM_SCORE_RERANK_MODIFIERS,
+    MARQO_GLOBAL_SCORE_MODIFIERS,
+)
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
+from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InvalidArgumentError
@@ -134,6 +140,54 @@ class TestConvertHybridGlobalScoreModifiersToTensors(unittest.TestCase):
         self.assertEqual(g_add, {"doc_field": 1.0})
         self.assertEqual(c_mult, {"bm25_sum": 0.5})
         self.assertEqual(c_add, {})
+
+    def test_get_hybrid_score_modifiers_omits_custom_score_rerank_when_only_global_modifiers(self):
+        """No marqo__score_* modifiers => MARQO_CUSTOM_SCORE_RERANK_MODIFIERS must not be in result (regression guard)."""
+        vespa_index = self._create_index_with_hybrid()
+        hq = MarqoHybridQuery(
+            index_name="test",
+            limit=10,
+            offset=0,
+            or_phrases=["q"],
+            and_phrases=[],
+            vector_query=[0.1],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            score_modifiers=[
+                ScoreModifier(field="popularity", weight=1.0, type=ScoreModifierType.Add),
+            ],
+        )
+        result = vespa_index._get_hybrid_score_modifiers(hq)
+        self.assertNotIn(MARQO_CUSTOM_SCORE_RERANK_MODIFIERS, result)
+        self.assertIsNotNone(result.get(MARQO_GLOBAL_SCORE_MODIFIERS))
+
+    def test_get_hybrid_score_modifiers_omits_global_when_only_custom_rerank_modifiers(self):
+        """Only marqo__score_* modifiers => global key stays None; custom rerank dict is present."""
+        vespa_index = self._create_index_with_hybrid()
+        hq = MarqoHybridQuery(
+            index_name="test",
+            limit=10,
+            offset=0,
+            or_phrases=["q"],
+            and_phrases=[],
+            vector_query=[0.1],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+            ),
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        result = vespa_index._get_hybrid_score_modifiers(hq)
+        self.assertIsNone(result.get(MARQO_GLOBAL_SCORE_MODIFIERS))
+        self.assertIn(MARQO_CUSTOM_SCORE_RERANK_MODIFIERS, result)
 
 
 class TestValidateCustomScoreModifierFieldsAggregates(unittest.TestCase):

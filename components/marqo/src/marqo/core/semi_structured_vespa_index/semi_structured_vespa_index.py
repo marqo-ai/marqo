@@ -541,6 +541,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # Add custom score rerank support for semi-structured indexes.
         custom_score_keys: Set[str] = set()
+        applicable_custom_score_keys: Set[str] = set()
         custom_score_rerank = hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)
 
         # Calculate new terms for tensor and lexical retrievers
@@ -571,8 +572,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # When custom score rerank is used with attributes_to_retrieve, sub-query hits must include
         # summaryfeatures (bm25, ranking_closeness_metric_*). A restricted YQL select can cause Vespa
         # to omit summaryfeatures; use select * so hits have them; response is filtered in Python.
+        # Guard on applicable keys only: global-only score modifiers must not force select *.
         select_for_hybrid_yql = select_attributes
-        if custom_score_rerank and marqo_query.attributes_to_retrieve is not None:
+        if applicable_custom_score_keys and marqo_query.attributes_to_retrieve is not None:
             select_for_hybrid_yql = "*"
 
         tensor_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
@@ -628,12 +630,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
 
         # Tell the custom searcher what type of custom score reranking will be done
-        if custom_score_rerank:
-            has_bm25 = False
-            has_closeness = False
-            if applicable_custom_score_keys:
-                has_bm25 = bool(self._get_fields_to_bm25_rerank_by(applicable_custom_score_keys))
-                has_closeness = bool(self._get_fields_to_closeness_rerank_by(applicable_custom_score_keys))
+        if applicable_custom_score_keys:
+            has_bm25 = bool(self._get_fields_to_bm25_rerank_by(applicable_custom_score_keys))
+            has_closeness = bool(self._get_fields_to_closeness_rerank_by(applicable_custom_score_keys))
             if has_closeness:
                 query["marqo__hasRankingVector"] = True
                 # Pass distance metric so searcher can min-max normalize only for dot product (others are already [0,1] in rank profile)
