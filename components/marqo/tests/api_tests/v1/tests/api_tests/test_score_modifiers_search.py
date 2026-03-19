@@ -50,7 +50,7 @@ class TestScoreModifierSearch(MarqoTestCase):
                     np.round(np.random.uniform(-10, 10, 8), 2)
 
                 doc = {
-                    "image_field": TestImageUrls.HIPPO_STATUE,
+                    "image_field": TestImageUrls.HIPPO_STATUE.value,
                     "text_field": "Marqo can support vector search",
                     "multiply_1": multiply_1_value,
                     "multiply_2": multiply_2_value,

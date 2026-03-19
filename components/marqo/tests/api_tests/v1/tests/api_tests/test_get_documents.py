@@ -66,17 +66,17 @@ class TestGetDocuments(MarqoTestCase):
         documents = [
             {
                 "_id": "1",
-                "image_field_1": TestImageUrls.IMAGE1,
+                "image_field_1": TestImageUrls.IMAGE1.value,
                 "text_field_1": "hello world"
             },
             {
                 "_id": "2",
-                "image_field_1": TestImageUrls.IMAGE2,
+                "image_field_1": TestImageUrls.IMAGE2.value,
                 "text_field_1": "This is a test"
             },
             {
                 "_id": "3",
-                "image_field_1": TestImageUrls.IMAGE3,
+                "image_field_1": TestImageUrls.IMAGE3.value,
                 "text_field_1": "Another test"
             }
         ]

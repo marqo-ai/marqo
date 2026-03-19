@@ -55,7 +55,7 @@ class TestCreateIndex(MarqoTestCase):
     def test_create_unstructured_image_index(self):
         self.client.create_index(index_name=self.index_name, type="unstructured",
                                  treat_urls_and_pointers_as_images=True, model="open_clip/ViT-B-32/laion2b_s34b_b79k")
-        image_url = TestImageUrls.IMAGE2
+        image_url = TestImageUrls.IMAGE2.value
         documents = [{"test": "test",
                       "image": image_url}]
         self.client.index(self.index_name).add_documents(documents, tensor_fields=["test", "image"])
@@ -166,7 +166,7 @@ class TestCreateIndex(MarqoTestCase):
                                  all_fields=[{"name": "test", "type": "text", "features": ["lexical_search"]},
                                              {"name": "image", "type": "image_pointer"}],
                                  tensor_fields=["test", "image"])
-        image_url = TestImageUrls.IMAGE2
+        image_url = TestImageUrls.IMAGE2.value
         documents = [{"test": "test",
                       "image": image_url}]
 
