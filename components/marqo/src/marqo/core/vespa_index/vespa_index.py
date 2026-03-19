@@ -149,11 +149,7 @@ class VespaIndex(ABC):
             if modifier.field.startswith(constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX):
                 field_name_to_use = modifier.field[len(constants.MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX):]
                 if ParsedCustomScoreKey.parse(field_name_to_use) is None:
-                    raise InvalidArgumentError(
-                        "Attempted to use custom score reranker with invalid format. "
-                        f"Field name '{modifier.field}' does not match expected patterns (e.g. marqo__score_bm25_field_<field>, "
-                        "marqo__score_bm25_sum, marqo__score_closeness_retrieval_vector_field_<field>)."
-                    )
+                    continue
                 mult_tensor = custom_score_rerankers_mult_tensor
                 add_tensor = custom_score_rerankers_add_tensor
             else:

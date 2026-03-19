@@ -93,8 +93,8 @@ class TestConvertHybridGlobalScoreModifiersToTensors(unittest.TestCase):
         self.assertEqual(c_mult, {})
         self.assertEqual(c_add, {"bm25_field_title": 1.0, "bm25_max": 2.0})
 
-    def test_custom_score_invalid_format_raises_400(self):
-        """Field starting with marqo__score_ but invalid format raises InvalidArgumentError (400)."""
+    def test_custom_score_invalid_format_is_silently_ignored(self):
+        """Field starting with marqo__score_ but invalid format is silently ignored."""
         vespa_index = self._create_index_with_hybrid()
         modifiers = [
             ScoreModifier(
@@ -103,10 +103,9 @@ class TestConvertHybridGlobalScoreModifiersToTensors(unittest.TestCase):
                 type=ScoreModifierType.Add,
             ),
         ]
-        with self.assertRaises(InvalidArgumentError) as ctx:
-            vespa_index._convert_hybrid_global_score_modifiers_to_tensors(modifiers)
-        self.assertIn("invalid format", str(ctx.exception))
-        self.assertIn("invalid_format", str(ctx.exception))
+        g_mult, g_add, c_mult, c_add = vespa_index._convert_hybrid_global_score_modifiers_to_tensors(modifiers)
+        self.assertEqual(c_mult, {})
+        self.assertEqual(c_add, {})
 
     def test_global_score_modifiers_unchanged(self):
         """Non-custom score modifiers go to global mult/add only."""
