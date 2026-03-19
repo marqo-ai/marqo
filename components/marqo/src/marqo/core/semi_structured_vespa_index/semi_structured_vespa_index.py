@@ -629,7 +629,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # Tell the custom searcher what type of custom score reranking will be done
         if custom_score_rerank:
-            applicable_custom_score_keys = self._filter_applicable_custom_score_keys(custom_score_keys)
             has_bm25 = False
             has_closeness = False
             if applicable_custom_score_keys:
