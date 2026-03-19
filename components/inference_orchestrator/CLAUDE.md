@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The Marqo Inference Container is a FastAPI-based service that handles ML model inference for the Marqo tensor search engine. It provides:
 
-- Model loading and management (HuggingFace, OpenCLIP, LanguageBind, etc.)
+- Model loading and management (HuggingFace, OpenCLIP, etc.)
 - Media download and preprocessing (images, text, multimodal)
 - Inference caching for improved performance
 - Triton inference server integration
