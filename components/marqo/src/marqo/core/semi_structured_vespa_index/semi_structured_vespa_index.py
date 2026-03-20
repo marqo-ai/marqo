@@ -570,8 +570,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             )
 
         # When custom score rerank is used with attributes_to_retrieve, sub-query hits must include
-        # summaryfeatures (bm25, ranking_closeness_metric_*). Adding "summaryfeatures" to the YQL
-        # select clause triggers Vespa to compute and attach them without fetching all document fields.
+        # summaryfeatures (bm25, ranking_closeness_metric_*) or else these will be unavailable in the global step.
         select_for_hybrid_yql = select_attributes
         if applicable_custom_score_keys and marqo_query.attributes_to_retrieve is not None:
             select_for_hybrid_yql = select_attributes + ', summaryfeatures'
