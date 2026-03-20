@@ -586,7 +586,8 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         yql = call_kwargs['yql']
 
         # Retrieval terms should be ORed (default behavior)
-        retrieval_part = yql.split('rank(')[1].split(',')[0]
+        # Extract retrieval part: everything between "rank(" and ", query_index"
+        retrieval_part = yql.split('rank(')[1].split(', query_index')[0]
         self.assertIn(' OR ', retrieval_part)
         self.assertNotIn(' AND ', retrieval_part)
 
