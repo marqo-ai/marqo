@@ -81,8 +81,8 @@ class Typeahead:
 
                 ranking_terms.append(f"query_index contains \"{escaped_token}\"")
 
-            # Join retrieval terms: AND when prefix_only mode, OR otherwise
-            join_operator = " AND " if request.prefix_only else " OR "
+            # Join retrieval terms: AND when match_all_tokens mode, OR otherwise
+            join_operator = " AND " if request.match_all_tokens else " OR "
             yql_retrieval = join_operator.join(retrieval_terms)
             yql_ranking = " OR ".join(ranking_terms)
             yql = f"SELECT query, metadata FROM {typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})"

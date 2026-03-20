@@ -510,13 +510,13 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
 
 
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_prefix_only_uses_and_logic(self, mock_normalize):
-        """Test get_suggestions uses AND between retrieval terms when prefixOnly=True."""
+    def test_get_suggestions_match_all_tokens_uses_and_logic(self, mock_normalize):
+        """Test get_suggestions uses AND between retrieval terms when matchAllTokens=True."""
         mock_normalize.return_value = "taylor s"
 
         self.mock_vespa_client.query.return_value = self.empty_vespa_response
 
-        request = TypeaheadRequest(q="taylor s", prefix_only=True)
+        request = TypeaheadRequest(q="taylor s", match_all_tokens=True)
 
         with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
             self.typeahead.get_suggestions("test_index", request)
@@ -530,13 +530,13 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertIn('query_index contains "taylor" OR query_index contains "s"', yql)
 
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_prefix_only_keeps_fuzzy(self, mock_normalize):
+    def test_get_suggestions_match_all_tokens_keeps_fuzzy(self, mock_normalize):
         """Test get_suggestions still uses fuzzy matching for long tokens in prefix-only mode."""
         mock_normalize.return_value = "machine learning"
 
         self.mock_vespa_client.query.return_value = self.empty_vespa_response
 
-        request = TypeaheadRequest(q="machine learning", prefix_only=True, fuzzy_edit_distance=2,
+        request = TypeaheadRequest(q="machine learning", match_all_tokens=True, fuzzy_edit_distance=2,
                                    min_fuzzy_match_length=3)
 
         with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
@@ -552,13 +552,13 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertIn(' AND ', yql)
 
     @patch('marqo.core.typeahead.typeahead.normalize_text')
-    def test_get_suggestions_prefix_only_single_token(self, mock_normalize):
+    def test_get_suggestions_match_all_tokens_single_token(self, mock_normalize):
         """Test get_suggestions prefix-only mode works with a single token."""
         mock_normalize.return_value = "taylor"
 
         self.mock_vespa_client.query.return_value = self.empty_vespa_response
 
-        request = TypeaheadRequest(q="taylor", prefix_only=True)
+        request = TypeaheadRequest(q="taylor", match_all_tokens=True)
 
         with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
             self.typeahead.get_suggestions("test_index", request)

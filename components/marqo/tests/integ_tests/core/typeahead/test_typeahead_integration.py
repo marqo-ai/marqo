@@ -305,11 +305,11 @@ class TestTypeaheadIntegration(MarqoTestCase):
                 self.assertListEqual([q.query for q in sorted_queries[0:limit]],
                                      [s.suggestion for s in response.suggestions])
     
-    def test_get_suggestions_prefix_only_filters_unrelated_tokens(self):
-        """Test that prefixOnly=True requires ALL tokens to match, filtering out partial matches.
+    def test_get_suggestions_match_all_tokens_filters_unrelated_tokens(self):
+        """Test that matchAllTokens=True requires ALL tokens to match, filtering out partial matches.
 
         With the default OR logic, "taylor s" returns results matching just "s" (e.g., "sport", "sad").
-        With prefixOnly=True (AND logic), only results containing BOTH "taylor" AND "s*" are returned.
+        With matchAllTokens=True (AND logic), only results containing BOTH "taylor" AND "s*" are returned.
         """
         queries = [
             TypeaheadAddQueryRequest(query="taylor swift", popularity=2.0),
@@ -330,7 +330,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
         self.assertGreater(len(or_suggestions), 3, f"OR mode should return many results, got: {or_suggestions}")
 
         # Prefix-only AND behavior: "taylor s" requires BOTH "taylor" AND "s*"
-        request_and = TypeaheadRequest(q="taylor s", prefix_only=True)
+        request_and = TypeaheadRequest(q="taylor s", match_all_tokens=True)
         response_and = self.config.typeahead.get_suggestions(self.test_index_name, request_and)
         and_suggestions = [s.suggestion for s in response_and.suggestions]
 
@@ -343,8 +343,8 @@ class TestTypeaheadIntegration(MarqoTestCase):
         self.assertNotIn("sad", and_suggestions)
         self.assertNotIn("suspense", and_suggestions)
 
-    def test_get_suggestions_prefix_only_with_fuzzy(self):
-        """Test that prefixOnly=True still allows fuzzy matching for typo tolerance."""
+    def test_get_suggestions_match_all_tokens_with_fuzzy(self):
+        """Test that matchAllTokens=True still allows fuzzy matching for typo tolerance."""
         queries = [
             TypeaheadAddQueryRequest(query="taylor swift", popularity=2.0),
             TypeaheadAddQueryRequest(query="samsung galaxy", popularity=1.5),
@@ -352,7 +352,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
         self._index_test_queries(queries)
 
         # Typo in "taylor" -> "taylro", fuzzy should still match
-        request = TypeaheadRequest(q="taylro swi", prefix_only=True, fuzzy_edit_distance=2)
+        request = TypeaheadRequest(q="taylro swi", match_all_tokens=True, fuzzy_edit_distance=2)
         response = self.config.typeahead.get_suggestions(self.test_index_name, request)
         suggestions = [s.suggestion for s in response.suggestions]
 
