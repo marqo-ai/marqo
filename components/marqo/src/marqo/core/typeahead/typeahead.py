@@ -81,8 +81,9 @@ class Typeahead:
 
                 ranking_terms.append(f"query_index contains \"{escaped_token}\"")
 
-            # Create single YQL query that ORs all token conditions
-            yql_retrieval = " OR ".join(retrieval_terms)
+            # Join retrieval terms: AND when prefix_only mode, OR otherwise
+            join_operator = " AND " if request.prefix_only else " OR "
+            yql_retrieval = join_operator.join(retrieval_terms)
             yql_ranking = " OR ".join(ranking_terms)
             yql = f"SELECT query, metadata FROM {typeahead_schema_name} WHERE rank({yql_retrieval}, {yql_ranking})"
 

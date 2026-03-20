@@ -509,6 +509,88 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         self.assertEqual(result.processing_time_ms, 123)
 
 
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_prefix_only_uses_and_logic(self, mock_normalize):
+        """Test get_suggestions uses AND between retrieval terms when prefixOnly=True."""
+        mock_normalize.return_value = "taylor s"
+
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="taylor s", prefix_only=True)
+
+        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
+            self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        yql = call_kwargs['yql']
+
+        # Retrieval terms should be ANDed
+        self.assertIn(' AND ', yql)
+        # The ranking part still uses OR (inside rank() second argument)
+        self.assertIn('query_index contains "taylor" OR query_index contains "s"', yql)
+
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_prefix_only_keeps_fuzzy(self, mock_normalize):
+        """Test get_suggestions still uses fuzzy matching for long tokens in prefix-only mode."""
+        mock_normalize.return_value = "machine learning"
+
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="machine learning", prefix_only=True, fuzzy_edit_distance=2,
+                                   min_fuzzy_match_length=3)
+
+        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
+            self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        yql = call_kwargs['yql']
+
+        # Fuzzy matching should still be used for long tokens
+        self.assertIn('fuzzy("machine")', yql)
+        self.assertIn('fuzzy("learning")', yql)
+        # But joined with AND
+        self.assertIn(' AND ', yql)
+
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_prefix_only_single_token(self, mock_normalize):
+        """Test get_suggestions prefix-only mode works with a single token."""
+        mock_normalize.return_value = "taylor"
+
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="taylor", prefix_only=True)
+
+        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
+            self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        yql = call_kwargs['yql']
+
+        # Single token — AND/OR doesn't matter, but query should still be valid
+        self.assertIn('fuzzy("taylor")', yql)
+        self.assertNotIn(' OR ', yql.split('rank(')[1].split(',')[0])  # no OR in retrieval part
+
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_default_uses_or_logic(self, mock_normalize):
+        """Test get_suggestions uses OR between retrieval terms by default (backward compat)."""
+        mock_normalize.return_value = "taylor s"
+
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="taylor s")
+
+        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
+            self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        yql = call_kwargs['yql']
+
+        # Retrieval terms should be ORed (default behavior)
+        retrieval_part = yql.split('rank(')[1].split(',')[0]
+        self.assertIn(' OR ', retrieval_part)
+        self.assertNotIn(' AND ', retrieval_part)
+
+
 class TestTypeaheadDeleteQueries(unittest.TestCase):
     """Test cases for delete query methods."""
 

@@ -305,6 +305,60 @@ class TestTypeaheadIntegration(MarqoTestCase):
                 self.assertListEqual([q.query for q in sorted_queries[0:limit]],
                                      [s.suggestion for s in response.suggestions])
     
+    def test_get_suggestions_prefix_only_filters_unrelated_tokens(self):
+        """Test that prefixOnly=True requires ALL tokens to match, filtering out partial matches.
+
+        With the default OR logic, "taylor s" returns results matching just "s" (e.g., "sport", "sad").
+        With prefixOnly=True (AND logic), only results containing BOTH "taylor" AND "s*" are returned.
+        """
+        queries = [
+            TypeaheadAddQueryRequest(query="taylor swift", popularity=2.0),
+            TypeaheadAddQueryRequest(query="taylor", popularity=1.5),
+            TypeaheadAddQueryRequest(query="sport", popularity=1.8),
+            TypeaheadAddQueryRequest(query="sad", popularity=1.0),
+            TypeaheadAddQueryRequest(query="suspense", popularity=0.8),
+            TypeaheadAddQueryRequest(query="taylor series math", popularity=0.5),
+        ]
+        self._index_test_queries(queries)
+
+        # Default OR behavior: "taylor s" matches anything with "taylor" OR "s*"
+        request_or = TypeaheadRequest(q="taylor s")
+        response_or = self.config.typeahead.get_suggestions(self.test_index_name, request_or)
+        or_suggestions = [s.suggestion for s in response_or.suggestions]
+
+        # Should include results that only match "s" like "sport", "sad", "suspense"
+        self.assertGreater(len(or_suggestions), 3, f"OR mode should return many results, got: {or_suggestions}")
+
+        # Prefix-only AND behavior: "taylor s" requires BOTH "taylor" AND "s*"
+        request_and = TypeaheadRequest(q="taylor s", prefix_only=True)
+        response_and = self.config.typeahead.get_suggestions(self.test_index_name, request_and)
+        and_suggestions = [s.suggestion for s in response_and.suggestions]
+
+        # Should only include results with both "taylor" and a word starting with "s"
+        self.assertIn("taylor swift", and_suggestions)
+        self.assertIn("taylor series math", and_suggestions)
+        # Should NOT include results that only match one token
+        self.assertNotIn("taylor", and_suggestions)  # no word starting with "s"
+        self.assertNotIn("sport", and_suggestions)  # no "taylor"
+        self.assertNotIn("sad", and_suggestions)
+        self.assertNotIn("suspense", and_suggestions)
+
+    def test_get_suggestions_prefix_only_with_fuzzy(self):
+        """Test that prefixOnly=True still allows fuzzy matching for typo tolerance."""
+        queries = [
+            TypeaheadAddQueryRequest(query="taylor swift", popularity=2.0),
+            TypeaheadAddQueryRequest(query="samsung galaxy", popularity=1.5),
+        ]
+        self._index_test_queries(queries)
+
+        # Typo in "taylor" -> "taylro", fuzzy should still match
+        request = TypeaheadRequest(q="taylro swi", prefix_only=True, fuzzy_edit_distance=2)
+        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+        suggestions = [s.suggestion for s in response.suggestions]
+
+        self.assertIn("taylor swift", suggestions)
+        self.assertNotIn("samsung galaxy", suggestions)
+
     # D. Query Management Tests
     def test_get_queries_by_strings(self):
         """Retrieve specific queries by their query strings."""

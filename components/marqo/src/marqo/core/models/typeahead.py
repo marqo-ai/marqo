@@ -37,6 +37,11 @@ class TypeaheadRequest(ImmutableStrictBaseModelV2):
         alias="bm25Weight",
         description="Weight for BM25 score in ranking"
     )
+    prefix_only: bool = Field(
+        default=False,
+        alias="prefixOnly",
+        description="When true, requires all tokens to match (AND logic) instead of any token (OR logic)"
+    )
 
 class TypeaheadSuggestion(ImmutableStrictBaseModelV2):
     """Individual suggestion in typeahead response."""
