@@ -570,12 +570,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             )
 
         # When custom score rerank is used with attributes_to_retrieve, sub-query hits must include
-        # summaryfeatures (bm25, ranking_closeness_metric_*). A restricted YQL select can cause Vespa
-        # to omit summaryfeatures; use select * so hits have them; response is filtered in Python.
-        # Guard on applicable keys only: global-only score modifiers must not force select *.
+        # summaryfeatures (bm25, ranking_closeness_metric_*). Adding "summaryfeatures" to the YQL
+        # select clause triggers Vespa to compute and attach them without fetching all document fields.
         select_for_hybrid_yql = select_attributes
         if applicable_custom_score_keys and marqo_query.attributes_to_retrieve is not None:
-            select_for_hybrid_yql = "*"
+            select_for_hybrid_yql = select_attributes + ', summaryfeatures'
 
         tensor_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'

@@ -637,6 +637,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             ),
         )
         with self.subTest(modifier="bm25"):
+            # All results should only have this 1 field
             requested_attrs = ["lex_ranking_field"]
             res = tensor_search.search(
                 config=self.config,
