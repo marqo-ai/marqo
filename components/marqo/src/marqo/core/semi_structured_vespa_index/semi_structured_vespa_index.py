@@ -165,7 +165,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         self,
         marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery],
         is_facets_term: bool = False,
-        _is_ranking_term: bool = False,
+        is_ranking_term: bool = False,
         attributes_to_search: Optional[List[str]] = None,
     ) -> str:
         """Generate the OR/weakAnd terms for the lexical search term."""
@@ -185,20 +185,20 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         terms = [
             self._get_lexical_contains_term(
                 phrase,
-                query=None if _is_ranking_term else marqo_query,
-                attributes_to_search=attributes_to_search if _is_ranking_term else None,
-                _is_ranking_term=_is_ranking_term,
+                query=None if is_ranking_term else marqo_query,
+                attributes_to_search=attributes_to_search if is_ranking_term else None,
+                is_ranking_term=is_ranking_term,
             )
             for phrase in marqo_query.or_phrases
         ]
 
         # Avoid invalid YQL (e.g. weakAnd(, , ...)) when all terms are empty (e.g. no attrs survived).
-        if _is_ranking_term and terms and not any(terms):
+        if is_ranking_term and terms and not any(terms):
             return ""
 
         if is_facets_term:
             return ' OR '.join(terms)
-        if _is_ranking_term:
+        if is_ranking_term:
             return f'weakAnd({", ".join(terms)})'
         if rerank_depth_lexical is not None:
             if rerank_depth_lexical <= 0:
@@ -212,7 +212,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         self,
         marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery],
         is_facets_term: bool = False,
-        _is_ranking_term: bool = False,
+        is_ranking_term: bool = False,
         attributes_to_search: Optional[List[str]] = None,
     ) -> str:
         """
@@ -220,9 +220,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         plus an optional AND (required phrases).
 
         Used in 2 scenarios:
-        1. Retrieval lexical term (_is_ranking_term=False, most common use case)
+        1. Retrieval lexical term (is_ranking_term=False, most common use case)
             - Uses marqo_query object and its searchable_attributes (if any).
-        2. Ranking lexical term (_is_ranking_term=True)
+        2. Ranking lexical term (is_ranking_term=True)
             - Uses given attributes_to_search, ignoring query-specified attributes. These attributes are determined by
             user-input custom score rerank fields. Ranking terms do NOT fetch all scores, only those specified in
             attributes_to_search.
@@ -241,7 +241,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return 'true'
 
         # When building a ranking term, if no attributes survive filtering, return "" without building OR/AND statements.
-        if _is_ranking_term and attributes_to_search is not None and attributes_to_search != ["*"]:
+        if is_ranking_term and attributes_to_search is not None and attributes_to_search != ["*"]:
             searchable = [
                 f for f in attributes_to_search
                 if f in self._marqo_index.field_map
@@ -253,16 +253,16 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         or_terms = self._generate_or_terms(
             marqo_query,
             is_facets_term=is_facets_term,
-            _is_ranking_term=_is_ranking_term,
+            is_ranking_term=is_ranking_term,
             attributes_to_search=attributes_to_search,
         )
         if marqo_query.and_phrases:
             and_terms = ' AND '.join([
                 self._get_lexical_contains_term(
                     phrase,
-                    query=None if _is_ranking_term else marqo_query,
-                    attributes_to_search=attributes_to_search if _is_ranking_term else None,
-                    _is_ranking_term=_is_ranking_term,
+                    query=None if is_ranking_term else marqo_query,
+                    attributes_to_search=attributes_to_search if is_ranking_term else None,
+                    is_ranking_term=is_ranking_term,
                 )
                 for phrase in marqo_query.and_phrases
             ])
@@ -278,10 +278,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         phrase: str,
         query: Optional[MarqoQuery] = None,
         attributes_to_search: Optional[List[str]] = None,
-        _is_ranking_term: bool = False,
+        is_ranking_term: bool = False,
     ) -> str:
         """Build a single YQL contains expression for the given phrase."""
-        if _is_ranking_term:
+        if is_ranking_term:
             if attributes_to_search == ["*"]:
                 return f'default contains "{phrase}"'
             searchable_attributes = [
@@ -447,7 +447,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if simplified_lexical:
             extra_bm25_term_for_lexical = self._get_lexical_search_term(
                 marqo_query,
-                _is_ranking_term=True,
+                is_ranking_term=True,
                 attributes_to_search=simplified_lexical,
             )
         if extra_bm25_term_for_lexical:
@@ -457,7 +457,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if bm25_fields:
             extra_bm25_term_for_tensor = self._get_lexical_search_term(
                 marqo_query,
-                _is_ranking_term=True,
+                is_ranking_term=True,
                 attributes_to_search=simplified_tensor,
             )
         if extra_bm25_term_for_tensor:

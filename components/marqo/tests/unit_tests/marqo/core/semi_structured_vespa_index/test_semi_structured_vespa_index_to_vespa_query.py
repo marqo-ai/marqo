@@ -1706,13 +1706,13 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         )
 
     def test_get_lexical_contains_term_with_attributes_to_search(self):
-        """_get_lexical_contains_term with _is_ranking_term=True uses attributes_to_search."""
+        """_get_lexical_contains_term with is_ranking_term=True uses attributes_to_search."""
         term = self.vespa_index._get_lexical_contains_term(
-            'hello', attributes_to_search=['*'], _is_ranking_term=True
+            'hello', attributes_to_search=['*'], is_ranking_term=True
         )
         self.assertEqual(term, 'default contains "hello"')
         term = self.vespa_index._get_lexical_contains_term(
-            'hello', attributes_to_search=['title'], _is_ranking_term=True
+            'hello', attributes_to_search=['title'], is_ranking_term=True
         )
         self.assertIn('marqo__lexical_title', term)
         self.assertIn('hello', term)
@@ -1740,7 +1740,7 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         self.assertIn('marqo__embeddings', terms[0])
 
     def test_generate_or_terms_ranking_term_no_target_hits(self):
-        """_generate_or_terms with _is_ranking_term=True returns weakAnd without targetHits."""
+        """_generate_or_terms with is_ranking_term=True returns weakAnd without targetHits."""
         hybrid_params = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
@@ -1757,14 +1757,14 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             hybrid_parameters=hybrid_params,
         )
         result = self.vespa_index._generate_or_terms(
-            q, _is_ranking_term=True, attributes_to_search=['title']
+            q, is_ranking_term=True, attributes_to_search=['title']
         )
         self.assertIn('weakAnd', result)
         self.assertNotIn('targetHits', result)
         self.assertIn('search', result)
 
     def test_get_lexical_search_term_ranking_term(self):
-        """_get_lexical_search_term with _is_ranking_term=True uses attributes_to_search, no targetHits."""
+        """_get_lexical_search_term with is_ranking_term=True uses attributes_to_search, no targetHits."""
         hybrid_params = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
@@ -1781,14 +1781,14 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             hybrid_parameters=hybrid_params,
         )
         result = self.vespa_index._get_lexical_search_term(
-            q, _is_ranking_term=True, attributes_to_search=['title']
+            q, is_ranking_term=True, attributes_to_search=['title']
         )
         self.assertNotEqual(result, 'false')
         self.assertNotIn('targetHits', result)
         self.assertIn('hello', result)
 
     def test_get_lexical_search_term_ranking_term_empty_attributes_returns_empty(self):
-        """When _is_ranking_term=True and attributes_to_search is empty, return "" so rank() is skipped."""
+        """When is_ranking_term=True and attributes_to_search is empty, return "" so rank() is skipped."""
         hybrid_params = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
@@ -1805,12 +1805,12 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             hybrid_parameters=hybrid_params,
         )
         result = self.vespa_index._get_lexical_search_term(
-            q, _is_ranking_term=True, attributes_to_search=[]
+            q, is_ranking_term=True, attributes_to_search=[]
         )
         self.assertEqual(result, "")
 
     def test_get_lexical_search_term_ranking_term_no_lexical_fields_survive_returns_empty(self):
-        """When _is_ranking_term=True and no attributes have lexical_field_name (e.g. tags), return ""."""
+        """When is_ranking_term=True and no attributes have lexical_field_name (e.g. tags), return ""."""
         hybrid_params = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
@@ -1828,12 +1828,12 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         )
         # 'tags' is a string-array field with no lexical_field_name in this index
         result = self.vespa_index._get_lexical_search_term(
-            q, _is_ranking_term=True, attributes_to_search=['tags']
+            q, is_ranking_term=True, attributes_to_search=['tags']
         )
         self.assertEqual(result, "")
 
     def test_get_lexical_search_term_ranking_term_valid_attributes_returns_weak_and(self):
-        """When _is_ranking_term=True and attributes survive, return valid weakAnd (no invalid YQL)."""
+        """When is_ranking_term=True and attributes survive, return valid weakAnd (no invalid YQL)."""
         hybrid_params = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
@@ -1850,7 +1850,7 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             hybrid_parameters=hybrid_params,
         )
         result = self.vespa_index._get_lexical_search_term(
-            q, _is_ranking_term=True, attributes_to_search=['title']
+            q, is_ranking_term=True, attributes_to_search=['title']
         )
         self.assertIn('weakAnd', result)
         self.assertIn('hello', result)
@@ -1859,7 +1859,7 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         self.assertNotRegex(result, r'weakAnd\(\s*,\s*,')
 
     def test_generate_or_terms_ranking_term_all_empty_terms_returns_empty(self):
-        """_generate_or_terms with _is_ranking_term and all empty terms returns "" (defensive guard)."""
+        """_generate_or_terms with is_ranking_term and all empty terms returns "" (defensive guard)."""
         hybrid_params = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
@@ -1877,7 +1877,7 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         )
         # attributes_to_search=['tags'] yields no lexical fields, so each term is ""
         result = self.vespa_index._generate_or_terms(
-            q, _is_ranking_term=True, attributes_to_search=['tags']
+            q, is_ranking_term=True, attributes_to_search=['tags']
         )
         self.assertEqual(result, "")
 

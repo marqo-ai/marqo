@@ -737,8 +737,10 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_bm25_multiply_score_by_affects_scores(self):
         """
-        multiply_score_by with bm25 lex_ranking_field: may not fully reverse order (doc1 base score
-        too high) but must affect scores so _score != _pre_rerank_score and higher bm25 docs get boosted.
+        multiply_score_by with bm25 lex_ranking_field (weight 1.0): each doc's score is multiplied
+        by its normalized BM25 (value / max). Doc5 has the highest BM25 so its multiplier is 1.0
+        (score unchanged). Doc1 has the lowest BM25 so its multiplier is min/max (small but > 0).
+        The multiplier increases monotonically from doc1 to doc5.
         """
         self._add_tuxedo_docs()
         res_no_rerank = tensor_search.search(
@@ -766,11 +768,32 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             result_count=10,
         )
         self._assert_pre_rerank_score_matches_baseline(res_with_rerank, res_no_rerank)
+        pre_rerank = {h["_id"]: h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"]}
         scores_with = {h["_id"]: h["_score"] for h in res_with_rerank["hits"]}
-        self.assertGreater(scores_with["doc5"], scores_with["doc1"], msg="doc5 (highest bm25 lex_ranking_field) should have higher score than doc1 after multiply")
-        # multiply_score_by affects scores: at least one doc has _score != _pre_rerank_score (e.g. doc with mid bm25)
-        any_changed = any(h["_score"] != h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"])
-        self.assertTrue(any_changed, msg="multiply_score_by must change at least one doc's score")
+
+        # Doc5 (max BM25) keeps its full score (multiplied by 1.0)
+        self.assertEqual(scores_with["doc5"], pre_rerank["doc5"],
+                         msg="doc5 (max BM25) should keep full score (multiplied by 1.0)")
+
+        # Doc1 (min BM25) has a reduced but non-zero score (divide-by-max never gives 0)
+        self.assertGreater(scores_with["doc1"], 0.0,
+                           msg="doc1 score must be > 0 with divide-by-max normalization")
+        self.assertLess(scores_with["doc1"], pre_rerank["doc1"],
+                        msg="doc1 (min BM25) should have reduced score")
+
+        # The multiplier (score / pre_rerank) increases from doc1 to doc5
+        # BM25 order: doc1 < doc2 < doc3 < doc4 < doc5
+        multipliers = {}
+        for doc_id in ["doc1", "doc2", "doc3", "doc4", "doc5"]:
+            multipliers[doc_id] = scores_with[doc_id] / pre_rerank[doc_id]
+        for i, (a, b) in enumerate(zip(
+            ["doc1", "doc2", "doc3", "doc4"],
+            ["doc2", "doc3", "doc4", "doc5"],
+        )):
+            self.assertLess(
+                multipliers[a], multipliers[b],
+                msg=f"Multiplier for {a} ({multipliers[a]:.4f}) should be < {b} ({multipliers[b]:.4f})",
+            )
 
 
     def test_all_bm25_aggregates_sum_max_avg(self):
@@ -829,16 +852,15 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 # Assert order is correct for each aggregate type
                 if agg in ("sum", "avg"):
                     expected_order = ["strongest_sum_avg", "middle_of_both", "strongest_max"]
-                    # Confirm that it's normalized.
-                    # Meaning top hit has +1000 to original score
+                    # Top hit has max normalized score (1.0) so gets +1000 to original score
                     self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_sum_avg + 1000.0)
-                    # Then bottom hit score must match its base score (it was normalized to 0).
-                    self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_max)
+                    # Bottom hit has a small positive normalized score (not 0, since we use divide-by-max)
+                    self.assertGreater(res["hits"][-1]["_score"], baseline_score_strongest_max)
 
                 else:  # max
                     expected_order = ["strongest_max", "middle_of_both", "strongest_sum_avg"]
                     self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_max + 1000.0)
-                    self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_sum_avg)
+                    self.assertGreater(res["hits"][-1]["_score"], baseline_score_strongest_sum_avg)
 
                 # Confirm order is correct
                 ids = [h["_id"] for h in res["hits"]]

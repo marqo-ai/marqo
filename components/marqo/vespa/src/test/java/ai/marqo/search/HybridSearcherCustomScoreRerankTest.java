@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for custom score rerank logic in HybridSearcher (Part C of the feature plan):
- * parsing keys, resolving match feature names, extracting scores, and min-max normalization.
+ * parsing keys, resolving match feature names, extracting scores, and divide-by-max normalization.
  */
 class HybridSearcherCustomScoreRerankTest {
 
@@ -30,7 +30,7 @@ class HybridSearcherCustomScoreRerankTest {
         @Test
         void bm25_field_returns_parsed() {
             HybridSearcher.CustomScoreKeyParsed p =
-                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                    HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
                             "bm25_field_variantTitle");
             assertThat(p).isNotNull();
             assertThat(p.scoreType).isEqualTo("bm25");
@@ -40,19 +40,19 @@ class HybridSearcherCustomScoreRerankTest {
 
         @Test
         void bm25_aggregates_return_parsed() {
-            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_sum"))
+            assertThat(HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey("bm25_sum"))
                     .satisfies(
                             p -> {
                                 assertThat(p.scoreType).isEqualTo("bm25");
                                 assertThat(p.fieldName).isNull();
                                 assertThat(p.aggregateType).isEqualTo("sum");
                             });
-            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_max"))
+            assertThat(HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey("bm25_max"))
                     .satisfies(
                             p -> {
                                 assertThat(p.aggregateType).isEqualTo("max");
                             });
-            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_avg"))
+            assertThat(HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey("bm25_avg"))
                     .satisfies(
                             p -> {
                                 assertThat(p.aggregateType).isEqualTo("avg");
@@ -62,7 +62,7 @@ class HybridSearcherCustomScoreRerankTest {
         @Test
         void closeness_retrieval_vector_field_returns_parsed() {
             HybridSearcher.CustomScoreKeyParsed p =
-                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                    HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
                             "closeness_retrieval_vector_field_variantImage");
             assertThat(p).isNotNull();
             assertThat(p.scoreType).isEqualTo("closeness_retrieval_vector");
@@ -73,7 +73,7 @@ class HybridSearcherCustomScoreRerankTest {
         @Test
         void closeness_retrieval_vector_aggregates_return_parsed() {
             assertThat(
-                            HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                            HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
                                     "closeness_retrieval_vector_sum"))
                     .satisfies(
                             p -> {
@@ -86,41 +86,50 @@ class HybridSearcherCustomScoreRerankTest {
         @Test
         void unsupported_or_invalid_returns_null() {
             assertThat(
-                            HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                            HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
                                     "closeness_ranking_vector_sum"))
                     .isNull();
             assertThat(
-                            HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                            HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
                                     "unknown_type_field_x"))
                     .isNull();
-            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("")).isNull();
-            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25")).isNull();
-            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_")).isNull();
-            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_field_"))
+            assertThat(HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey("")).isNull();
+            assertThat(HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey("bm25"))
                     .isNull();
-            assertThat(HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(null)).isNull();
+            assertThat(HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey("bm25_"))
+                    .isNull();
+            assertThat(
+                            HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
+                                    "bm25_field_"))
+                    .isNull();
+            assertThat(HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(null))
+                    .isNull();
         }
     }
 
     @Nested
-    class MinMaxNormalizeTest {
+    class NormalizeByMaxTest {
 
         @Test
-        void normalizes_to_zero_one() {
-            assertThat(HybridSearcher.minMaxNormalize(0.0, 0.0, 10.0)).isEqualTo(0.0);
-            assertThat(HybridSearcher.minMaxNormalize(10.0, 0.0, 10.0)).isEqualTo(1.0);
-            assertThat(HybridSearcher.minMaxNormalize(5.0, 0.0, 10.0)).isEqualTo(0.5);
+        void normalizes_by_dividing_by_max() {
+            assertThat(HybridSearcher.normalizeByMax(10.0, 10.0)).isEqualTo(1.0);
+            assertThat(HybridSearcher.normalizeByMax(5.0, 10.0)).isEqualTo(0.5);
+            assertThat(HybridSearcher.normalizeByMax(2.0, 10.0)).isEqualTo(0.2);
         }
 
         @Test
-        void min_equals_max_returns_half() {
-            assertThat(HybridSearcher.minMaxNormalize(3.0, 3.0, 3.0)).isEqualTo(1.0);
+        void max_zero_returns_one() {
+            assertThat(HybridSearcher.normalizeByMax(3.0, 0.0)).isEqualTo(1.0);
         }
 
         @Test
-        void clamps_to_zero_one() {
-            assertThat(HybridSearcher.minMaxNormalize(-1.0, 0.0, 10.0)).isEqualTo(0.0);
-            assertThat(HybridSearcher.minMaxNormalize(11.0, 0.0, 10.0)).isEqualTo(1.0);
+        void max_negative_returns_one() {
+            assertThat(HybridSearcher.normalizeByMax(3.0, -1.0)).isEqualTo(1.0);
+        }
+
+        @Test
+        void max_nan_returns_one() {
+            assertThat(HybridSearcher.normalizeByMax(3.0, Double.NaN)).isEqualTo(1.0);
         }
     }
 
@@ -134,7 +143,8 @@ class HybridSearcherCustomScoreRerankTest {
             when(summaryFeatures.getDouble("bm25(marqo__lexical_title)")).thenReturn(2.5);
             Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_field_title");
+                    HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
+                            "bm25_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
                                     null, "bm25_field_title", parsed, keys, summaryFeatures))
@@ -148,7 +158,7 @@ class HybridSearcherCustomScoreRerankTest {
             when(summaryFeatures.getDouble("ranking_closeness_metric_title")).thenReturn(0.9);
             Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(
+                    HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
                             "closeness_retrieval_vector_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
@@ -170,7 +180,7 @@ class HybridSearcherCustomScoreRerankTest {
                     .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
             Set<String> keys = Set.of();
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_sum");
+                    HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey("bm25_sum");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
                                     null, "bm25_sum", parsed, keys, summaryFeatures))
@@ -180,7 +190,8 @@ class HybridSearcherCustomScoreRerankTest {
         @Test
         void returns_null_when_summary_features_null() {
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey("bm25_field_title");
+                    HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(
+                            "bm25_field_title");
             assertThat(
                             HybridSearcher.extractCustomScoreForHit(
                                     null, "bm25_field_title", parsed, Set.of(), null))
@@ -188,30 +199,24 @@ class HybridSearcherCustomScoreRerankTest {
         }
     }
 
-    /** Min-max normalization and key stripping: used for both BM25 and closeness. */
+    /** Divide-by-max normalization and key stripping: used for both BM25 and closeness. */
     @Nested
-    class MinMaxNormalizationTest {
+    class DivideByMaxNormalizationTest {
 
         @Test
-        void minMaxNormalize_returns_zero_one_between_min_max() {
-            assertThat(HybridSearcher.minMaxNormalize(10.0, 10.0, 30.0)).isEqualTo(0.0);
-            assertThat(HybridSearcher.minMaxNormalize(30.0, 10.0, 30.0)).isEqualTo(1.0);
-            assertThat(HybridSearcher.minMaxNormalize(20.0, 10.0, 30.0)).isEqualTo(0.5);
+        void normalizeByMax_returns_proportion_of_max() {
+            assertThat(HybridSearcher.normalizeByMax(10.0, 30.0)).isCloseTo(0.333, within(0.001));
+            assertThat(HybridSearcher.normalizeByMax(30.0, 30.0)).isEqualTo(1.0);
+            assertThat(HybridSearcher.normalizeByMax(20.0, 30.0)).isCloseTo(0.667, within(0.001));
         }
 
         @Test
-        void minMaxNormalize_clamps_out_of_range() {
-            assertThat(HybridSearcher.minMaxNormalize(-1.0, 0.0, 10.0)).isEqualTo(0.0);
-            assertThat(HybridSearcher.minMaxNormalize(11.0, 0.0, 10.0)).isEqualTo(1.0);
+        void normalizeByMax_returns_one_when_max_zero() {
+            assertThat(HybridSearcher.normalizeByMax(5.0, 0.0)).isEqualTo(1.0);
         }
 
         @Test
-        void minMaxNormalize_returns_one_when_min_equals_max() {
-            assertThat(HybridSearcher.minMaxNormalize(5.0, 5.0, 5.0)).isEqualTo(1.0);
-        }
-
-        @Test
-        void computeMinMaxPerKey_returns_min_max_for_closeness_single_field() {
+        void computeMaxPerKey_returns_max_for_closeness_single_field() {
             HitGroup hits = new HitGroup();
             for (double value : new double[] {10.0, 20.0, 30.0}) {
                 Hit hit = new Hit("doc_" + value, 1.0);
@@ -231,16 +236,13 @@ class HybridSearcherCustomScoreRerankTest {
                                     1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
+            Map<String, Double> result = searcher.computeMaxPerKey(hits, addWeights, null);
             assertThat(result).containsKey("closeness_retrieval_vector_field_title");
-            double[] minMax = result.get("closeness_retrieval_vector_field_title");
-            assertThat(minMax).hasSize(2);
-            assertThat(minMax[0]).isEqualTo(10.0);
-            assertThat(minMax[1]).isEqualTo(30.0);
+            assertThat(result.get("closeness_retrieval_vector_field_title")).isEqualTo(30.0);
         }
 
         @Test
-        void computeMinMaxPerKey_aggregate_closeness_sum_two_fields() {
+        void computeMaxPerKey_aggregate_closeness_sum_two_fields() {
             HitGroup hits = new HitGroup();
             Hit hit1 = new Hit("doc1", 1.0);
             FeatureData sf1 = mock(FeatureData.class);
@@ -266,15 +268,13 @@ class HybridSearcherCustomScoreRerankTest {
                             .cell(TensorAddress.ofLabels("closeness_retrieval_vector_sum"), 1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
+            Map<String, Double> result = searcher.computeMaxPerKey(hits, addWeights, null);
             assertThat(result).containsKey("closeness_retrieval_vector_sum");
-            double[] minMax = result.get("closeness_retrieval_vector_sum");
-            assertThat(minMax[0]).isCloseTo(0.6, within(1e-9));
-            assertThat(minMax[1]).isEqualTo(1.0);
+            assertThat(result.get("closeness_retrieval_vector_sum")).isEqualTo(1.0);
         }
 
         @Test
-        void computeMinMaxPerKey_includes_both_bm25_and_closeness_keys() {
+        void computeMaxPerKey_includes_both_bm25_and_closeness_keys() {
             HitGroup hits = new HitGroup();
             Hit hit = new Hit("doc1", 1.0);
             FeatureData sf = mock(FeatureData.class);
@@ -295,14 +295,14 @@ class HybridSearcherCustomScoreRerankTest {
                                     1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
+            Map<String, Double> result = searcher.computeMaxPerKey(hits, addWeights, null);
             assertThat(result).containsKey("bm25_field_title");
             assertThat(result).containsKey("closeness_retrieval_vector_field_title");
         }
     }
 
     /**
-     * Min-max normalization is applied after aggregation: for aggregate keys (bm25_sum,
+     * Divide-by-max normalization is applied after aggregation: for aggregate keys (bm25_sum,
      * closeness_retrieval_vector_sum, etc.) we first compute the aggregate per hit, then compute
      * min/max of that aggregated value across hits, then normalize. So the normalized score is
      * based on the aggregate, not on individual field values.
@@ -311,7 +311,7 @@ class HybridSearcherCustomScoreRerankTest {
     class NormalizationAfterAggregationTest {
 
         @Test
-        void computeBm25MinMaxPerKey_for_bm25_sum_uses_aggregated_value_per_hit() {
+        void computeMaxPerKey_for_bm25_sum_uses_aggregated_value_per_hit() {
             HitGroup hits = new HitGroup();
             // Hit1: bm25_a=1, bm25_b=2 -> sum=3
             Hit hit1 = new Hit("doc1", 1.0);
@@ -337,17 +337,13 @@ class HybridSearcherCustomScoreRerankTest {
                             .cell(TensorAddress.ofLabels("bm25_sum"), 1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
+            Map<String, Double> result = searcher.computeMaxPerKey(hits, addWeights, null);
             assertThat(result).containsKey("bm25_sum");
-            double[] minMax = result.get("bm25_sum");
-            assertThat(minMax).hasSize(2);
-            assertThat(minMax[0]).isEqualTo(3.0);
-            assertThat(minMax[1]).isEqualTo(6.0);
+            assertThat(result.get("bm25_sum")).isEqualTo(6.0);
         }
 
         @Test
-        void
-                computeClosenessMinMaxPerKey_for_closeness_retrieval_vector_sum_uses_aggregated_value_per_hit() {
+        void computeMaxPerKey_for_closeness_retrieval_vector_sum_uses_aggregated_value_per_hit() {
             HitGroup hits = new HitGroup();
             // Hit1: f1=0.2, f2=0.4 -> sum=0.6
             Hit hit1 = new Hit("doc1", 1.0);
@@ -375,42 +371,33 @@ class HybridSearcherCustomScoreRerankTest {
                             .cell(TensorAddress.ofLabels("closeness_retrieval_vector_sum"), 1.0)
                             .build();
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> result = searcher.computeMinMaxPerKey(hits, addWeights, null);
+            Map<String, Double> result = searcher.computeMaxPerKey(hits, addWeights, null);
             assertThat(result).containsKey("closeness_retrieval_vector_sum");
-            double[] minMax = result.get("closeness_retrieval_vector_sum");
-            assertThat(minMax).hasSize(2);
-            assertThat(minMax[0]).isCloseTo(0.6, within(1e-9));
-            assertThat(minMax[1]).isEqualTo(1.0);
+            assertThat(result.get("closeness_retrieval_vector_sum")).isEqualTo(1.0);
         }
     }
 
     /**
-     * Normalization maps raw custom scores (which may be outside [0,1]) to [0,1], with the
-     * minimum score across hits mapping to 0 and the maximum to 1. Five hits with raw scores
-     * -2, 0.25, 0.5, 0.75, 5 (inside and outside [0,1]) are used; we assert normalized values
-     * are in [0,1] and that min->0 and max->1 for all key types.
+     * Divide-by-max normalization maps raw custom scores to [value/max], with the maximum score
+     * across hits mapping to 1. Three hits with positive raw scores 2, 4, 8 are used; we assert
+     * max maps to 1.0 and others are proportional.
      */
     @Nested
-    class NormalizationOutputZeroToOneTest {
+    class NormalizationOutputTest {
 
-        private static final double[] RAW_SCORES = {-2.0, 0.25, 0.5, 0.75, 5.0};
-        private static final double MIN_RAW = -2.0;
-        private static final double MAX_RAW = 5.0;
+        private static final double[] RAW_SCORES = {2.0, 4.0, 8.0};
+        private static final double MAX_RAW = 8.0;
 
-        /** Build 5 hits, compute minMaxPerKey for the given key, return normalized scores in hit order. */
+        /** Build hits, compute maxPerKey for the given key, return normalized scores in hit order. */
         private List<Double> computeNormalizedScoresForKey(
                 HitGroup hits, String key, Tensor addWeights) {
             HybridSearcher searcher = new HybridSearcher();
-            Map<String, double[]> minMaxPerKey =
-                    searcher.computeMinMaxPerKey(hits, addWeights, null);
-            assertThat(minMaxPerKey).containsKey(key);
-            double[] minMax = minMaxPerKey.get(key);
-            assertThat(minMax).hasSize(2);
-            assertThat(minMax[0]).isEqualTo(MIN_RAW);
-            assertThat(minMax[1]).isEqualTo(MAX_RAW);
+            Map<String, Double> maxPerKey = searcher.computeMaxPerKey(hits, addWeights, null);
+            assertThat(maxPerKey).containsKey(key);
+            assertThat(maxPerKey.get(key)).isEqualTo(MAX_RAW);
 
             HybridSearcher.CustomScoreKeyParsed parsed =
-                    HybridSearcher.CustomScoreKeyParsed.parseCustomScoreKey(key);
+                    HybridSearcher.CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
             assertThat(parsed).isNotNull();
             List<Double> normalized = new ArrayList<>();
             for (Hit hit : hits) {
@@ -419,29 +406,28 @@ class HybridSearcherCustomScoreRerankTest {
                         HybridSearcher.extractCustomScoreForHit(
                                 null, key, parsed, Set.of(), summaryFeatures);
                 assertThat(raw).isNotNull();
-                double norm = HybridSearcher.minMaxNormalize(raw, minMax[0], minMax[1]);
+                double norm = HybridSearcher.normalizeByMax(raw, maxPerKey.get(key));
                 normalized.add(norm);
             }
             return normalized;
         }
 
-        private void assertNormalizationMapsMinToZeroMaxToOne(List<Double> normalized) {
-            assertThat(normalized).hasSize(5);
+        private void assertNormalizationMaxToOneOthersProportional(List<Double> normalized) {
+            assertThat(normalized).hasSize(3);
+            // Max (8.0) maps to 1.0
+            assertThat(normalized.get(2)).isEqualTo(1.0);
+            // Others are proportional: 2/8=0.25, 4/8=0.5
+            assertThat(normalized.get(0)).isCloseTo(2.0 / MAX_RAW, within(1e-9));
+            assertThat(normalized.get(1)).isCloseTo(4.0 / MAX_RAW, within(1e-9));
+            // No score is 0 (all raw scores are positive)
             for (Double n : normalized) {
-                assertThat(n).isBetween(0.0, 1.0);
+                assertThat(n).isGreaterThan(0.0);
+                assertThat(n).isLessThanOrEqualTo(1.0);
             }
-            assertThat(normalized.get(0)).isEqualTo(0.0);
-            assertThat(normalized.get(4)).isEqualTo(1.0);
-            assertThat(normalized.get(1))
-                    .isCloseTo((0.25 - MIN_RAW) / (MAX_RAW - MIN_RAW), within(1e-9));
-            assertThat(normalized.get(2))
-                    .isCloseTo((0.5 - MIN_RAW) / (MAX_RAW - MIN_RAW), within(1e-9));
-            assertThat(normalized.get(3))
-                    .isCloseTo((0.75 - MIN_RAW) / (MAX_RAW - MIN_RAW), within(1e-9));
         }
 
         @Test
-        void bm25_single_field_normalized_in_zero_one_min_zero_max_one() {
+        void bm25_single_field_normalized_max_to_one() {
             HitGroup hits = new HitGroup();
             for (double raw : RAW_SCORES) {
                 Hit hit = new Hit("doc_" + raw, 1.0);
@@ -458,73 +444,11 @@ class HybridSearcherCustomScoreRerankTest {
                             .build();
             List<Double> normalized =
                     computeNormalizedScoresForKey(hits, "bm25_field_title", addWeights);
-            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+            assertNormalizationMaxToOneOthersProportional(normalized);
         }
 
         @Test
-        void bm25_sum_normalized_in_zero_one_min_zero_max_one() {
-            HitGroup hits = new HitGroup();
-            for (double raw : RAW_SCORES) {
-                Hit hit = new Hit("doc_" + raw, 1.0);
-                FeatureData sf = mock(FeatureData.class);
-                when(sf.getDouble("bm25(marqo__lexical_a)")).thenReturn(raw);
-                when(sf.getDouble("bm25(marqo__lexical_b)")).thenReturn(0.0);
-                when(sf.featureNames())
-                        .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
-                hit.setField("summaryfeatures", sf);
-                hits.add(hit);
-            }
-            TensorType tensorType = new TensorType.Builder().mapped("p").build();
-            Tensor addWeights =
-                    Tensor.Builder.of(tensorType)
-                            .cell(TensorAddress.ofLabels("bm25_sum"), 1.0)
-                            .build();
-            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_sum", addWeights);
-            assertNormalizationMapsMinToZeroMaxToOne(normalized);
-        }
-
-        @Test
-        void bm25_max_normalized_in_zero_one_min_zero_max_one() {
-            HitGroup hits = new HitGroup();
-            for (double raw : RAW_SCORES) {
-                Hit hit = new Hit("doc_" + raw, 1.0);
-                FeatureData sf = mock(FeatureData.class);
-                when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
-                when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
-                hit.setField("summaryfeatures", sf);
-                hits.add(hit);
-            }
-            TensorType tensorType = new TensorType.Builder().mapped("p").build();
-            Tensor addWeights =
-                    Tensor.Builder.of(tensorType)
-                            .cell(TensorAddress.ofLabels("bm25_max"), 1.0)
-                            .build();
-            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_max", addWeights);
-            assertNormalizationMapsMinToZeroMaxToOne(normalized);
-        }
-
-        @Test
-        void bm25_avg_normalized_in_zero_one_min_zero_max_one() {
-            HitGroup hits = new HitGroup();
-            for (double raw : RAW_SCORES) {
-                Hit hit = new Hit("doc_" + raw, 1.0);
-                FeatureData sf = mock(FeatureData.class);
-                when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
-                when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
-                hit.setField("summaryfeatures", sf);
-                hits.add(hit);
-            }
-            TensorType tensorType = new TensorType.Builder().mapped("p").build();
-            Tensor addWeights =
-                    Tensor.Builder.of(tensorType)
-                            .cell(TensorAddress.ofLabels("bm25_avg"), 1.0)
-                            .build();
-            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_avg", addWeights);
-            assertNormalizationMapsMinToZeroMaxToOne(normalized);
-        }
-
-        @Test
-        void closeness_retrieval_vector_single_field_normalized_in_zero_one_min_zero_max_one() {
+        void closeness_retrieval_vector_single_field_normalized_max_to_one() {
             HitGroup hits = new HitGroup();
             for (double raw : RAW_SCORES) {
                 Hit hit = new Hit("doc_" + raw, 1.0);
@@ -545,11 +469,73 @@ class HybridSearcherCustomScoreRerankTest {
             List<Double> normalized =
                     computeNormalizedScoresForKey(
                             hits, "closeness_retrieval_vector_field_title", addWeights);
-            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+            assertNormalizationMaxToOneOthersProportional(normalized);
         }
 
         @Test
-        void closeness_retrieval_vector_sum_normalized_in_zero_one_min_zero_max_one() {
+        void bm25_sum_normalized_max_to_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("bm25(marqo__lexical_a)")).thenReturn(raw);
+                when(sf.getDouble("bm25(marqo__lexical_b)")).thenReturn(0.0);
+                when(sf.featureNames())
+                        .thenReturn(Set.of("bm25(marqo__lexical_a)", "bm25(marqo__lexical_b)"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("bm25_sum"), 1.0)
+                            .build();
+            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_sum", addWeights);
+            assertNormalizationMaxToOneOthersProportional(normalized);
+        }
+
+        @Test
+        void bm25_max_normalized_max_to_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
+                when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("bm25_max"), 1.0)
+                            .build();
+            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_max", addWeights);
+            assertNormalizationMaxToOneOthersProportional(normalized);
+        }
+
+        @Test
+        void bm25_avg_normalized_max_to_one() {
+            HitGroup hits = new HitGroup();
+            for (double raw : RAW_SCORES) {
+                Hit hit = new Hit("doc_" + raw, 1.0);
+                FeatureData sf = mock(FeatureData.class);
+                when(sf.getDouble("bm25(marqo__lexical_title)")).thenReturn(raw);
+                when(sf.featureNames()).thenReturn(Set.of("bm25(marqo__lexical_title)"));
+                hit.setField("summaryfeatures", sf);
+                hits.add(hit);
+            }
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor addWeights =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("bm25_avg"), 1.0)
+                            .build();
+            List<Double> normalized = computeNormalizedScoresForKey(hits, "bm25_avg", addWeights);
+            assertNormalizationMaxToOneOthersProportional(normalized);
+        }
+
+        @Test
+        void closeness_retrieval_vector_sum_normalized_max_to_one() {
             HitGroup hits = new HitGroup();
             for (double raw : RAW_SCORES) {
                 Hit hit = new Hit("doc_" + raw, 1.0);
@@ -572,11 +558,11 @@ class HybridSearcherCustomScoreRerankTest {
             List<Double> normalized =
                     computeNormalizedScoresForKey(
                             hits, "closeness_retrieval_vector_sum", addWeights);
-            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+            assertNormalizationMaxToOneOthersProportional(normalized);
         }
 
         @Test
-        void closeness_retrieval_vector_max_normalized_in_zero_one_min_zero_max_one() {
+        void closeness_retrieval_vector_max_normalized_max_to_one() {
             HitGroup hits = new HitGroup();
             for (double raw : RAW_SCORES) {
                 Hit hit = new Hit("doc_" + raw, 1.0);
@@ -594,11 +580,11 @@ class HybridSearcherCustomScoreRerankTest {
             List<Double> normalized =
                     computeNormalizedScoresForKey(
                             hits, "closeness_retrieval_vector_max", addWeights);
-            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+            assertNormalizationMaxToOneOthersProportional(normalized);
         }
 
         @Test
-        void closeness_retrieval_vector_avg_normalized_in_zero_one_min_zero_max_one() {
+        void closeness_retrieval_vector_avg_normalized_max_to_one() {
             HitGroup hits = new HitGroup();
             for (double raw : RAW_SCORES) {
                 Hit hit = new Hit("doc_" + raw, 1.0);
@@ -616,7 +602,7 @@ class HybridSearcherCustomScoreRerankTest {
             List<Double> normalized =
                     computeNormalizedScoresForKey(
                             hits, "closeness_retrieval_vector_avg", addWeights);
-            assertNormalizationMapsMinToZeroMaxToOne(normalized);
+            assertNormalizationMaxToOneOthersProportional(normalized);
         }
     }
 }

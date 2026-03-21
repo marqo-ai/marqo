@@ -155,7 +155,7 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
                 self.assertIn('marqo__hybrid.rankingMethod', vespa_query)
 
     def test_get_individual_field_tensor_search_terms_non_ranking_includes_target_hits(self):
-        """With _is_ranking_term=False derives from query and term includes targetHits."""
+        """With is_ranking_term=False derives from query and term includes targetHits."""
         hybrid_params = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,

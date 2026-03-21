@@ -112,6 +112,9 @@ public class HybridSearcher extends Searcher {
      */
     @VisibleForTesting
     static final class CustomScoreKeyParsed {
+        /** Shared instance for calling parseCustomScoreKey and bm25SummaryFeatureName. */
+        static final CustomScoreKeyParsed PARSER = new CustomScoreKeyParsed(null, null, null);
+
         final String scoreType;
         final String fieldName; // null for aggregate
         final String aggregateType; // null for single-field
@@ -131,7 +134,7 @@ public class HybridSearcher extends Searcher {
          * @return Parsed key or null if unsupported/invalid
          */
         @VisibleForTesting
-        static CustomScoreKeyParsed parseCustomScoreKey(String key) {
+        CustomScoreKeyParsed parseCustomScoreKey(String key) {
             if (key == null || key.isEmpty() || !key.contains("_")) {
                 return null;
             }
@@ -159,7 +162,7 @@ public class HybridSearcher extends Searcher {
         }
 
         /** Summary feature name for single-field BM25: bm25(marqo__lexical_<fieldName>). One per lexical field; no bm25(marqo__ranking_strings). */
-        static String bm25SummaryFeatureName(String fieldName) {
+        String bm25SummaryFeatureName(String fieldName) {
             if (fieldName == null || fieldName.isEmpty()) {
                 return null;
             }
@@ -1647,7 +1650,7 @@ public class HybridSearcher extends Searcher {
                         false,
                         verbose);
             }
-            String featName = CustomScoreKeyParsed.bm25SummaryFeatureName(parsed.fieldName);
+            String featName = CustomScoreKeyParsed.PARSER.bm25SummaryFeatureName(parsed.fieldName);
             return getSingleFieldScoreWithLog(summaryFeatures, featName, keyForLog, verbose);
         }
         if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
@@ -1766,22 +1769,22 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Computes min-max normalization (value in [0,1]). If min == max or invalid, returns 1.0 to
-     * avoid division by zero. Used for both BM25 and closeness custom score keys.
+     * Normalizes a value by dividing by the maximum (value / max). The highest value maps to 1.0;
+     * all others map to their proportion of the max. If max is zero, NaN, or negative, returns 1.0
+     * to avoid division by zero. Used for both BM25 and closeness custom score keys.
      */
     @VisibleForTesting
-    static double minMaxNormalize(double value, double min, double max) {
-        if (min >= max || Double.isNaN(min) || Double.isNaN(max)) {
+    static double normalizeByMax(double value, double max) {
+        if (max <= 0 || Double.isNaN(max) || !Double.isFinite(max)) {
             return 1.0;
         }
-        double normalized = (value - min) / (max - min);
-        return Math.max(0.0, Math.min(1.0, normalized));
+        return value / max;
     }
 
     /**
      * Returns weight * normalizedScore for one custom-score cell, or null if the score is missing
-     * or the key is invalid. Scores are min-max normalized using minMaxPerKey (same for BM25 and
-     * closeness). Custom score values are read only from summaryFeatures.
+     * or the key is invalid. Scores are normalized by dividing by the max value across hits
+     * (value / max) using maxPerKey. Custom score values are read only from summaryFeatures.
      * Tensor keys are always in canonical form (e.g. closeness_retrieval_vector_sum, bm25_sum)
      * without the marqo__score_ prefix, as set by Python when building the query.
      */
@@ -1789,12 +1792,12 @@ public class HybridSearcher extends Searcher {
             Cell cell,
             FeatureData hitMatchFeatures,
             Set<String> matchFeatureKeys,
-            Map<String, double[]> minMaxPerKey,
+            Map<String, Double> maxPerKey,
             FeatureData summaryFeatures,
             Logger logger,
             boolean verbose) {
         String key = cell.getKey().label(0);
-        CustomScoreKeyParsed parsed = CustomScoreKeyParsed.parseCustomScoreKey(key);
+        CustomScoreKeyParsed parsed = CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
         if (parsed == null) return null;
         Double score =
                 extractCustomScoreForHit(
@@ -1808,9 +1811,9 @@ public class HybridSearcher extends Searcher {
         if (score == null || Double.isNaN(score)) return null;
         double weight = cell.getValue().doubleValue();
         double normalizedScore = score;
-        double[] minMax = minMaxPerKey != null ? minMaxPerKey.get(key) : null;
-        if (minMax != null && minMax.length == 2) {
-            normalizedScore = minMaxNormalize(score, minMax[0], minMax[1]);
+        Double maxVal = maxPerKey != null ? maxPerKey.get(key) : null;
+        if (maxVal != null) {
+            normalizedScore = normalizeByMax(score, maxVal);
         }
         double modifierValue = weight * normalizedScore;
         logIfVerbose(
@@ -1830,9 +1833,9 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Applies custom score rerank weights to add and mult modifiers: for each key in add weights,
-     * adds (weight * score) to addModifier; for each key in mult weights, multiplies multModifier
-     * by (weight * normalizedScore). BM25 and closeness_retrieval_vector scores are min-max
-     * normalized when min/max maps are provided (closeness so dot product ends in [0,1], 1=closest).
+     * adds (weight * normalizedScore) to addModifier; for each key in mult weights, multiplies
+     * multModifier by (weight * normalizedScore). BM25 and closeness_retrieval_vector scores are
+     * normalized by dividing by the max value across hits (value / max).
      */
     private void applyCustomScoreContributions(
             Double addModifier,
@@ -1841,7 +1844,7 @@ public class HybridSearcher extends Searcher {
             Set<String> matchFeatureKeys,
             Tensor customAddWeights,
             Tensor customMultWeights,
-            Map<String, double[]> minMaxPerKey,
+            Map<String, Double> maxPerKey,
             double[] outAdd,
             double[] outMult,
             boolean verbose,
@@ -1856,7 +1859,7 @@ public class HybridSearcher extends Searcher {
                                 it.next(),
                                 hitMatchFeatures,
                                 matchFeatureKeys,
-                                minMaxPerKey,
+                                maxPerKey,
                                 summaryFeatures,
                                 logger,
                                 verbose);
@@ -1871,7 +1874,7 @@ public class HybridSearcher extends Searcher {
                                 it.next(),
                                 hitMatchFeatures,
                                 matchFeatureKeys,
-                                minMaxPerKey,
+                                maxPerKey,
                                 summaryFeatures,
                                 logger,
                                 verbose);
@@ -1884,34 +1887,32 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Compute per-key min and max values across hits for all custom score keys (BM25 and
-     * closeness_retrieval_vector) present in add/mult weight tensors. Tensor keys are always in
-     * canonical form (e.g. bm25_sum, closeness_retrieval_vector_sum).
-     * For aggregate keys, the value per hit is the aggregate (sum/max/avg); min/max are
-     * taken over those values, so normalization is after aggregation.
-     *
+     * Compute per-key max value across hits for all custom score keys (BM25 and
+     * closeness_retrieval_vector) present in add/mult weight tensors. Used for divide-by-max
+     * normalization (value / max). Tensor keys are always in canonical form (e.g. bm25_sum,
+     * closeness_retrieval_vector_sum). For aggregate keys, the value per hit is the aggregate
+     * (sum/max/avg); max is taken over those values, so normalization is after aggregation.
      */
     @VisibleForTesting
-    Map<String, double[]> computeMinMaxPerKey(
+    Map<String, Double> computeMaxPerKey(
             HitGroup hits, Tensor customAddWeights, Tensor customMultWeights) {
         Set<String> keys = new HashSet<>();
         if (customAddWeights != null) {
             for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
                 String key = it.next().getKey().label(0);
-                if (CustomScoreKeyParsed.parseCustomScoreKey(key) != null) keys.add(key);
+                if (CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key) != null) keys.add(key);
             }
         }
         if (customMultWeights != null) {
             for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
                 String key = it.next().getKey().label(0);
-                if (CustomScoreKeyParsed.parseCustomScoreKey(key) != null) keys.add(key);
+                if (CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key) != null) keys.add(key);
             }
         }
-        Map<String, double[]> result = new HashMap<>();
+        Map<String, Double> result = new HashMap<>();
         for (String key : keys) {
-            CustomScoreKeyParsed parsed = CustomScoreKeyParsed.parseCustomScoreKey(key);
+            CustomScoreKeyParsed parsed = CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
             if (parsed == null) continue;
-            double min = Double.POSITIVE_INFINITY;
             double max = Double.NEGATIVE_INFINITY;
             for (Hit hit : hits) {
                 FeatureData summaryFeatures = getSummaryFeaturesForHit(hit);
@@ -1926,12 +1927,11 @@ public class HybridSearcher extends Searcher {
                                 null,
                                 false);
                 if (v != null && !Double.isNaN(v)) {
-                    min = Math.min(min, v);
                     max = Math.max(max, v);
                 }
             }
-            if (min <= max && Double.isFinite(min) && Double.isFinite(max)) {
-                result.put(key, new double[] {min, max});
+            if (Double.isFinite(max) && max > 0) {
+                result.put(key, max);
             }
         }
         return result;
@@ -1974,7 +1974,7 @@ public class HybridSearcher extends Searcher {
                 Cell cell = it.next();
                 String key = cell.getKey().label(0);
                 double weight = cell.getValue().doubleValue();
-                CustomScoreKeyParsed parsed = CustomScoreKeyParsed.parseCustomScoreKey(key);
+                CustomScoreKeyParsed parsed = CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
                 if (parsed != null) {
                     logIfVerbose(
                             "[CustomScoreRerank] unpack add_to_score key="
@@ -1996,7 +1996,7 @@ public class HybridSearcher extends Searcher {
                 Cell cell = it.next();
                 String key = cell.getKey().label(0);
                 double weight = cell.getValue().doubleValue();
-                CustomScoreKeyParsed parsed = CustomScoreKeyParsed.parseCustomScoreKey(key);
+                CustomScoreKeyParsed parsed = CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
                 if (parsed != null) {
                     logIfVerbose(
                             "[CustomScoreRerank] unpack multiply_score_by key="
@@ -2015,7 +2015,7 @@ public class HybridSearcher extends Searcher {
         }
 
         Set<String> allMatchFeatureKeys = new HashSet<>();
-        Map<String, double[]> minMaxPerKey = new HashMap<>();
+        Map<String, Double> maxPerKey = new HashMap<>();
         if (hasCustomScores) {
             Hit firstHit = hits.get(0);
             FeatureData firstMf = (FeatureData) firstHit.getField("matchfeatures");
@@ -2028,8 +2028,8 @@ public class HybridSearcher extends Searcher {
                             + "): "
                             + allMatchFeatureKeys,
                     verbose);
-            /* Compute min and max scores for each key for use in normalization */
-            minMaxPerKey = computeMinMaxPerKey(hits, customAddWeights, customMultWeights);
+            /* Compute max score for each key for divide-by-max normalization */
+            maxPerKey = computeMaxPerKey(hits, customAddWeights, customMultWeights);
         }
 
         boolean applyRecency =
@@ -2068,7 +2068,7 @@ public class HybridSearcher extends Searcher {
                                 hitMatchFeatureKeys,
                                 customAddWeights,
                                 customMultWeights,
-                                minMaxPerKey,
+                                maxPerKey,
                                 outAdd,
                                 outMult,
                                 verbose,
@@ -2079,11 +2079,8 @@ public class HybridSearcher extends Searcher {
                             logIfVerbose(
                                     String.format(
                                             "[CustomScoreRerank] first hit add_modifier=%.5f"
-                                                + " outAdd=%.5f outMult=%.5f minMaxPerKeySize=%d",
-                                            add_modifier,
-                                            outAdd[0],
-                                            outMult[0],
-                                            minMaxPerKey.size()),
+                                                    + " outAdd=%.5f outMult=%.5f maxPerKeySize=%d",
+                                            add_modifier, outAdd[0], outMult[0], maxPerKey.size()),
                                     verbose);
                         }
                     }
