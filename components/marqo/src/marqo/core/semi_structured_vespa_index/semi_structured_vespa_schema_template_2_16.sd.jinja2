@@ -400,7 +400,7 @@ schema {{ index.schema_name }} {
             {%- elif index.distance_metric.value == 'dotproduct' %}
             expression: reduce(reduce(attribute({{ field.embeddings_field_name }}) * query(marqo__query_embedding), sum, x), sum)
             {%- elif index.distance_metric.value == 'hamming' %}
-            expression: reduce(1.0 / (1.0 + hamming(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding))), sum)
+            expression: reduce(1.0 / (1.0 + hamming(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)), sum)
             {%- endif %}
         }
         {% endfor %}
