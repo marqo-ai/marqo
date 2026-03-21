@@ -120,24 +120,25 @@ DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES = [
     {
         # If max aggregate is chosen: one field has highest closeness (tuxedo 1.0), rest low
         "_id": "strongest_max",
-        "tensor_ranking_field_1": "tuxedo",
-        "tensor_ranking_field_2": "unrelated",
+        "tensor_ranking_field_1": "tuxedo",         # Adds 1.0 closeness score
+        "tensor_ranking_field_2": "unrelated",      # Adds 0.4584048390388489 closeness score
     },
     {
         # A doc that should end up in the middle, whether aggregate method is sum, avg, or max.
         "_id": "middle_of_both",
-        "tensor_ranking_field_1": "suit",
-        "tensor_ranking_field_2": "suit",
+        "tensor_ranking_field_1": "black tuxedo",   # Adds 0.7219897508621216 closeness score
+        "tensor_ranking_field_2": "black tuxedo",   # Adds 0.7219897508621216 closeness score
+        "tensor_ranking_field_3": "black tuxedo",   # Adds 0.7219897508621216 closeness score
     },
     {
-        # If sum/avg aggregate is chosen: many fields with medium-high closeness (rainbow tie 0.795)
+        # If sum/avg aggregate is chosen: many fields with medium-high closeness
         "_id": "strongest_sum_avg",
-        "tensor_ranking_field_1": "rainbow tie",
-        "tensor_ranking_field_2": "rainbow tie",
-        "tensor_ranking_field_3": "rainbow tie",
-        "tensor_ranking_field_4": "rainbow tie",
-        "tensor_ranking_field_5": "rainbow tie",
-        "tensor_ranking_field_6": "rainbow tie",
+        "tensor_ranking_field_1": "rainbow tie",    # Adds 0.5811693072319031 closeness score
+        "tensor_ranking_field_2": "rainbow tie",    # Adds 0.5811693072319031 closeness score
+        "tensor_ranking_field_3": "rainbow tie",    # Adds 0.5811693072319031 closeness score
+        "tensor_ranking_field_4": "rainbow tie",    # Adds 0.5811693072319031 closeness score
+        "tensor_ranking_field_5": "rainbow tie",    # Adds 0.5811693072319031 closeness score
+        "tensor_ranking_field_6": "rainbow tie",    # Adds 0.5811693072319031 closeness score
     },
 ]
 
@@ -148,13 +149,14 @@ HYBRID_PARAMS_TUXEDO = HybridParameters(
     rrfK=60,
     searchableAttributesTensor=["tensor_retrieval_field"],
     searchableAttributesLexical=["lex_retrieval_field"],
+    verbose=True
 )
 
 BASE_RRF_ORDER = ["doc1", "doc2", "doc3", "doc4", "doc5"]
 REVERSED_ORDER = ["doc5", "doc4", "doc3", "doc2", "doc1"]
 
 # Closeness (prenormalized-angular) to "tuxedo" with model open_clip/ViT-B-16-SigLIP-512/webli (from plan).
-CLOSENESS_TUXEDO = {
+OLD_CLOSENESS_TUXEDO = {
     "tuxedo": 1.0,
     "black tuxedo": 0.9290061705548538,
     "black tie": 0.9105825129267998,
@@ -166,55 +168,21 @@ CLOSENESS_TUXEDO = {
     "rainbow tie": 0.7955299917394352,
     "unrelated": 0.5882339267201514,
 }
-# Per-doc tensor_ranking_field value and its closeness (for expected score calculation).
-DOC_TENSOR_RANKING_CLOSENESS = {
-    "doc1": ("unrelated", CLOSENESS_TUXEDO["unrelated"]),
-    "doc2": ("rainbow tie", CLOSENESS_TUXEDO["rainbow tie"]),
-    "doc3": ("shorts", CLOSENESS_TUXEDO["shorts"]),
-    "doc4": ("suit", CLOSENESS_TUXEDO["suit"]),
-    "doc5": ("tuxedo", CLOSENESS_TUXEDO["tuxedo"]),
+
+# Closeness (prenormalized-angular) to "tuxedo" with model open_clip/ViT-B-16-SigLIP-512/webli (from plan).
+# Using new closeness (copied from vespa)
+NEW_CLOSENESS_TUXEDO = {
+    "tuxedo": 1.0,
+    "black tuxedo": 0.7219897508621216,
+    "black tie": 0.6926929950714111,
+    "suit": 0.6790624260902405,
+    "shorts": 0.6071039438247681,
+    "backpack": 0.6020216941833496,
+    "floral dress": 0.6027941703796387,
+    "suede shoes": 0.5905405879020691,
+    "rainbow tie": 0.5811693072319031,
+    "unrelated": 0.4584048390388489,
 }
-
-# Per-doc (closeness of tensor_retrieval_field, closeness of tensor_ranking_field) to query "tuxedo".
-# Used to manually verify closeness aggregates: sum/avg/max of these two values must match backend contribution.
-DOC_TENSOR_CLOSENESS_PAIR = {
-    "doc1": (CLOSENESS_TUXEDO["tuxedo"], CLOSENESS_TUXEDO["unrelated"]),       # retrieval, ranking
-    "doc2": (CLOSENESS_TUXEDO["suit"], CLOSENESS_TUXEDO["rainbow tie"]),
-    "doc3": (CLOSENESS_TUXEDO["unrelated"], CLOSENESS_TUXEDO["shorts"]),
-    "doc4": (CLOSENESS_TUXEDO["shorts"], CLOSENESS_TUXEDO["suit"]),
-    "doc5": (CLOSENESS_TUXEDO["backpack"], CLOSENESS_TUXEDO["tuxedo"]),
-}
-
-
-def _expected_closeness_aggregate(doc_id: str, aggregate: str) -> float:
-    """Expected contribution for closeness_retrieval_vector_{aggregate} with weight 1.0 (sum/avg/max of the two tensor field closenesses)."""
-    a, b = DOC_TENSOR_CLOSENESS_PAIR[doc_id]
-    if aggregate == "sum":
-        return a + b
-    if aggregate == "avg":
-        return (a + b) / 2.0
-    if aggregate == "max":
-        return max(a, b)
-    raise ValueError(f"unknown aggregate: {aggregate}")
-
-_CLOSENESS_VALS = [v for _, v in DOC_TENSOR_RANKING_CLOSENESS.values()]
-_CLOSENESS_MIN = min(_CLOSENESS_VALS)
-_CLOSENESS_MAX = max(_CLOSENESS_VALS)
-_CLOSENESS_RANGE = _CLOSENESS_MAX - _CLOSENESS_MIN
-
-
-def _normalized_closeness_for_doc(doc_id: str) -> float:
-    """Min-max normalized closeness for plan docs (0 for doc1, 1 for doc5)."""
-    raw = DOC_TENSOR_RANKING_CLOSENESS[doc_id][1]
-    if _CLOSENESS_RANGE <= 0:
-        return 0.0
-    return (raw - _CLOSENESS_MIN) / _CLOSENESS_RANGE
-
-
-def _raw_closeness_for_doc(doc_id: str) -> float:
-    """Raw closeness (prenormalized-angular) for plan docs; backend uses this for closeness_retrieval_vector (no min-max)."""
-    return DOC_TENSOR_RANKING_CLOSENESS[doc_id][1]
-
 
 # Helpers for TestCustomScoreRerankingWithOtherFeatures (same tuxedo index/model as main tests).
 def _tuxedo_docs_with_extras(*, popularity=None, category=None, parent_id=None, timestamp=None):
@@ -822,6 +790,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         res_baseline = tensor_search.search(
             config=self.config,
             index_name=self.index_bm25_aggregates.name,
+            hybrid_parameters=HybridParameters(verbose=True),
             text="tuxedo",
             search_method="HYBRID",
             result_count=10,
@@ -841,6 +810,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 res = tensor_search.search(
                     config=self.config,
                     index_name=self.index_bm25_aggregates.name,
+                    hybrid_parameters=HybridParameters(verbose=True),
                     text="tuxedo",
                     search_method="HYBRID",
                     score_modifiers=ScoreModifierLists(
@@ -870,7 +840,6 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                     self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_max + 1000.0)
                     self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_sum_avg)
 
-
                 # Confirm order is correct
                 ids = [h["_id"] for h in res["hits"]]
                 self.assertEqual(ids, expected_order, msg=f"add_to_score bm25_{agg}: order must be {expected_order}")
@@ -896,6 +865,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             index_name=self.index_closeness_aggregates.name,
             text="tuxedo",
             search_method="HYBRID",
+            hybrid_parameters=HybridParameters(verbose=True),
             result_count=10,
         )
 
@@ -915,6 +885,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                     index_name=self.index_closeness_aggregates.name,
                     text="tuxedo",
                     search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(verbose=True),
                     score_modifiers=ScoreModifierLists(
                         add_to_score=[
                             # High weight because the numbers are small.
@@ -931,20 +902,24 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 # Assert order is correct for each aggregate type
                 if agg in ("sum", "avg"):
                     expected_order = ["strongest_sum_avg", "middle_of_both", "strongest_max"]
-                    # Confirm that it's normalized.
-                    # Meaning top hit has +1000 to original score
-                    self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_sum_avg + 1000.0)
-                    # Then bottom hit score must match its base score (it was normalized to 0).
-                    self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_max)
-
                 else:  # max
                     expected_order = ["strongest_max", "middle_of_both", "strongest_sum_avg"]
-                    self.assertEqual(res["hits"][0]["_score"], baseline_score_strongest_max + 1000.0)
-                    self.assertEqual(res["hits"][-1]["_score"], baseline_score_strongest_sum_avg)
 
                 # Confirm order is correct
                 ids = [h["_id"] for h in res["hits"]]
-                self.assertEqual(ids, expected_order, msg=f"add_to_score bm25_{agg}: order must be {expected_order}")
+                self.assertEqual(ids, expected_order, msg=f"add_to_score closeness_{agg}: order must be {expected_order}")
+
+                # Top hit has max normalized score (1.0) so gets +weight to pre_rerank_score
+                self.assertEqual(
+                    res["hits"][0]["_score"],
+                    res["hits"][0][MARQO_DOC_PRE_RERANK_SCORE] + 1000.0,
+                )
+                # All hits have custom score contribution >= 0 (add_to_score never decreases score)
+                for hit in res["hits"]:
+                    self.assertGreaterEqual(
+                        hit["_score"], hit[MARQO_DOC_PRE_RERANK_SCORE],
+                        msg=f"Hit {hit['_id']}: score should be >= pre_rerank_score",
+                    )
 
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")

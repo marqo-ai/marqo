@@ -216,8 +216,16 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         attributes_to_search: Optional[List[str]] = None,
     ) -> str:
         """
-        Builds the lexical YQL search term for a query, given either a marqo query object or a list of attributes (used for ranking terms).
-        This is built from an OR-query part (optional phrases) plus an optional AND (required phrases).
+        Builds a lexical YQL search term for a query. It has an OR-query part (optional phrases)
+        plus an optional AND (required phrases).
+
+        Used in 2 scenarios:
+        1. Retrieval lexical term (_is_ranking_term=False, most common use case)
+            - Uses marqo_query object and its searchable_attributes (if any).
+        2. Ranking lexical term (_is_ranking_term=True)
+            - Uses given attributes_to_search, ignoring query-specified attributes. These attributes are determined by
+            user-input custom score rerank fields. Ranking terms do NOT fetch all scores, only those specified in
+            attributes_to_search.
 
         Rules:
         - Empty query → `false`; 

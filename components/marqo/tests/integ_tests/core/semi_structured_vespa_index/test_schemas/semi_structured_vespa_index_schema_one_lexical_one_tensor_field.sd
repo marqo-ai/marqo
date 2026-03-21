@@ -289,7 +289,7 @@ schema marqo__test_00semi_00structured_00schema {
 
         }
         function ranking_closeness_metric_tensor_field() {
-            expression: reduce((1.0 + cosine_similarity(attribute(marqo__embeddings_tensor_field), query(marqo__query_embedding), x)) / 2.0, sum)
+            expression: reduce(1.0 / (2.0 - cosine_similarity(attribute(marqo__embeddings_tensor_field), query(marqo__query_embedding), x)), sum)
         }
         summary-features {
             ranking_closeness_metric_tensor_field

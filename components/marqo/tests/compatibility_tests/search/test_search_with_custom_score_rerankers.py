@@ -150,7 +150,7 @@ class TestSearchWithCustomScoreRerankers(BaseCompatibilityTestCase):
         self.save_results_to_file(all_results)
         # store the result of search across all structured & unstructured indexes
 
-    def test_search_with_global_score_modifiers(self):
+    def test_search_with_custom_score_rerankers(self):
         """Run search queries and compare the results with the stored results."""
         self.logger.info(f"Running test_search on {self.__class__.__name__}")
         stored_results = self.load_results_from_file()

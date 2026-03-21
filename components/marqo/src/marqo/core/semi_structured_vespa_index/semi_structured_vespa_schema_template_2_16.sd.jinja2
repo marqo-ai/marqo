@@ -379,19 +379,28 @@ schema {{ index.schema_name }} {
             {% if collapse_field %}collapse_field_hash{% endif %}
         }
 
-        {# Per-field ranking score (similarity to marqo__query_embedding), bounded to [0,1] where 1=closest.
-           Named ranking_closeness_metric_<field_name> for custom score rerank summary-features. Not for geodegrees. #}
+        {# Per-field closeness score (similarity to marqo__query_embedding) for custom score rerank summary-features.
+           Formulas match Vespa's closeness() rank feature (to_rawscore) per distance metric (higher = closer).
+           Sources:
+             angular: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/angular_distance.cpp
+             prenormalized-angular: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/prenormalized_angular_distance.cpp
+             euclidean: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/euclidean_distance.cpp
+             dotproduct: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/mips_distance_transform.cpp
+             hamming: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/hamming_distance.cpp
+           Not for geodegrees. #}
         {% if index.tensor_fields and index.distance_metric.value != 'geodegrees' %}
         {% for field in index.tensor_fields %}
         function ranking_closeness_metric_{{ field.name }}() {
-            {%- if index.distance_metric.value in ['angular', 'prenormalized-angular'] %}
-            expression: reduce((1.0 + cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)) / 2.0, sum)
+            {%- if index.distance_metric.value == 'angular' %}
+            expression: reduce(1.0 / (1.0 + acos(min(1.0, max(-1.0, cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x))))), sum)
+            {%- elif index.distance_metric.value == 'prenormalized-angular' %}
+            expression: reduce(1.0 / (2.0 - cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)), sum)
             {%- elif index.distance_metric.value == 'euclidean' %}
             expression: reduce(1.0 / (1.0 + euclidean_distance(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)), sum)
             {%- elif index.distance_metric.value == 'dotproduct' %}
             expression: reduce(reduce(attribute({{ field.embeddings_field_name }}) * query(marqo__query_embedding), sum, x), sum)
             {%- elif index.distance_metric.value == 'hamming' %}
-            expression: reduce(1.0 - (hamming(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding)) / (8.0 * {{ dimension }})), sum)
+            expression: reduce(1.0 / (1.0 + hamming(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding))), sum)
             {%- endif %}
         }
         {% endfor %}
