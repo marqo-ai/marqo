@@ -2001,6 +2001,92 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         self.assertIn("sortBy", str(ctx.exception))
         self.assertIn("scoreModifiers", str(ctx.exception))
 
+    def test_custom_score_rerank_for_hit_only_in_lexical(self):
+        """
+        Retrieve on field_a, custom score rerank on both field_a and field_b.
+        lexical_only_doc has field_a and field_b but NOT exclusive_tensor_field,
+        so it appears only in lexical results (not tensor). Confirm that both
+        BM25 custom score rerankers are properly applied to lexical_only_doc.
+        """
+        docs = [
+            {
+                "_id": "lexical_only_doc",
+                "field_a": "tuxedo tuxedo tuxedo",      # will be top bm25 hit
+                "field_b": "tuxedo tuxedo",             # will be top bm25 hit
+                # NO exclusive_tensor_field -> won't appear in tensor results
+            },
+            {
+                "_id": "both_doc",
+                "field_a": "tuxedo",
+                "field_b": "tuxedo",
+                "exclusive_tensor_field": "tuxedo",
+            },
+        ]
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index.name,
+                docs=docs,
+                tensor_fields=["exclusive_tensor_field"],
+            ),
+        )
+
+        res_baseline = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                searchableAttributesLexical=["field_a"],
+                searchableAttributesTensor=["exclusive_tensor_field"],
+            ),
+            result_count=10,
+        )
+
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                searchableAttributesLexical=["field_a"],
+                searchableAttributesTensor=["exclusive_tensor_field"],
+            ),
+            score_modifiers=ScoreModifierLists(
+                add_to_score=[
+                    {"field_name": "marqo__score_bm25_field_field_a", "weight": 1000.0},
+                    {"field_name": "marqo__score_bm25_field_field_b", "weight": 1000.0},
+                ]
+            ),
+            result_count=10,
+        )
+
+        # Both docs should be in results
+        ids = [h["_id"] for h in res["hits"]]
+        self.assertIn("lexical_only_doc", ids)
+        self.assertIn("both_doc", ids)
+
+        # Both custom score rerankers should boost lexical_only_doc's score above its baseline
+        for hit in res["hits"]:
+            if hit["_id"] == "lexical_only_doc":
+                baseline = next(
+                    h["_score"] for h in res_baseline["hits"] if h["_id"] == "lexical_only_doc"
+                )
+                # Score should be significantly above baseline (both rerankers contributing)
+                self.assertAlmostEqual(
+                    hit["_score"], baseline + 2000,
+                    msg="lexical_only_doc should have +1000 from each field",
+                )
+                # Pre-rerank score should match baseline
+                self.assertAlmostEqual(
+                    hit[MARQO_DOC_PRE_RERANK_SCORE], baseline, places=5,
+                    msg="pre_rerank_score should match baseline",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
