@@ -400,26 +400,6 @@ public class HybridSearcher extends Searcher {
         if (hasRankingVector || hasRankingLexical) {
             Result resultToFill = new Result(query, hitsForPostProcessing);
             execution.fill(resultToFill, "dummy-light-summary");
-
-            // DEBUG: dump all summary features for every hit after fill
-            for (Hit h : hitsForPostProcessing) {
-                FeatureData sf = getSummaryFeaturesForHit(h);
-                if (sf != null) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("[BM25_INSPECT] hit=").append(h.getId()).append(" summaryFeatures={");
-                    boolean first = true;
-                    for (String fname : sf.featureNames()) {
-                        if (!first) sb.append(", ");
-                        first = false;
-                        Double val = getFeatureDouble(sf, fname);
-                        sb.append(fname).append("=").append(val);
-                    }
-                    sb.append("}");
-                    logger.info(sb.toString());
-                } else {
-                    logger.info("[BM25_INSPECT] hit=" + h.getId() + " summaryFeatures=null");
-                }
-            }
         }
 
         // Determine post-processing mode based on query parameters
