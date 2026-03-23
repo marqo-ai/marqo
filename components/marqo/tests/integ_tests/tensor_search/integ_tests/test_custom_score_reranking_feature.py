@@ -2003,10 +2003,12 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
 
     def test_custom_score_rerank_for_hit_only_in_lexical(self):
         """
-        Retrieve on field_a, custom score rerank on both field_a and field_b.
-        lexical_only_doc has field_a and field_b but NOT exclusive_tensor_field,
-        so it appears only in lexical results (not tensor). Confirm that both
-        BM25 custom score rerankers are properly applied to lexical_only_doc.
+        Confirms that BM25 custom score rerankers are properly applied to a doc that only appears in lexical results.
+
+        We retrieve on field_a, custom score rerank on both field_a and field_b. This test confirms that the bm25 score
+        for field_a is properly calculated and used for reranking, even when field_a is removed from the second arg of
+        rank() (deduplicated, since it's already used in the main lexical term). We know the Lexical YQL is used,
+        therefore the deduplication.
         """
         docs = [
             {
