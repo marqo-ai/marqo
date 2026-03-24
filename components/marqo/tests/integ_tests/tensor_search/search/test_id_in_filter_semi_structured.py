@@ -20,8 +20,8 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
     Inserts 1,000 documents once at class level. Tests large IN lists up to 10,000 IDs.
     """
 
-    NUM_DOCS = 1000
-    ALL_IDS = {f"doc_{i}" for i in range(1000)}
+    NUM_DOCS = 10000
+    ALL_IDS = {f"doc_{i}" for i in range(10000)}
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -142,24 +142,24 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         self.assertEqual({"doc_0", "doc_10"}, result_ids)
 
     def test_id_in_large_list_10000_ids(self):
-        """_id IN with 10,000 IDs (1,000 real + 9,000 nonexistent) works without error.
+        """_id IN with 10,000 IDs works without error.
 
-        Proves the IN operator handles large ID lists. Only the 1,000 existing docs match.
+        Proves the IN operator handles large ID lists. All 10,000 IDs are real docs.
+        MARQO_MAX_SEARCH_LIMIT caps results at 1,000, so we verify the query succeeds
+        and all returned IDs are from our doc set.
         """
-        real_ids = [f"doc_{i}" for i in range(self.NUM_DOCS)]
-        fake_ids = [f"fake_{i}" for i in range(9000)]
-        all_ids = real_ids + fake_ids
+        all_ids = [f"doc_{i}" for i in range(self.NUM_DOCS)]
         filter_str = "_id IN (" + ", ".join(all_ids) + ")"
 
         res = tensor_search.search(
             config=self.config, index_name=self.index.name,
-            text="product", result_count=self.NUM_DOCS,
+            text="product", result_count=1000,
             filter=filter_str, search_method=SearchMethod.TENSOR
         )
 
-        self.assertEqual(self.NUM_DOCS, len(res["hits"]))
+        self.assertEqual(1000, len(res["hits"]))
         result_ids = {hit["_id"] for hit in res["hits"]}
-        self.assertEqual(self.ALL_IDS, result_ids)
+        self.assertTrue(result_ids.issubset(self.ALL_IDS))
 
     def test_id_in_single_id(self):
         """_id IN with a single ID returns exactly one result."""
