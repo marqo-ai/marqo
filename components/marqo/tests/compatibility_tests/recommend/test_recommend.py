@@ -58,28 +58,28 @@ class TestRecommend(BaseCompatibilityTestCase):
         {
             '_id': f"example_doc_1",
             'text_field': 'Man riding a horse',
-            'image_field': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg',
+            'image_field': 'https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg',
             'tags': ['man', 'horse'],
             'my_int': 1
         },
         {
             "_id": f"example_doc_2",
             "text_field": "Flying Plane",
-            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
             'tags': ['plane'],
             'my_int': 2
         },
         {
             "_id": f"example_doc_3",
             "text_field": "Traffic light",
-            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg",
+            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image3.jpg",
             'tags': ['light'],
             'caption': 'example_doc_3'
         },
         {
             "_id": f"example_doc_4",
             "text_field": "Red Bus",
-            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg",
+            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
             'tags': ['bus', 'red'],
             'caption': 'example_doc_4'
         }
