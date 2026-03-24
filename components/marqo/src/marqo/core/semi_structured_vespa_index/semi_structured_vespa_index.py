@@ -508,6 +508,18 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             return f'({float_field_string} OR {int_field_string})'
 
+        def generate_in_filter_string(node: search_filter.InTerm) -> str:
+            if node.field == MARQO_DOC_ID:
+                escaped_values = ', '.join(
+                    f'"{self.escape(v)}"' for v in node.value_list
+                )
+                return f'{VESPA_FIELD_ID} in ({escaped_values})'
+            else:
+                raise InvalidArgumentError(
+                    "The 'IN' filter keyword is only supported for the '_id' field "
+                    "on semi-structured indexes."
+                )
+
         def tree_to_filter_string(node: search_filter.Node) -> Optional[str]:
             # Skip any terms with excluded fields first - check at node level
             if (isinstance(node, search_filter.Term) or isinstance(node, search_filter.Modifier)) and exclude_terms is not None:
@@ -553,7 +565,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 elif isinstance(node, search_filter.RangeTerm):
                     return generate_range_filter_string(node)
                 elif isinstance(node, search_filter.InTerm):
-                    raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
+                    return generate_in_filter_string(node)
 
             raise InternalError(f'Unknown node type {type(node)}')
 

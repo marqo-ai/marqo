@@ -438,7 +438,8 @@ class TestSearch(MarqoTestCase):
                         if expected_ids:
                             self.assertEqual(set(expected_ids), {hit["_id"] for hit in res["hits"]})
 
-    def test_filter_unstructured_index_in_keyword_fails(self):
+    def test_filter_unstructured_index_non_id_in_keyword_fails(self):
+        """IN filter on non-_id fields raises InvalidArgumentError on semi-structured indexes."""
         test_cases = [
             "text_field_1 in (random1, true)",
             "int_field_1 in (100, 200)",
@@ -458,7 +459,30 @@ class TestSearch(MarqoTestCase):
                     tensor_search.search(config=self.config, index_name=self.unstructured_default_text_index.name,
                                          text="", filter=case)
 
-                self.assertIn("'IN' filter keyword is not yet supported for unstructured", str(cm.exception))
+                self.assertIn("only supported for the '_id' field", str(cm.exception))
+
+    def test_filter_unstructured_index_id_in_succeeds(self):
+        """_id IN filter works on semi-structured indexes."""
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.unstructured_default_text_index.name,
+                docs=[
+                    {"_id": "in_test_1", "text_field_1": "hello"},
+                    {"_id": "in_test_2", "text_field_1": "world"},
+                    {"_id": "in_test_3", "text_field_1": "foo"},
+                ],
+                tensor_fields=["text_field_1"]
+            )
+        )
+
+        res = tensor_search.search(
+            config=self.config, index_name=self.unstructured_default_text_index.name,
+            text="", result_count=10, filter="_id IN (in_test_1, in_test_3)"
+        )
+
+        result_ids = {hit["_id"] for hit in res["hits"]}
+        self.assertEqual({"in_test_1", "in_test_3"}, result_ids)
 
     def test_filter_id(self):
         """
