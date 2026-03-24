@@ -33,12 +33,12 @@ class TestAddDocumentsMultiModal(BaseCompatibilityTestCase):
     text_docs = [
         {
             "_id": "doc_1",
-            "img": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
+            "img": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
             "caption": "A man riding horse",
         },
         {
             "_id": "doc_2",
-            "img": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            "img": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
             "caption": "An airplane flying in the sky",
         },
         ]
