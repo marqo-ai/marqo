@@ -54,15 +54,20 @@ class TestSemiStructuredInFilter(MarqoTestCase):
     def test_id_in_combined_with_and(self):
         """_id IN combined with AND equality filter."""
         result = self._get_filter('_id IN (doc1, doc2) AND title:hello')
-        self.assertIn('marqo__id in ("doc1", "doc2")', result)
-        self.assertIn('AND', result)
-        self.assertIn('title', result)
+        self.assertEqual(
+            result,
+            '(marqo__id in ("doc1", "doc2") AND '
+            '((marqo__short_string_fields contains sameElement(key contains "title", value contains "hello"))))'
+        )
 
     def test_id_in_combined_with_or(self):
         """_id IN combined with OR equality filter."""
         result = self._get_filter('_id IN (doc1) OR title:hello')
-        self.assertIn('marqo__id in ("doc1")', result)
-        self.assertIn('OR', result)
+        self.assertEqual(
+            result,
+            '(marqo__id in ("doc1") OR '
+            '((marqo__short_string_fields contains sameElement(key contains "title", value contains "hello"))))'
+        )
 
     def test_id_in_empty_returns_empty_string_value(self):
         """_id IN () parses as single empty string value — returns 0 hits in practice."""

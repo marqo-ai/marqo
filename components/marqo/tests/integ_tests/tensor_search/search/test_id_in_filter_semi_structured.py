@@ -1,6 +1,7 @@
 """Integration tests for _id IN filter on semi-structured indexes.
 
-Uses a random model to avoid real inference overhead. Tests with 1000 documents.
+Uses a random model to avoid real inference overhead. Adds 1,000 documents once
+in setUpClass, then tests filter queries including 10,000-ID lists.
 """
 import os
 from unittest import mock
@@ -14,9 +15,13 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestIdInFilterSemiStructured(MarqoTestCase):
-    """Tests for _id IN filter on semi-structured (unstructured) indexes with 1000 documents."""
+    """Tests for _id IN filter on semi-structured (unstructured) indexes.
+
+    Inserts 1,000 documents once at class level. Tests large IN lists up to 10,000 IDs.
+    """
 
     NUM_DOCS = 1000
+    ALL_IDS = {f"doc_{i}" for i in range(1000)}
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -29,34 +34,33 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         cls.indexes = cls.create_indexes([unstructured_index_request])
         cls.index = cls.indexes[0]
 
-        # Verify it's semi-structured
         assert isinstance(cls.index, SemiStructuredMarqoIndex), \
             f"Expected SemiStructuredMarqoIndex, got {type(cls.index)}"
 
+        # Add 1,000 documents once for all tests
+        with mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"}):
+            batch_size = 64
+            for start in range(0, cls.NUM_DOCS, batch_size):
+                end = min(start + batch_size, cls.NUM_DOCS)
+                docs = [
+                    {"_id": f"doc_{i}", "title": f"product {i}", "category": f"cat_{i % 10}"}
+                    for i in range(start, end)
+                ]
+                cls.add_documents(
+                    config=cls.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=cls.index.name,
+                        docs=docs,
+                        tensor_fields=["title"],
+                    )
+                )
+
     def setUp(self) -> None:
-        super().setUp()
+        # Don't call super().setUp() — it clears the index. Data is shared read-only.
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
-        # Add 1000 documents
-        batch_size = 64
-        for start in range(0, self.NUM_DOCS, batch_size):
-            end = min(start + batch_size, self.NUM_DOCS)
-            docs = [
-                {"_id": f"doc_{i}", "title": f"product {i}", "category": f"cat_{i % 10}"}
-                for i in range(start, end)
-            ]
-            self.add_documents(
-                config=self.config,
-                add_docs_params=AddDocsParams(
-                    index_name=self.index.name,
-                    docs=docs,
-                    tensor_fields=["title"],
-                )
-            )
-
     def tearDown(self) -> None:
-        super().tearDown()
         self.device_patcher.stop()
 
     def test_id_in_tensor_search(self):
@@ -102,21 +106,26 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         self.assertEqual(target_ids, result_ids)
 
     def test_not_id_in(self):
-        """NOT _id IN excludes the specified IDs from results."""
-        exclude_ids = {f"doc_{i}" for i in range(self.NUM_DOCS - 3, self.NUM_DOCS)}
-        filter_str = f"NOT _id IN ({', '.join(exclude_ids)})"
+        """NOT _id IN excludes the specified IDs and returns all remaining docs.
+
+        Uses a pool of 20 docs, excludes 5, verifies the exact remaining 15.
+        """
+        pool_ids = sorted([f"doc_{i}" for i in range(20)])
+        exclude_ids = sorted([f"doc_{i}" for i in range(15, 20)])
+        expected_ids = set(pool_ids) - set(exclude_ids)
+
+        pool_filter = "_id IN (" + ", ".join(pool_ids) + ")"
+        exclude_filter = f"NOT _id IN ({', '.join(exclude_ids)})"
+        filter_str = f"{pool_filter} AND {exclude_filter}"
 
         res = tensor_search.search(
             config=self.config, index_name=self.index.name,
-            text="product", result_count=self.NUM_DOCS,
+            text="product", result_count=20,
             filter=filter_str, search_method=SearchMethod.TENSOR
         )
 
         result_ids = {hit["_id"] for hit in res["hits"]}
-        # None of the excluded IDs should appear
-        self.assertEqual(set(), result_ids & exclude_ids)
-        # All other docs should be present
-        self.assertEqual(self.NUM_DOCS - len(exclude_ids), len(result_ids))
+        self.assertEqual(expected_ids, result_ids)
 
     def test_id_in_combined_with_equality_filter(self):
         """_id IN combined with AND equality filter on another field."""
@@ -130,12 +139,16 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         )
 
         result_ids = {hit["_id"] for hit in res["hits"]}
-        # Only doc_0 and doc_10 have category=cat_0
         self.assertEqual({"doc_0", "doc_10"}, result_ids)
 
-    def test_id_in_large_list_1000(self):
-        """_id IN with all 1000 IDs works without error."""
-        all_ids = [f"doc_{i}" for i in range(self.NUM_DOCS)]
+    def test_id_in_large_list_10000_ids(self):
+        """_id IN with 10,000 IDs (1,000 real + 9,000 nonexistent) works without error.
+
+        Proves the IN operator handles large ID lists. Only the 1,000 existing docs match.
+        """
+        real_ids = [f"doc_{i}" for i in range(self.NUM_DOCS)]
+        fake_ids = [f"fake_{i}" for i in range(9000)]
+        all_ids = real_ids + fake_ids
         filter_str = "_id IN (" + ", ".join(all_ids) + ")"
 
         res = tensor_search.search(
@@ -145,6 +158,8 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         )
 
         self.assertEqual(self.NUM_DOCS, len(res["hits"]))
+        result_ids = {hit["_id"] for hit in res["hits"]}
+        self.assertEqual(self.ALL_IDS, result_ids)
 
     def test_id_in_single_id(self):
         """_id IN with a single ID returns exactly one result."""
