@@ -325,23 +325,20 @@ class TestTypeaheadIntegration(MarqoTestCase):
         request_or = TypeaheadRequest(q="taylor s")
         response_or = self.config.typeahead.get_suggestions(self.test_index_name, request_or)
         or_suggestions = [s.suggestion for s in response_or.suggestions]
+        # All 6 queries should be returned (OR matches any token)
+        self.assertCountEqual(
+            ["taylor swift", "taylor", "sport", "sad", "taylor series math", "suspense"],
+            or_suggestions
+        )
 
-        # Should include results that only match "s" like "sport", "sad", "suspense"
-        self.assertGreater(len(or_suggestions), 3, f"OR mode should return many results, got: {or_suggestions}")
-
-        # Prefix-only AND behavior: "taylor s" requires BOTH "taylor" AND "s*"
+        # matchAllTokens AND behavior: "taylor s" requires BOTH "taylor" AND "s*"
         request_and = TypeaheadRequest(q="taylor s", match_all_tokens=True)
         response_and = self.config.typeahead.get_suggestions(self.test_index_name, request_and)
         and_suggestions = [s.suggestion for s in response_and.suggestions]
-
-        # Should only include results with both "taylor" and a word starting with "s"
-        self.assertIn("taylor swift", and_suggestions)
-        self.assertIn("taylor series math", and_suggestions)
-        # Should NOT include results that only match one token
-        self.assertNotIn("taylor", and_suggestions)  # no word starting with "s"
-        self.assertNotIn("sport", and_suggestions)  # no "taylor"
-        self.assertNotIn("sad", and_suggestions)
-        self.assertNotIn("suspense", and_suggestions)
+        self.assertListEqual(
+            ["taylor swift", "taylor series math"],
+            and_suggestions
+        )
 
     def test_get_suggestions_match_all_tokens_with_fuzzy(self):
         """Test that matchAllTokens=True still allows fuzzy matching for typo tolerance."""
@@ -355,9 +352,7 @@ class TestTypeaheadIntegration(MarqoTestCase):
         request = TypeaheadRequest(q="taylro swi", match_all_tokens=True, fuzzy_edit_distance=2)
         response = self.config.typeahead.get_suggestions(self.test_index_name, request)
         suggestions = [s.suggestion for s in response.suggestions]
-
-        self.assertIn("taylor swift", suggestions)
-        self.assertNotIn("samsung galaxy", suggestions)
+        self.assertListEqual(["taylor swift"], suggestions)
 
     # D. Query Management Tests
     def test_get_queries_by_strings(self):
