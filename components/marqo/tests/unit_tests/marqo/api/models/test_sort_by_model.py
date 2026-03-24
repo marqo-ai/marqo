@@ -151,7 +151,7 @@ class TestSortByModels(TestCase):
             limit=50,
             offset=29
         )
-        self.assertEqual(query.sort_by.min_sort_candidates, 79)  # max(77, 50+29)
+        self.assertEqual(79, query.sort_by.min_sort_candidates)
 
     def test_sort_by_sort_candidates_with_default_limit_and_offset(self):
         query = SearchQuery(
