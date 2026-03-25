@@ -2026,7 +2026,7 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                     msg="pre_rerank_score should match baseline",
                 )
 
-
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_custom_score_rerank_with_attributes_to_retrieve(self):
         """
         Summary-features (bm25(*), ranking_closeness_metric_*) are rank-profile outputs, not
