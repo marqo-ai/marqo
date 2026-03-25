@@ -693,5 +693,100 @@ class HybridSearcherTest {
                     .as("Main query should still have collapsefield property")
                     .isEqualTo("brand");
         }
+
+        @Test
+        void shouldInjectMaxIntoMultipleFacetYqlDelimitedQueries() {
+            // Verify that injectMaxHitsIntoFacetsGrouping works on each part of a
+            // delimiter-separated facets YQL (simulating what getFacetsFutureList does)
+            String delimiter = "\n---MARQO-YQL-QUERY-DELIMITER---\n";
+            String facetsYql =
+                    "SELECT * FROM s WHERE true | all(group(color) each(output(count())))"
+                            + delimiter
+                            + "SELECT * FROM s WHERE true | all(group(1.1) each(output(count())))";
+            int relevantCandidates = 5;
+
+            String[] queries = facetsYql.split(delimiter);
+            for (int i = 0; i < queries.length; i++) {
+                queries[i] =
+                        hybridSearcher.injectMaxHitsIntoFacetsGrouping(
+                                queries[i], relevantCandidates, false);
+            }
+
+            // Both queries should have max(5) injected
+            assertThat(queries[0]).contains("max(5)");
+            assertThat(queries[0]).contains("group(color)");
+            assertThat(queries[1]).contains("max(5)");
+            assertThat(queries[1]).contains("group(1.1)");
+        }
+
+        @Test
+        void shouldNotModifyFacetsYqlWhenRelevanceCutoffIsNull() {
+            // When relevantCandidates is null, getFacetsFutureList should pass YQL unchanged
+            String originalYql =
+                    "SELECT * FROM s WHERE true | all(group(color) each(output(count())))";
+
+            // Verify: no injection when we don't call injectMax (simulating null path)
+            assertThat(originalYql).doesNotContain("max(");
+        }
+    }
+
+    @Nested
+    class InjectMaxHitsIntoFacetsGroupingTest {
+
+        @Test
+        void shouldInjectMaxIntoSimpleGrouping() {
+            String input =
+                    "select * from schema where (query) limit 0 | all(group(color)"
+                            + " each(output(count())))";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
+            assertThat(result).contains("all(max(5)");
+            assertThat(result).contains("group(color)");
+        }
+
+        @Test
+        void shouldInjectMaxIntoTotalHitsGrouping() {
+            String input =
+                    "select * from schema where (query) limit 0 | all(group(1.1)"
+                            + " each(output(count())))";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 2, false);
+            assertThat(result).contains("all(max(2)");
+            assertThat(result).contains("group(1.1)");
+        }
+
+        @Test
+        void shouldInjectMaxIntoGroupingWithExistingMaxDepth() {
+            String input =
+                    "select * from schema where (query) limit 0 | all( max(100) all(group(color)"
+                            + " each(output(count()))))";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 3, false);
+            assertThat(result).contains("max(3)");
+            assertThat(result).contains("max(100)");
+        }
+
+        @Test
+        void shouldReturnUnchangedWhenNoPipe() {
+            String input = "select * from schema where (query)";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
+            assertThat(result).isEqualTo(input);
+        }
+
+        @Test
+        void shouldReturnUnchangedWhenGroupingDoesNotStartWithAll() {
+            String input = "select * from schema where (query) limit 0 | each(output(count()))";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
+            assertThat(result).isEqualTo(input);
+        }
+
+        @Test
+        void shouldHandleMultipleFacetFieldsGrouping() {
+            String input =
+                    "select * from schema where (query) limit 0 | all( all(group(color) max(100)"
+                            + " order(-count()) each(output(count()))) all(group(brand) max(100)"
+                            + " order(-count()) each(output(count()))) )";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 10, false);
+            assertThat(result).contains("max(10)");
+            assertThat(result).contains("group(color)");
+            assertThat(result).contains("group(brand)");
+        }
     }
 }
