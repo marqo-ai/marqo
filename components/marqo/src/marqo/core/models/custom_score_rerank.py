@@ -1,15 +1,13 @@
 """Parsing of custom score rerank keys (suffix after ``marqo__score_``)."""
 from __future__ import annotations
 
-from typing import Literal, Optional, cast
+from typing import Literal, Optional, cast, get_args
 
 from marqo.base_model import StrictBaseModel
 
 ScoreType = Literal["bm25", "closeness_retrieval_vector"]
 AggregateType = Literal["sum", "max", "avg"]
 
-_SUPPORTED_SCORE_TYPES = ("bm25", "closeness_retrieval_vector")
-_AGGREGATE_TYPES = ("sum", "max", "avg")
 
 
 class ParsedCustomScoreKey(StrictBaseModel):
@@ -50,12 +48,12 @@ class ParsedCustomScoreKey(StrictBaseModel):
         if not key or "_" not in key:
             return None
 
-        for score_type in _SUPPORTED_SCORE_TYPES:
+        for score_type in get_args(ScoreType):
             prefix = score_type + "_"
             if not key.startswith(prefix):
                 continue
             rest = key[len(prefix):]
-            if rest in _AGGREGATE_TYPES:
+            if rest in get_args(AggregateType):
                 # Set `aggregate_type` and leave `field_name` as None.
                 return cls(
                     score_type=cast(ScoreType, score_type),

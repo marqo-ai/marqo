@@ -465,10 +465,30 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         self._assert_pre_rerank_score_matches_baseline(res_with_rerank, res_no_rerank)
         ids = [h["_id"] for h in res_with_rerank["hits"]]
         self.assertEqual(REVERSED_ORDER, ids, msg="add_to_score bm25 lex_ranking_field: order must be doc5, doc4, doc3, doc2, doc1")
-        scores_with = {h["_id"]: h["_score"] for h in res_with_rerank["hits"]}
-        self.assertGreater(scores_with["doc5"], scores_with["doc1"], msg="doc5 (highest bm25 lex_ranking_field) should have higher score than doc1")
-        any_changed = any(h["_score"] != h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"])
-        self.assertTrue(any_changed, msg="Custom score modifier must change at least one doc's score")
+
+        # Exact score assertions: _score == _pre_rerank_score + weight * (raw_bm25 / max_raw_bm25)
+        # With divide-by-max normalization and weight=1.0, doc5 (highest bm25) gets contribution=1.0.
+        contributions = {
+            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"]
+        }
+        # Doc5 has the max BM25, so its normalized score must be exactly 1.0
+        self.assertAlmostEqual(contributions["doc5"], 1.0, places=5,
+                               msg="doc5 (max bm25) should have normalized contribution of 1.0")
+        # All contributions must be in [0, 1] and strictly decreasing doc5 > doc4 > ... > doc1
+        for doc_id, contrib in contributions.items():
+            self.assertGreaterEqual(contrib, 0.0, msg=f"{doc_id}: contribution must be >= 0")
+            self.assertLessEqual(contrib, 1.0, msg=f"{doc_id}: contribution must be <= 1")
+        for i in range(len(REVERSED_ORDER) - 1):
+            self.assertGreater(
+                contributions[REVERSED_ORDER[i]], contributions[REVERSED_ORDER[i + 1]],
+                msg=f"{REVERSED_ORDER[i]} should have higher bm25 contribution than {REVERSED_ORDER[i + 1]}",
+            )
+        # Verify _score = _pre_rerank_score + contribution for every hit
+        for hit in res_with_rerank["hits"]:
+            self.assertAlmostEqual(
+                hit["_score"], hit[MARQO_DOC_PRE_RERANK_SCORE] + contributions[hit["_id"]],
+                places=5, msg=f"Doc {hit['_id']}: _score must equal _pre_rerank_score + contribution",
+            )
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_closeness_retrieval_vector_single_field_modifies_scores_and_reverses_order(self):
@@ -507,21 +527,29 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         self._assert_pre_rerank_score_matches_baseline(res_with_rerank, res_no_rerank)
         ids = [h["_id"] for h in res_with_rerank["hits"]]
         self.assertEqual(REVERSED_ORDER, ids, msg="add_to_score closeness: order must be doc5, doc4, doc3, doc2, doc1")
-        # Backend adds weight * (normalized or raw) closeness; Vespa's output can differ from plan's hardcoded values.
-        # Assert contribution order: doc5 (highest closeness) gets largest add, then doc4, ..., doc1.
-        for hit in res_with_rerank["hits"]:
-            contribution = hit["_score"] - hit[MARQO_DOC_PRE_RERANK_SCORE]
-            self.assertGreaterEqual(
-                contribution,
-                0.0,
-                msg=f"Doc {hit['_id']}: add_to_score contribution should be non-negative for weight 1",
+
+        # Exact score assertions: _score == _pre_rerank_score + weight * (raw_closeness / max_raw_closeness)
+        # With divide-by-max normalization and weight=1.0, doc5 (highest closeness) gets contribution=1.0.
+        contributions = {
+            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"]
+        }
+        # Doc5 has the max closeness (tensor_ranking_field="tuxedo"), so normalized contribution must be 1.0
+        self.assertAlmostEqual(contributions["doc5"], 1.0, places=5,
+                               msg="doc5 (max closeness) should have normalized contribution of 1.0")
+        # All contributions must be in [0, 1] and strictly decreasing doc5 > doc4 > ... > doc1
+        for doc_id, contrib in contributions.items():
+            self.assertGreaterEqual(contrib, 0.0, msg=f"{doc_id}: contribution must be >= 0")
+            self.assertLessEqual(contrib, 1.0, msg=f"{doc_id}: contribution must be <= 1")
+        for i in range(len(REVERSED_ORDER) - 1):
+            self.assertGreater(
+                contributions[REVERSED_ORDER[i]], contributions[REVERSED_ORDER[i + 1]],
+                msg=f"{REVERSED_ORDER[i]} should have higher closeness contribution than {REVERSED_ORDER[i + 1]}",
             )
-        contributions = [res_with_rerank["hits"][i]["_score"] - res_with_rerank["hits"][i][MARQO_DOC_PRE_RERANK_SCORE] for i in range(len(ids))]
-        for i in range(len(contributions) - 1):
-            self.assertGreaterEqual(
-                contributions[i],
-                contributions[i + 1],
-                msg=f"Closeness contributions should decrease in order doc5..doc1: {contributions}",
+        # Verify _score = _pre_rerank_score + contribution for every hit
+        for hit in res_with_rerank["hits"]:
+            self.assertAlmostEqual(
+                hit["_score"], hit[MARQO_DOC_PRE_RERANK_SCORE] + contributions[hit["_id"]],
+                places=5, msg=f"Doc {hit['_id']}: _score must equal _pre_rerank_score + contribution",
             )
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
@@ -908,6 +936,68 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         self._assert_pre_rerank_score_matches_baseline(res_double, res_no_rerank)
         ids_double = [h["_id"] for h in res_double["hits"]]
         self.assertEqual(ids_double, REVERSED_ORDER, msg="Weight 2.0 should give reversed order doc5..doc1")
+
+    def test_lexical_search_with_custom_score_reranker_is_silent_noop(self):
+        """Pure LEXICAL search with marqo__score_* modifiers returns results without applying reranking."""
+        self._add_tuxedo_docs()
+        res_without = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="LEXICAL",
+            result_count=10,
+        )
+        res_with = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="LEXICAL",
+            score_modifiers=ScoreModifierLists(
+                add_to_score=[{"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0}]
+            ),
+            result_count=10,
+        )
+        # Scores are identical — custom score reranker had no effect
+        scores_without = {h["_id"]: h["_score"] for h in res_without["hits"]}
+        scores_with = {h["_id"]: h["_score"] for h in res_with["hits"]}
+        self.assertEqual(scores_without, scores_with,
+                         msg="Custom score reranker should have no effect on pure LEXICAL search scores")
+        # No _pre_rerank_score field present
+        for hit in res_with["hits"]:
+            self.assertNotIn(MARQO_DOC_PRE_RERANK_SCORE, hit,
+                             msg=f"Hit {hit['_id']}: _pre_rerank_score should not be present for LEXICAL search")
+
+    def test_tensor_search_with_custom_score_reranker_is_silent_noop(self):
+        """Pure TENSOR search with marqo__score_* modifiers returns results without applying reranking."""
+        self._add_tuxedo_docs()
+        res_without = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="TENSOR",
+            result_count=10,
+        )
+        res_with = tensor_search.search(
+            config=self.config,
+            index_name=self.index.name,
+            text="tuxedo",
+            search_method="TENSOR",
+            score_modifiers=ScoreModifierLists(
+                add_to_score=[
+                    {"field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field", "weight": 1.0}
+                ]
+            ),
+            result_count=10,
+        )
+        # Scores are identical — custom score reranker had no effect
+        scores_without = {h["_id"]: h["_score"] for h in res_without["hits"]}
+        scores_with = {h["_id"]: h["_score"] for h in res_with["hits"]}
+        self.assertEqual(scores_without, scores_with,
+                         msg="Custom score reranker should have no effect on pure TENSOR search scores")
+        # No _pre_rerank_score field present
+        for hit in res_with["hits"]:
+            self.assertNotIn(MARQO_DOC_PRE_RERANK_SCORE, hit,
+                             msg=f"Hit {hit['_id']}: _pre_rerank_score should not be present for TENSOR search")
 
 
 class TestCustomScoreRerankStructuredIndexUnsupported(MarqoTestCase):
