@@ -63,7 +63,7 @@ class ParsedCustomScoreKey(StrictBaseModel):
                     aggregate_type=cast(AggregateType, rest),
                 )
             if rest.startswith("field_"):
-                field_name = rest[6:]
+                field_name = rest.removeprefix("field_")
                 if not field_name:
                     return None
                 # Set `field_name` and leave `aggregate_type` as None.

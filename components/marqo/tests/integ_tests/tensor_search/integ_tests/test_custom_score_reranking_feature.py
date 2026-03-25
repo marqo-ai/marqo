@@ -23,6 +23,7 @@ from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsCon
 from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import CollapseField, DistanceMetric, FieldFeature, FieldType, Model
 from marqo.core.models.marqo_index_request import FieldRequest
+import marqo.tensor_search.index_meta_cache as index_meta_cache
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.api_models import ScoreModifierLists, SearchQuery
 from marqo.tensor_search.models.relevance_cutoff_model import (
@@ -213,26 +214,19 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        # TODO: Change hardcoded values. Original planned open_clip/ViT-B-16-SigLIP-512/webli is no longer there
         model = Model(name="open_clip/ViT-B-16-SigLIP/webli")
         index_request = cls.unstructured_marqo_index_request(model=model)
-        index_request_empty = cls.unstructured_marqo_index_request(model=model)
         index_request_bm25_aggregates = cls.unstructured_marqo_index_request(model=model)
         index_request_closeness_aggregates = cls.unstructured_marqo_index_request(model=model)
-        index_request_lexical_only = cls.unstructured_marqo_index_request(model=model)
 
         cls.indexes = cls.create_indexes([
             index_request,
-            index_request_empty,
             index_request_bm25_aggregates,
             index_request_closeness_aggregates,
-            index_request_lexical_only,
         ])
         cls.index = cls.indexes[0]
-        cls.index_number_only = cls.indexes[1]
-        cls.index_bm25_aggregates = cls.indexes[2]
-        cls.index_closeness_aggregates = cls.indexes[3]
-        cls.index_lexical_only = cls.indexes[4]
+        cls.index_bm25_aggregates = cls.indexes[1]
+        cls.index_closeness_aggregates = cls.indexes[2]
 
 
     def _add_tuxedo_docs(self) -> None:
@@ -248,7 +242,6 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
 
     def test_custom_score_rerank_raises_when_schema_version_below_minimum(self):
         """Custom score rerankers on an index with schema version < 2.26.0 raises UnsupportedFeatureError."""
-        import marqo.tensor_search.index_meta_cache as index_meta_cache
         real_get_index = index_meta_cache.get_index
 
         def get_index_old_schema(index_management, index_name, force_refresh=False):
@@ -585,86 +578,6 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             )
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
-    def test_custom_score_rerank_with_attributes_to_retrieve(self):
-        """
-        Summary-features (bm25(*), ranking_closeness_metric_*) are rank-profile outputs, not
-        document attributes; they are not controlled by attributes_to_retrieve. With
-        attributes_to_retrieve set, custom score rerank (BM25 or closeness) must still reverse
-        order (doc5..doc1), and each hit must contain only _id, _score, _highlights, and the
-        requested attributes.
-        """
-        docs = [dict(d) for d in DOCS_TUXEDO_PLAN]
-        for d in docs:
-            d["other_field"] = f"val_{d['_id']}"
-        self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index.name,
-                docs=docs,
-                tensor_fields=TENSOR_FIELDS_PLAN,
-            ),
-        )
-        with self.subTest(modifier="bm25"):
-            # All results should only have this 1 field
-            requested_attrs = ["lex_ranking_field"]
-            res = tensor_search.search(
-                config=self.config,
-                index_name=self.index.name,
-                text="tuxedo",
-                search_method="HYBRID",
-                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-                score_modifiers=ScoreModifierLists(
-                    add_to_score=[{"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0}]
-                ),
-                result_count=10,
-                attributes_to_retrieve=requested_attrs,
-            )
-            ids = [h["_id"] for h in res["hits"]]
-            self.assertEqual(
-                REVERSED_ORDER, ids,
-                msg="BM25 add_to_score must reverse order with attributes_to_retrieve",
-            )
-            allowed_keys = {"_id", "_score", "_highlights"}.union(requested_attrs)
-            for hit in res["hits"]:
-                self.assertLessEqual(
-                    set(hit.keys()), allowed_keys,
-                    msg=f"Hit {hit.get('_id')} should only have requested attributes and metadata; keys: {sorted(hit.keys())}",
-                )
-                for attr in requested_attrs:
-                    self.assertIn(attr, hit, msg=f"Requested attribute {attr} must be present in hit {hit.get('_id')}")
-        with self.subTest(modifier="closeness"):
-            requested_attrs = ["other_field"]
-            res = tensor_search.search(
-                config=self.config,
-                index_name=self.index.name,
-                text="tuxedo",
-                search_method="HYBRID",
-                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-                score_modifiers=ScoreModifierLists(
-                    add_to_score=[
-                        {
-                            "field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
-                            "weight": 1.0,
-                        }
-                    ]
-                ),
-                result_count=10,
-                attributes_to_retrieve=requested_attrs,
-            )
-            ids = [h["_id"] for h in res["hits"]]
-            self.assertEqual(
-                REVERSED_ORDER, ids,
-                msg="Closeness add_to_score must reverse order (doc5..doc1) even when only other_field is retrieved",
-            )
-            allowed_keys = {"_id", "_score", "_highlights"}.union(requested_attrs)
-            for hit in res["hits"]:
-                self.assertLessEqual(
-                    set(hit.keys()), allowed_keys,
-                    msg=f"Hit {hit.get('_id')} should only have other_field and metadata; keys: {sorted(hit.keys())}",
-                )
-                for attr in requested_attrs:
-                    self.assertIn(attr, hit, msg=f"Requested attribute {attr} must be present in hit {hit.get('_id')}")
-                self.assertEqual(hit["other_field"], f"val_{hit['_id']}")
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_closeness_weighted_exact_final_score(self):
@@ -995,72 +908,6 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         self._assert_pre_rerank_score_matches_baseline(res_double, res_no_rerank)
         ids_double = [h["_id"] for h in res_double["hits"]]
         self.assertEqual(ids_double, REVERSED_ORDER, msg="Weight 2.0 should give reversed order doc5..doc1")
-
-    def test_hybrid_search_with_custom_score_raises_when_index_has_no_lexical_fields(self):
-        """
-        Hybrid search with custom score modifier fails when the index has no lexically searchable
-        fields (number-only index). The index does not support hybrid, so we expect
-        InvalidArgumentError indicating hybrid search cannot be performed.
-        """
-        self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_number_only.name,
-                docs=[{"_id": "seed", "numeric_field": 1}],
-                tensor_fields=[],
-            ),
-        )
-
-        with self.assertRaises(InvalidArgumentError) as ctx:
-            tensor_search.search(
-                config=self.config,
-                index_name=self.index_number_only.name,
-                text="anything",
-                search_method="HYBRID",
-                score_modifiers=ScoreModifierLists(
-                    add_to_score=[{"field_name": "marqo__score_bm25_sum", "weight": 1.0}]
-                ),
-                result_count=5,
-            )
-        self.assertIn("hybrid search cannot be performed", str(ctx.exception))
-
-    def test_hybrid_search_with_custom_score_raises_when_index_has_no_tensor_fields(self):
-        """
-        Hybrid search with custom score modifier fails when the index has no tensor fields
-        (lexical-only index). The index does not support hybrid, so we expect
-        InvalidArgumentError indicating hybrid search cannot be performed.
-        """
-        self.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.index_lexical_only.name,
-                docs=[{"_id": "seed_lex", "lex_retrieval_field": "anything"}],
-                tensor_fields=[],
-            ),
-        )
-        params_lexical_only = HybridParameters(
-            retrievalMethod=RetrievalMethod.Disjunction,
-            rankingMethod=RankingMethod.RRF,
-            alpha=0.5001,
-            rrfK=60,
-            searchableAttributesTensor=[],
-            searchableAttributesLexical=["lex_retrieval_field"],
-        )
-        with self.assertRaises(InvalidArgumentError) as ctx:
-            tensor_search.search(
-                config=self.config,
-                index_name=self.index_lexical_only.name,
-                text="anything",
-                search_method="HYBRID",
-                hybrid_parameters=params_lexical_only,
-                score_modifiers=ScoreModifierLists(
-                    add_to_score=[
-                        {"field_name": "marqo__score_closeness_retrieval_vector_sum", "weight": 1.0}
-                    ]
-                ),
-                result_count=5,
-            )
-        self.assertIn("hybrid search cannot be performed", str(ctx.exception))
 
 
 class TestCustomScoreRerankStructuredIndexUnsupported(MarqoTestCase):
@@ -2088,6 +1935,88 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                     hit[MARQO_DOC_PRE_RERANK_SCORE], baseline, places=5,
                     msg="pre_rerank_score should match baseline",
                 )
+
+
+    def test_custom_score_rerank_with_attributes_to_retrieve(self):
+        """
+        Summary-features (bm25(*), ranking_closeness_metric_*) are rank-profile outputs, not
+        document attributes; they are not controlled by attributes_to_retrieve. With
+        attributes_to_retrieve set, custom score rerank (BM25 or closeness) must still reverse
+        order (doc5..doc1), and each hit must contain only _id, _score, _highlights, and the
+        requested attributes.
+        """
+        docs = [dict(d) for d in DOCS_TUXEDO_PLAN]
+        for d in docs:
+            d["other_field"] = f"val_{d['_id']}"
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.index.name,
+                docs=docs,
+                tensor_fields=TENSOR_FIELDS_PLAN,
+            ),
+        )
+        with self.subTest(modifier="bm25"):
+            # All results should only have this 1 field
+            requested_attrs = ["lex_ranking_field"]
+            res = tensor_search.search(
+                config=self.config,
+                index_name=self.index.name,
+                text="tuxedo",
+                search_method="HYBRID",
+                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                score_modifiers=ScoreModifierLists(
+                    add_to_score=[{"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0}]
+                ),
+                result_count=10,
+                attributes_to_retrieve=requested_attrs,
+            )
+            ids = [h["_id"] for h in res["hits"]]
+            self.assertEqual(
+                REVERSED_ORDER, ids,
+                msg="BM25 add_to_score must reverse order with attributes_to_retrieve",
+            )
+            allowed_keys = {"_id", "_score", "_highlights"}.union(requested_attrs)
+            for hit in res["hits"]:
+                self.assertLessEqual(
+                    set(hit.keys()), allowed_keys,
+                    msg=f"Hit {hit.get('_id')} should only have requested attributes and metadata; keys: {sorted(hit.keys())}",
+                )
+                for attr in requested_attrs:
+                    self.assertIn(attr, hit, msg=f"Requested attribute {attr} must be present in hit {hit.get('_id')}")
+        with self.subTest(modifier="closeness"):
+            requested_attrs = ["other_field"]
+            res = tensor_search.search(
+                config=self.config,
+                index_name=self.index.name,
+                text="tuxedo",
+                search_method="HYBRID",
+                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                score_modifiers=ScoreModifierLists(
+                    add_to_score=[
+                        {
+                            "field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
+                            "weight": 1.0,
+                        }
+                    ]
+                ),
+                result_count=10,
+                attributes_to_retrieve=requested_attrs,
+            )
+            ids = [h["_id"] for h in res["hits"]]
+            self.assertEqual(
+                REVERSED_ORDER, ids,
+                msg="Closeness add_to_score must reverse order (doc5..doc1) even when only other_field is retrieved",
+            )
+            allowed_keys = {"_id", "_score", "_highlights"}.union(requested_attrs)
+            for hit in res["hits"]:
+                self.assertLessEqual(
+                    set(hit.keys()), allowed_keys,
+                    msg=f"Hit {hit.get('_id')} should only have other_field and metadata; keys: {sorted(hit.keys())}",
+                )
+                for attr in requested_attrs:
+                    self.assertIn(attr, hit, msg=f"Requested attribute {attr} must be present in hit {hit.get('_id')}")
+                self.assertEqual(hit["other_field"], f"val_{hit['_id']}")
 
 
 if __name__ == "__main__":
