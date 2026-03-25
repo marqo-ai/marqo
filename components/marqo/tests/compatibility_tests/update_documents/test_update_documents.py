@@ -23,13 +23,13 @@ class TestUpdateDocuments(BaseCompatibilityTestCase):
 
     text_docs = [
         {
-            "img": "https://github.com/marqo-ai/marqo/blob/mainline/examples/ImageSearchGuide/data/image0.jpg?raw=true",
+            "img": "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg",
             "title": "A lady taking a phote",
             "label": "lady",
             "_id": "1",
         },
         {
-            "img": "https://github.com/marqo-ai/marqo/blob/mainline/examples/ImageSearchGuide/data/image1.jpg?raw=true",
+            "img": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
             "title": "A plane flying in the sky",
             "label": "airplane",
             "_id": "2",
