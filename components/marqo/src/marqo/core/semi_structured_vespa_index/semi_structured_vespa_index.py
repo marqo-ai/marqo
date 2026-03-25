@@ -509,6 +509,13 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return f'({float_field_string} OR {int_field_string})'
 
         def generate_in_filter_string(node: search_filter.InTerm) -> str:
+            max_in_filter_ids = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_IN_FILTER_IDS)
+            if max_in_filter_ids is not None and len(node.value_list) > max_in_filter_ids:
+                raise InvalidArgumentError(
+                    f"The IN filter contains {len(node.value_list)} values, which exceeds the maximum "
+                    f"of {max_in_filter_ids} (MARQO_MAX_IN_FILTER_IDS)."
+                )
+
             if node.field == MARQO_DOC_ID:
                 escaped_values = ', '.join(
                     f'"{self.escape(v)}"' for v in node.value_list

@@ -1,6 +1,6 @@
 """Integration tests for _id IN filter on semi-structured indexes.
 
-Uses a random model to avoid real inference overhead. Adds 1,000 documents once
+Uses a random model to avoid real inference overhead. Adds 10,000 documents once
 in setUpClass, then tests filter queries including 10,000-ID lists.
 """
 import os
@@ -9,15 +9,15 @@ from unittest import mock
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import Model, SemiStructuredMarqoIndex
 from marqo.exceptions import InvalidArgumentError
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import SearchMethod
+from marqo.tensor_search import tensor_search, utils
+from marqo.tensor_search.enums import EnvVars, SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestIdInFilterSemiStructured(MarqoTestCase):
     """Tests for _id IN filter on semi-structured (unstructured) indexes.
 
-    Inserts 1,000 documents once at class level. Tests large IN lists up to 10,000 IDs.
+    Inserts 10,000 documents once at class level. Tests large IN lists up to 10,000 IDs.
     """
 
     NUM_DOCS = 10000
@@ -37,7 +37,7 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         assert isinstance(cls.index, SemiStructuredMarqoIndex), \
             f"Expected SemiStructuredMarqoIndex, got {type(cls.index)}"
 
-        # Add 1,000 documents once for all tests
+        # Add 10,000 documents once for all tests
         with mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"}):
             batch_size = 64
             for start in range(0, cls.NUM_DOCS, batch_size):
@@ -56,12 +56,9 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
                 )
 
     def setUp(self) -> None:
-        # Don't call super().setUp() — it clears the index. Data is shared read-only.
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        self.device_patcher.start()
-
-    def tearDown(self) -> None:
-        self.device_patcher.stop()
+        # Skip base class setUp which clears all documents.
+        # Data is shared read-only across tests and inserted once in setUpClass.
+        pass
 
     def test_id_in_tensor_search(self):
         """_id IN filter works with TENSOR search."""
@@ -142,9 +139,8 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         self.assertEqual({"doc_0", "doc_10"}, result_ids)
 
     def test_id_in_large_list_10000_ids(self):
-        """_id IN with 10,000 IDs works without error.
+        """_id IN with all 10,000 IDs works without error.
 
-        Proves the IN operator handles large ID lists. All 10,000 IDs are real docs.
         MARQO_MAX_SEARCH_LIMIT caps results at 1,000, so we verify the query succeeds
         and all returned IDs are from our doc set.
         """
@@ -202,3 +198,40 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
             )
 
         self.assertIn("only supported for the '_id' field", str(cm.exception))
+
+    def test_id_in_exceeds_max_limit_raises_error(self):
+        """_id IN with more IDs than MARQO_MAX_IN_FILTER_IDS raises InvalidArgumentError."""
+        max_ids = 5
+        ids = [f"doc_{i}" for i in range(max_ids + 1)]
+        filter_str = "_id IN (" + ", ".join(ids) + ")"
+
+        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: str(max_ids)}):
+            with self.assertRaises(InvalidArgumentError) as cm:
+                tensor_search.search(
+                    config=self.config, index_name=self.index.name,
+                    text="product", result_count=10,
+                    filter=filter_str, search_method=SearchMethod.TENSOR
+                )
+
+            self.assertIn("MARQO_MAX_IN_FILTER_IDS", str(cm.exception))
+            self.assertIn(str(max_ids), str(cm.exception))
+
+    def test_id_in_at_max_limit_succeeds(self):
+        """_id IN with exactly MARQO_MAX_IN_FILTER_IDS values succeeds."""
+        max_ids = 5
+        ids = [f"doc_{i}" for i in range(max_ids)]
+        filter_str = "_id IN (" + ", ".join(ids) + ")"
+
+        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: str(max_ids)}):
+            res = tensor_search.search(
+                config=self.config, index_name=self.index.name,
+                text="product", result_count=10,
+                filter=filter_str, search_method=SearchMethod.TENSOR
+            )
+
+            self.assertEqual(max_ids, len(res["hits"]))
+
+    def test_id_in_default_limit_is_10000(self):
+        """Default MARQO_MAX_IN_FILTER_IDS is 10,000."""
+        default_limit = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_IN_FILTER_IDS)
+        self.assertEqual(10000, default_limit)

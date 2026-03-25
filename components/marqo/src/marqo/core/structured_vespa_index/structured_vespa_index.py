@@ -828,6 +828,12 @@ class StructuredVespaIndex(VespaIndex):
                     else:
                         raise InternalError('RangeTerm has no lower or upper bound')
                 elif isinstance(node, search_filter.InTerm):
+                    max_in_filter_ids = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_IN_FILTER_IDS)
+                    if max_in_filter_ids is not None and len(node.value_list) > max_in_filter_ids:
+                        raise InvalidArgumentError(
+                            f"The IN filter contains {len(node.value_list)} values, which exceeds the maximum "
+                            f"of {max_in_filter_ids} (MARQO_MAX_IN_FILTER_IDS)."
+                        )
                     return (f'{marqo_field_name} in '
                             f'{_convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type)}')
 

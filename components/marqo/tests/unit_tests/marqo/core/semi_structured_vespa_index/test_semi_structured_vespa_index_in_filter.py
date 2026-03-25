@@ -1,6 +1,10 @@
+import os
+from unittest import mock
+
 from marqo.core.models import MarqoQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.exceptions import InvalidArgumentError
+from marqo.tensor_search.enums import EnvVars
 from tests.unit_tests.marqo_test import MarqoTestCase
 
 
@@ -100,3 +104,35 @@ class TestSemiStructuredInFilter(MarqoTestCase):
         self.assertTrue(result.startswith('marqo__id in ('))
         for id_ in ids:
             self.assertIn(f'"{id_}"', result)
+
+    def test_id_in_exceeds_max_limit_raises_error(self):
+        """_id IN exceeding MARQO_MAX_IN_FILTER_IDS raises InvalidArgumentError."""
+        max_ids = 3
+        ids = [f'id_{i}' for i in range(max_ids + 1)]
+        filter_str = '_id IN (' + ', '.join(ids) + ')'
+
+        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: str(max_ids)}):
+            with self.assertRaises(InvalidArgumentError) as cm:
+                self._get_filter(filter_str)
+
+            self.assertIn("MARQO_MAX_IN_FILTER_IDS", str(cm.exception))
+            self.assertIn(str(max_ids), str(cm.exception))
+
+    def test_id_in_at_max_limit_succeeds(self):
+        """_id IN with exactly MARQO_MAX_IN_FILTER_IDS values succeeds."""
+        max_ids = 5
+        ids = [f'id_{i}' for i in range(max_ids)]
+        filter_str = '_id IN (' + ', '.join(ids) + ')'
+
+        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: str(max_ids)}):
+            result = self._get_filter(filter_str)
+            self.assertTrue(result.startswith('marqo__id in ('))
+
+    def test_non_id_in_exceeds_max_limit_raises_field_error_not_limit_error(self):
+        """Non-_id IN raises field error even if limit is also exceeded."""
+        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: "1"}):
+            with self.assertRaises(InvalidArgumentError) as cm:
+                self._get_filter('color IN (red, blue, green)')
+
+            # Should get the limit error first (checked before field check)
+            self.assertIn("MARQO_MAX_IN_FILTER_IDS", str(cm.exception))
