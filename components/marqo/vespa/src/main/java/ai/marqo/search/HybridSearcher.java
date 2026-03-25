@@ -205,11 +205,9 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException("Query limit cannot be null.");
         }
 
-        List<Future<Result>> futureFacets =
-                getFacetsFutureList(query, execution, verbose, collapse);
-
         // --- Begin relevance cut-off handling ---
-        // Execute probe lexical search for relevance cut-off if parameters are provided
+        // Execute probe lexical search for relevance cut-off if parameters are provided.
+        // This must run BEFORE facets so we can apply max(relevantCandidates) to facets grouping.
         Integer relevantCandidates = null;
         Integer probeCandidates = null;
         if (relevanceCutoffMethod != null) {
@@ -226,6 +224,9 @@ public class HybridSearcher extends Searcher {
                             verbose);
         }
         // --- End relevance cut-off handling ---
+
+        List<Future<Result>> futureFacets =
+                getFacetsFutureList(query, execution, verbose, collapse, relevantCandidates);
 
         // --- Update the query hits, offset and targetHits, if sort or relevance cut-off is used
         boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;
@@ -393,7 +394,11 @@ public class HybridSearcher extends Searcher {
 
     @VisibleForTesting
     List<Future<Result>> getFacetsFutureList(
-            Query query, Execution execution, boolean verbose, boolean collapse) {
+            Query query,
+            Execution execution,
+            boolean verbose,
+            boolean collapse,
+            Integer relevantCandidates) {
         // Check for custom facets YQL properties - expect array of strings
         String[] facetsYqlQueries =
                 query.properties()
@@ -403,6 +408,14 @@ public class HybridSearcher extends Searcher {
 
         for (String facetsYql : facetsYqlQueries) {
             if (!facetsYql.isEmpty()) {
+                // When relevance cutoff is active, inject max(relevantCandidates) into the
+                // grouping expression so Vespa only aggregates over documents that pass the
+                // cutoff. The facets queries use lexical ranking (same as the probe), so the
+                // top N by relevance correspond to the relevant candidates.
+                if (relevantCandidates != null) {
+                    facetsYql =
+                            injectMaxHitsIntoFacetsGrouping(facetsYql, relevantCandidates, verbose);
+                }
                 // Create a subquery for each facet query
                 Query queryFacets =
                         createSubQuery(
@@ -421,6 +434,54 @@ public class HybridSearcher extends Searcher {
             }
         }
         return futureFacets;
+    }
+
+    /**
+     * Injects max(N) into the outermost all() of a facets grouping YQL expression.
+     *
+     * <p>Facets YQL has the form: {@code <select clause> | <grouping expression>}
+     * where the grouping expression starts with {@code all(}. This method injects
+     * {@code max(relevantCandidates)} right after the opening {@code all(} so that
+     * Vespa only processes the top N documents (by relevance) for the aggregation.
+     *
+     * @param facetsYql The facets YQL string to modify.
+     * @param relevantCandidates The number of relevant candidates to limit grouping to.
+     * @param verbose Whether to log the modification.
+     * @return The modified facets YQL with max(N) injected.
+     */
+    @VisibleForTesting
+    String injectMaxHitsIntoFacetsGrouping(
+            String facetsYql, int relevantCandidates, boolean verbose) {
+        // Find the pipe separator between the select clause and grouping expression
+        int pipeIndex = facetsYql.lastIndexOf('|');
+        if (pipeIndex == -1) {
+            logIfVerbose(
+                    "No pipe found in facets YQL, skipping max injection: " + facetsYql, verbose);
+            return facetsYql;
+        }
+
+        String selectPart = facetsYql.substring(0, pipeIndex + 1);
+        String groupingPart = facetsYql.substring(pipeIndex + 1).trim();
+
+        // Inject max(N) after "all(" or "all( "
+        String maxClause = "max(" + relevantCandidates + ") ";
+        if (groupingPart.startsWith("all(")) {
+            groupingPart = "all(" + maxClause + groupingPart.substring(4);
+        } else if (groupingPart.startsWith("all( ")) {
+            groupingPart = "all( " + maxClause + groupingPart.substring(5);
+        } else {
+            logIfVerbose(
+                    "Grouping does not start with all(, skipping max injection: " + groupingPart,
+                    verbose);
+            return facetsYql;
+        }
+
+        String result = selectPart + " " + groupingPart;
+        logIfVerbose(
+                String.format(
+                        "Injected max(%d) into facets grouping: %s", relevantCandidates, result),
+                verbose);
+        return result;
     }
 
     /**

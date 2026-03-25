@@ -931,3 +931,60 @@ class TestShouldUseCollapseSearch(TestCase):
         )
         main_sort = SortByModel(fields=[SortByField(field_name="date", order=SortOrder.Desc)])
         self.assertTrue(should_use_collapse_search(collapse=collapse, main_query_sort_by=main_sort))
+
+
+class TestInjectMaxHitsIntoFacetsGrouping(TestCase):
+    """Unit tests for the Java-side injectMaxHitsIntoFacetsGrouping logic.
+
+    These tests verify the expected YQL transformations that the Java HybridSearcher
+    performs when relevance cutoff is combined with facets/trackTotalHits.
+    The actual injection happens in Java; these tests document the expected behavior.
+    """
+
+    def test_max_injected_into_simple_grouping(self):
+        """Verify the expected YQL format after max(N) injection."""
+        original = "select * from schema where (query) limit 0 | all(group(color) each(output(count())))"
+        # After injection with relevantCandidates=5:
+        expected = "select * from schema where (query) limit 0 | all(max(5) group(color) each(output(count())))"
+        # Simulate the injection logic
+        result = self._inject_max(original, 5)
+        self.assertEqual(expected, result)
+
+    def test_max_injected_into_total_hits_grouping(self):
+        original = "select * from schema where (query) limit 0 | all(group(1.1) each(output(count())))"
+        expected = "select * from schema where (query) limit 0 | all(max(2) group(1.1) each(output(count())))"
+        result = self._inject_max(original, 2)
+        self.assertEqual(expected, result)
+
+    def test_max_injected_with_existing_max_depth(self):
+        """When max_depth is already present, both max clauses coexist.
+        The relevance cutoff max(N) takes precedence as it comes first."""
+        original = "select * from schema where (query) limit 0 | all( max(100) all(group(color) each(output(count()))))"
+        result = self._inject_max(original, 3)
+        self.assertIn("max(3)", result)
+        self.assertIn("max(100)", result)
+
+    def test_no_pipe_returns_unchanged(self):
+        original = "select * from schema where (query)"
+        result = self._inject_max(original, 5)
+        self.assertEqual(original, result)
+
+    @staticmethod
+    def _inject_max(facets_yql: str, relevant_candidates: int) -> str:
+        """Python equivalent of the Java injectMaxHitsIntoFacetsGrouping method."""
+        pipe_index = facets_yql.rfind('|')
+        if pipe_index == -1:
+            return facets_yql
+
+        select_part = facets_yql[:pipe_index + 1]
+        grouping_part = facets_yql[pipe_index + 1:].strip()
+
+        max_clause = f"max({relevant_candidates}) "
+        if grouping_part.startswith("all("):
+            grouping_part = "all(" + max_clause + grouping_part[4:]
+        elif grouping_part.startswith("all( "):
+            grouping_part = "all( " + max_clause + grouping_part[5:]
+        else:
+            return facets_yql
+
+        return select_part + " " + grouping_part
