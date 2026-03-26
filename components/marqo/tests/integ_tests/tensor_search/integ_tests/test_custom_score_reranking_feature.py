@@ -937,6 +937,7 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         ids_double = [h["_id"] for h in res_double["hits"]]
         self.assertEqual(ids_double, REVERSED_ORDER, msg="Weight 2.0 should give reversed order doc5..doc1")
 
+    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_lexical_search_with_custom_score_reranker_is_silent_noop(self):
         """Pure LEXICAL search with marqo__score_* modifiers returns results without applying reranking."""
         self._add_tuxedo_docs()
