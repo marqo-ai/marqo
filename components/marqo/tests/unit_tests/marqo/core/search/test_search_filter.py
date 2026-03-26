@@ -349,6 +349,30 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 ),
                 'NOT CONTAINS with AND'
             ),
+            (
+                '(a CONTAINS hello)',
+                SearchFilter(
+                    ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                ),
+                'CONTAINS in parentheses'
+            ),
+            (
+                'a CONTAINS hello\\ world',
+                SearchFilter(
+                    ContainsTerm('a', 'hello world', 'a CONTAINS hello\\ world')
+                ),
+                'CONTAINS with escaped space in value'
+            ),
+            (
+                '(a CONTAINS hello) OR b:2',
+                SearchFilter(
+                    root=Or(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=EqualityTerm('b', '2', 'b:2')
+                    )
+                ),
+                'CONTAINS as only term in complex expression with OR'
+            ),
             # A bit of everything
             (
                 '(a:1 AND NOT (b:[1 TO 10] OR (c IN (x, y, (hello world)))))',
