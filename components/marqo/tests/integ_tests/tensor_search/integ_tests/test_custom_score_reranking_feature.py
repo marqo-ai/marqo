@@ -126,6 +126,7 @@ RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO = {
 }
 
 # Raw BM25 scores for lex_ranking_field querying "tuxedo", verified by querying Vespa directly.
+# Will change if corpus changes from existing DOCS_TUXEDO_PLAN
 RAW_BM25_LEX_RANKING_FIELD_TUXEDO = {
     "doc1": 0.11964064336074084,    # "tuxedo" (1x)
     "doc2": 0.1320172616394382,     # "tuxedo" (1x)
