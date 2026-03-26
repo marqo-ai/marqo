@@ -9,6 +9,7 @@ or closeness tensor_ranking_field reverses order to (doc5..doc1). Each test show
 (1) custom score modified final score, (2) order changes deterministically,
 (3) _score vs _pre_rerank_score known by modifier and field scores.
 """
+import math
 import os
 from typing import Any, Dict, List
 from unittest import mock
@@ -37,13 +38,18 @@ from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField
 from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import InvalidArgumentError, UnsupportedFeatureError
+from marqo.core.inference.api import Modality
+from marqo.core.inference.api.inference import InferenceRequest, EmbeddingModelConfig
+from marqo.core.inference.api.preprocessing_config import TextPreprocessingConfig
 
 import unittest
 import pytest
 import time
 
-# --- Test Data ---
 TENSOR_FIELDS_PLAN = ["tensor_retrieval_field", "tensor_ranking_field"]
+
+# Used for a majority of the tests. Made such that the `ranking_fields` flip the order of docs compared to the
+# `retrieval_fields`.
 DOCS_TUXEDO_PLAN = [
     {
         # (1) In BOTH tensor and lexical
@@ -87,6 +93,48 @@ DOCS_TUXEDO_PLAN = [
     },
 ]
 
+# Hybrid params set such that tensor result will always be interleaved first, and only retrieval fields are used
+# for retrieval.
+HYBRID_PARAMS_TUXEDO = HybridParameters(
+    retrievalMethod=RetrievalMethod.Disjunction,
+    rankingMethod=RankingMethod.RRF,
+    alpha=0.5001,
+    rrfK=60,
+    searchableAttributesTensor=["tensor_retrieval_field"],
+    searchableAttributesLexical=["lex_retrieval_field"],
+    verbose=True
+)
+
+BASE_RRF_ORDER = ["doc1", "doc2", "doc3", "doc4", "doc5"]
+REVERSED_ORDER = ["doc5", "doc4", "doc3", "doc2", "doc1"]
+
+# Maps doc_id to tensor_ranking_field text content, for closeness lookups.
+DOC_TENSOR_RANKING_TEXT = {
+    "doc1": "unrelated", "doc2": "rainbow tie", "doc3": "shorts", "doc4": "suit", "doc5": "tuxedo",
+}
+
+# Raw prenormalized-angular closeness to "tuxedo" with model open_clip/ViT-B-16-SigLIP/webli.
+# Formula: 1/(2 - cosine_similarity). Values verified by querying Vespa directly and reading
+# ranking_closeness_metric_* summary-features. This is the single source of truth for all
+# hardcoded closeness scores in these tests.
+RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO = {
+    "tuxedo": 1.0,
+    "suit": 0.901208758354187,
+    "shorts": 0.831805944442749,
+    "rainbow tie": 0.8008741140365601,
+    "unrelated": 0.6171157956123352,
+}
+
+# Raw BM25 scores for lex_ranking_field querying "tuxedo", verified by querying Vespa directly.
+RAW_BM25_LEX_RANKING_FIELD_TUXEDO = {
+    "doc1": 0.11964064336074084,    # "tuxedo" (1x)
+    "doc2": 0.1320172616394382,     # "tuxedo" (1x)
+    "doc3": 0.1367321638408467,     # "tuxedo" (1x)
+    "doc4": 0.13921820318340752,    # "tuxedo" (1x)
+    "doc5": 0.14075369807145982,    # "tuxedo" (4x)
+}
+
+# ----- FOR AGGREGATE TESTS -----
 # This doc structure allows certain docs to come to the surface depending on which aggregate was chosen.
 # Ranking fields only; retrieval fields are added when indexing so all docs match the query.
 DOCS_TUXEDO_FOR_LEXICAL_AGGREGATES = [
@@ -96,9 +144,9 @@ DOCS_TUXEDO_FOR_LEXICAL_AGGREGATES = [
         "lex_ranking_field_1": "tuxedo tuxedo tuxedo",
         "lex_ranking_field_2": "no match",
     },
-{
+    {
         # A doc that should end up in the middle, whether aggregate method is sum, avg, or max.
-        # Note that avg divides by all fields in the index, not just that in this doc. That's why this doc
+        # Note that avg divides by all fields (6) in the index, not just that in this doc (2). That's why this doc
         # doesn't have the highest avg
         "_id": "middle_of_both",
         "lex_ranking_field_1": "tuxedo tuxedo",
@@ -122,68 +170,26 @@ DOCS_TUXEDO_FOR_CLOSENESS_AGGREGATES = [
         # If max aggregate is chosen: one field has highest closeness (tuxedo 1.0), rest low
         "_id": "strongest_max",
         "tensor_ranking_field_1": "tuxedo",         # Adds 1.0 closeness score
-        "tensor_ranking_field_2": "unrelated",      # Adds 0.4584048390388489 closeness score
+        "tensor_ranking_field_2": "unrelated",
     },
     {
         # A doc that should end up in the middle, whether aggregate method is sum, avg, or max.
         "_id": "middle_of_both",
-        "tensor_ranking_field_1": "black tuxedo",   # Adds 0.7219897508621216 closeness score
-        "tensor_ranking_field_2": "black tuxedo",   # Adds 0.7219897508621216 closeness score
-        "tensor_ranking_field_3": "black tuxedo",   # Adds 0.7219897508621216 closeness score
+        "tensor_ranking_field_1": "black tuxedo",
+        "tensor_ranking_field_2": "black tuxedo",
+        "tensor_ranking_field_3": "black tuxedo",
     },
     {
         # If sum/avg aggregate is chosen: many fields with medium-high closeness
         "_id": "strongest_sum_avg",
-        "tensor_ranking_field_1": "rainbow tie",    # Adds 0.5811693072319031 closeness score
-        "tensor_ranking_field_2": "rainbow tie",    # Adds 0.5811693072319031 closeness score
-        "tensor_ranking_field_3": "rainbow tie",    # Adds 0.5811693072319031 closeness score
-        "tensor_ranking_field_4": "rainbow tie",    # Adds 0.5811693072319031 closeness score
-        "tensor_ranking_field_5": "rainbow tie",    # Adds 0.5811693072319031 closeness score
-        "tensor_ranking_field_6": "rainbow tie",    # Adds 0.5811693072319031 closeness score
+        "tensor_ranking_field_1": "rainbow tie",
+        "tensor_ranking_field_2": "rainbow tie",
+        "tensor_ranking_field_3": "rainbow tie",
+        "tensor_ranking_field_4": "rainbow tie",
+        "tensor_ranking_field_5": "rainbow tie",
+        "tensor_ranking_field_6": "rainbow tie",
     },
 ]
-
-HYBRID_PARAMS_TUXEDO = HybridParameters(
-    retrievalMethod=RetrievalMethod.Disjunction,
-    rankingMethod=RankingMethod.RRF,
-    alpha=0.5001,
-    rrfK=60,
-    searchableAttributesTensor=["tensor_retrieval_field"],
-    searchableAttributesLexical=["lex_retrieval_field"],
-    verbose=True
-)
-
-BASE_RRF_ORDER = ["doc1", "doc2", "doc3", "doc4", "doc5"]
-REVERSED_ORDER = ["doc5", "doc4", "doc3", "doc2", "doc1"]
-
-# Closeness (prenormalized-angular) to "tuxedo" with model open_clip/ViT-B-16-SigLIP-512/webli (from plan).
-OLD_CLOSENESS_TUXEDO = {
-    "tuxedo": 1.0,
-    "black tuxedo": 0.9290061705548538,
-    "black tie": 0.9105825129267998,
-    "suit": 0.901995477338818,
-    "shorts": 0.8311302085908341,
-    "backpack": 0.8264572877032847,
-    "floral dress": 0.825913938286213,
-    "suede shoes": 0.8106355248508749,
-    "rainbow tie": 0.7955299917394352,
-    "unrelated": 0.5882339267201514,
-}
-
-# Closeness (prenormalized-angular) to "tuxedo" with model open_clip/ViT-B-16-SigLIP-512/webli (from plan).
-# Using new closeness (copied from vespa)
-NEW_CLOSENESS_TUXEDO = {
-    "tuxedo": 1.0,
-    "black tuxedo": 0.7219897508621216,
-    "black tie": 0.6926929950714111,
-    "suit": 0.6790624260902405,
-    "shorts": 0.6071039438247681,
-    "backpack": 0.6020216941833496,
-    "floral dress": 0.6027941703796387,
-    "suede shoes": 0.5905405879020691,
-    "rainbow tie": 0.5811693072319031,
-    "unrelated": 0.4584048390388489,
-}
 
 # Helpers for TestCustomScoreRerankingWithOtherFeatures (same tuxedo index/model as main tests).
 def _tuxedo_docs_with_extras(*, popularity=None, category=None, parent_id=None, timestamp=None):
@@ -215,9 +221,14 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
         model = Model(name="open_clip/ViT-B-16-SigLIP/webli")
-        index_request = cls.unstructured_marqo_index_request(model=model)
-        index_request_bm25_aggregates = cls.unstructured_marqo_index_request(model=model)
-        index_request_closeness_aggregates = cls.unstructured_marqo_index_request(model=model)
+        # Use prenormalized-angular to match Marqo's default production index settings.
+        # The test helper defaults to angular, but real indexes default to prenormalized-angular.
+        index_request = cls.unstructured_marqo_index_request(
+            model=model, distance_metric=DistanceMetric.PrenormalizedAngular)
+        index_request_bm25_aggregates = cls.unstructured_marqo_index_request(
+            model=model, distance_metric=DistanceMetric.PrenormalizedAngular)
+        index_request_closeness_aggregates = cls.unstructured_marqo_index_request(
+            model=model, distance_metric=DistanceMetric.PrenormalizedAngular)
 
         cls.indexes = cls.create_indexes([
             index_request,
@@ -287,30 +298,6 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
                 delta=tolerance,
                 msg=f"Doc {doc_id}: _pre_rerank_score should equal baseline score",
             )
-
-    def _custom_score_add_contributions_by_doc_id(
-        self, add_to_score_ops: List[Dict[str, Any]]
-    ) -> Dict[str, float]:
-        """
-        Run hybrid search with only the given marqo__score_* add_to_score modifiers (same query/index as plan).
-        Returns doc_id -> (_score - _pre_rerank_score) for each hit.
-
-        Used to compare single-modifier vs combined-modifier behavior in one test method (no state shared
-        across pytest test cases, which avoids ordering flakiness).
-        """
-        res = tensor_search.search(
-            config=self.config,
-            index_name=self.index.name,
-            text="tuxedo",
-            search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            score_modifiers=ScoreModifierLists(add_to_score=add_to_score_ops),
-            result_count=10,
-        )
-        return {
-            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE]
-            for h in res["hits"]
-        }
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_base_rrf_order_deterministic(self):
@@ -466,38 +453,25 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         ids = [h["_id"] for h in res_with_rerank["hits"]]
         self.assertEqual(REVERSED_ORDER, ids, msg="add_to_score bm25 lex_ranking_field: order must be doc5, doc4, doc3, doc2, doc1")
 
-        # Exact score assertions: _score == _pre_rerank_score + weight * (raw_bm25 / max_raw_bm25)
-        # With divide-by-max normalization and weight=1.0, doc5 (highest bm25) gets contribution=1.0.
-        contributions = {
-            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"]
-        }
-        # Doc5 has the max BM25, so its normalized score must be exactly 1.0
-        self.assertAlmostEqual(contributions["doc5"], 1.0, places=5,
-                               msg="doc5 (max bm25) should have normalized contribution of 1.0")
-        # All contributions must be in [0, 1] and strictly decreasing doc5 > doc4 > ... > doc1
-        for doc_id, contrib in contributions.items():
-            self.assertGreaterEqual(contrib, 0.0, msg=f"{doc_id}: contribution must be >= 0")
-            self.assertLessEqual(contrib, 1.0, msg=f"{doc_id}: contribution must be <= 1")
-        for i in range(len(REVERSED_ORDER) - 1):
-            self.assertGreater(
-                contributions[REVERSED_ORDER[i]], contributions[REVERSED_ORDER[i + 1]],
-                msg=f"{REVERSED_ORDER[i]} should have higher bm25 contribution than {REVERSED_ORDER[i + 1]}",
-            )
-        # Verify _score = _pre_rerank_score + contribution for every hit
+        # Exact score assertions against hardcoded BM25 source of truth.
+        # Contribution = weight * (raw_bm25 / max_raw_bm25). Weight=1.0, so contribution = raw/max.
+        max_bm25 = max(RAW_BM25_LEX_RANKING_FIELD_TUXEDO.values())
         for hit in res_with_rerank["hits"]:
+            doc_id = hit["_id"]
+            contribution = hit["_score"] - hit[MARQO_DOC_PRE_RERANK_SCORE]
+            expected_contribution = RAW_BM25_LEX_RANKING_FIELD_TUXEDO[doc_id] / max_bm25
             self.assertAlmostEqual(
-                hit["_score"], hit[MARQO_DOC_PRE_RERANK_SCORE] + contributions[hit["_id"]],
-                places=5, msg=f"Doc {hit['_id']}: _score must equal _pre_rerank_score + contribution",
+                contribution, expected_contribution, places=4,
+                msg=f"{doc_id}: bm25 contribution {contribution} != expected {expected_contribution}",
             )
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_closeness_retrieval_vector_single_field_modifies_scores_and_reverses_order(self):
         """
         add_to_score with closeness tensor_ranking_field (weight 1.0): order reverses to doc5..doc1.
-        Final _score = _pre_rerank_score + weight * raw_closeness (plan: custom_score_rerank_plan_final.md;
-        CLOSENESS_TUXEDO / DOC_TENSOR_RANKING_CLOSENESS). We assert the formula using each hit's
-        observed contribution (score - pre_rerank) because Vespa's closeness output can differ slightly
-        from the plan's hardcoded values; contribution order must still match plan (doc5 highest → doc1 lowest).
+        Contribution = raw_closeness / max_raw_closeness. Since max closeness (doc5="tuxedo") is 1.0,
+        the contribution equals the raw prenormalized-angular closeness from
+        RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO.
         """
         self._add_tuxedo_docs()
         res_no_rerank = tensor_search.search(
@@ -528,37 +502,24 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
         ids = [h["_id"] for h in res_with_rerank["hits"]]
         self.assertEqual(REVERSED_ORDER, ids, msg="add_to_score closeness: order must be doc5, doc4, doc3, doc2, doc1")
 
-        # Exact score assertions: _score == _pre_rerank_score + weight * (raw_closeness / max_raw_closeness)
-        # With divide-by-max normalization and weight=1.0, doc5 (highest closeness) gets contribution=1.0.
-        contributions = {
-            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_with_rerank["hits"]
-        }
-        # Doc5 has the max closeness (tensor_ranking_field="tuxedo"), so normalized contribution must be 1.0
-        self.assertAlmostEqual(contributions["doc5"], 1.0, places=5,
-                               msg="doc5 (max closeness) should have normalized contribution of 1.0")
-        # All contributions must be in [0, 1] and strictly decreasing doc5 > doc4 > ... > doc1
-        for doc_id, contrib in contributions.items():
-            self.assertGreaterEqual(contrib, 0.0, msg=f"{doc_id}: contribution must be >= 0")
-            self.assertLessEqual(contrib, 1.0, msg=f"{doc_id}: contribution must be <= 1")
-        for i in range(len(REVERSED_ORDER) - 1):
-            self.assertGreater(
-                contributions[REVERSED_ORDER[i]], contributions[REVERSED_ORDER[i + 1]],
-                msg=f"{REVERSED_ORDER[i]} should have higher closeness contribution than {REVERSED_ORDER[i + 1]}",
-            )
-        # Verify _score = _pre_rerank_score + contribution for every hit
+        # Exact score assertions against hardcoded closeness source of truth.
+        # Contribution = raw_closeness / max_raw_closeness (divide-by-max normalization).
+        max_closeness = max(RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO.values())
         for hit in res_with_rerank["hits"]:
+            doc_id = hit["_id"]
+            contribution = hit["_score"] - hit[MARQO_DOC_PRE_RERANK_SCORE]
+            expected_contribution = RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO[DOC_TENSOR_RANKING_TEXT[doc_id]] / max_closeness
             self.assertAlmostEqual(
-                hit["_score"], hit[MARQO_DOC_PRE_RERANK_SCORE] + contributions[hit["_id"]],
-                places=5, msg=f"Doc {hit['_id']}: _score must equal _pre_rerank_score + contribution",
+                contribution, expected_contribution, places=4,
+                msg=f"{doc_id}: closeness contribution {contribution} != expected {expected_contribution}",
             )
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_multiple_custom_score_modifiers_add_to_score(self):
         """
         add_to_score with both bm25 lex_ranking_field and closeness tensor_ranking_field (each weight 1.0).
-
-        BM25-only and closeness-only contributions are measured in this test; combined contribution
-        must equal their sum exactly per doc
+        Combined contribution must equal bm25_normalized + closeness_normalized per doc, using
+        hardcoded sources of truth for both.
         """
         self._add_tuxedo_docs()
         res_no_rerank = tensor_search.search(
@@ -569,51 +530,40 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
         )
-        bm25_only = [{"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0}]
-        closeness_only = [
-            {"field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field", "weight": 1.0}
-        ]
-        contrib_bm25 = self._custom_score_add_contributions_by_doc_id(bm25_only)
-        contrib_closeness = self._custom_score_add_contributions_by_doc_id(closeness_only)
         res_both = tensor_search.search(
             config=self.config,
             index_name=self.index.name,
             text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            score_modifiers=ScoreModifierLists(add_to_score=bm25_only + closeness_only),
+            score_modifiers=ScoreModifierLists(add_to_score=[
+                {"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0},
+                {"field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field", "weight": 1.0},
+            ]),
             result_count=10,
         )
         self._assert_pre_rerank_score_matches_baseline(res_both, res_no_rerank)
         ids = [h["_id"] for h in res_both["hits"]]
         self.assertEqual(REVERSED_ORDER, ids, msg="With both modifiers order must be doc5, doc4, doc3, doc2, doc1")
-        contrib_both = {
-            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE] for h in res_both["hits"]
-        }
-        for doc_id in BASE_RRF_ORDER:
-            self.assertIn(doc_id, contrib_bm25)
-            self.assertIn(doc_id, contrib_closeness)
-            self.assertIn(doc_id, contrib_both)
-            expected_sum = contrib_bm25[doc_id] + contrib_closeness[doc_id]
+
+        max_bm25 = max(RAW_BM25_LEX_RANKING_FIELD_TUXEDO.values())
+        max_closeness = max(RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO.values())
+        for hit in res_both["hits"]:
+            doc_id = hit["_id"]
+            contribution = hit["_score"] - hit[MARQO_DOC_PRE_RERANK_SCORE]
+            expected_bm25 = RAW_BM25_LEX_RANKING_FIELD_TUXEDO[doc_id] / max_bm25
+            expected_closeness = RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO[DOC_TENSOR_RANKING_TEXT[doc_id]] / max_closeness
             self.assertAlmostEqual(
-                contrib_both[doc_id],
-                expected_sum,
-                places=12,
-                msg=(
-                    f"Doc {doc_id}: combined add_to_score contribution must equal bm25 + closeness "
-                    f"({contrib_both[doc_id]} vs {contrib_bm25[doc_id]} + {contrib_closeness[doc_id]})"
-                ),
+                contribution, expected_bm25 + expected_closeness, places=4,
+                msg=f"{doc_id}: combined contribution {contribution} != bm25({expected_bm25}) + closeness({expected_closeness})",
             )
 
-    @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_closeness_weighted_exact_final_score(self):
         """
         add_to_score with closeness and weight 2.0 or -1.0: final _score must equal
-        _pre_rerank_score + weight * contribution (plan: weight × anticipated closeness; see
-        DOC_TENSOR_RANKING_CLOSENESS). We use contribution from a weight=1 run so the assertion
-        is exact regardless of Vespa's raw closeness values, and proves the formula is applied correctly.
+        _pre_rerank_score + weight * (raw_closeness / max_raw_closeness).
         """
         self._add_tuxedo_docs()
         res_no_rerank = tensor_search.search(
@@ -624,56 +574,35 @@ class TestCustomScoreRerankingFeature(MarqoTestCase):
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
         )
-        # Get per-doc contribution (raw closeness effect) from weight=1 run.
-        res_w1 = tensor_search.search(
-            config=self.config,
-            index_name=self.index.name,
-            text="tuxedo",
-            search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            score_modifiers=ScoreModifierLists(
-                add_to_score=[
-                    {
-                        "field_name": f"marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
-                        "weight": 1.0,
-                    }
-                ]
-            ),
-            result_count=10,
-        )
-        contribution_by_id = {
-            hit["_id"]: hit["_score"] - hit[MARQO_DOC_PRE_RERANK_SCORE]
-            for hit in res_w1["hits"]
-        }
+        max_closeness = max(RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO.values())
         for weight in (2.0, -1.0):
-            res = tensor_search.search(
-                config=self.config,
-                index_name=self.index.name,
-                text="tuxedo",
-                search_method="HYBRID",
-                hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-                score_modifiers=ScoreModifierLists(
-                    add_to_score=[
-                        {
-                            "field_name": f"marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
-                            "weight": weight,
-                        }
-                    ]
-                ),
-                result_count=10,
-            )
-            self._assert_pre_rerank_score_matches_baseline(res, res_no_rerank)
-            for hit in res["hits"]:
-                doc_id = hit["_id"]
-                pre = hit[MARQO_DOC_PRE_RERANK_SCORE]
-                contribution = contribution_by_id[doc_id]
-                expected = pre + weight * contribution
-                self.assertAlmostEqual(
-                    hit["_score"],
-                    expected,
-                    delta=1e-5,
-                    msg=f"Doc {doc_id} weight={weight}: expected _score = pre_rerank + {weight} * contribution = {expected}",
+            with self.subTest(weight=weight):
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.index.name,
+                    text="tuxedo",
+                    search_method="HYBRID",
+                    hybrid_parameters=HYBRID_PARAMS_TUXEDO,
+                    score_modifiers=ScoreModifierLists(
+                        add_to_score=[
+                            {
+                                "field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field",
+                                "weight": weight,
+                            }
+                        ]
+                    ),
+                    result_count=10,
                 )
+                self._assert_pre_rerank_score_matches_baseline(res, res_no_rerank)
+                for hit in res["hits"]:
+                    doc_id = hit["_id"]
+                    pre = hit[MARQO_DOC_PRE_RERANK_SCORE]
+                    normalized_closeness = RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO[DOC_TENSOR_RANKING_TEXT[doc_id]] / max_closeness
+                    expected_score = pre + weight * normalized_closeness
+                    self.assertAlmostEqual(
+                        hit["_score"], expected_score, places=4,
+                        msg=f"{doc_id} weight={weight}: _score {hit['_score']} != pre({pre}) + {weight}*normalized_closeness({normalized_closeness})",
+                    )
 
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_rrf_with_bm25_multiply_score_by_affects_scores(self):
@@ -1063,7 +992,9 @@ class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):
     used for vector search. One index per metric; same tuxedo docs; assert doc5 ranks first.
     """
 
-    # Metrics that support standard closeness-style ranking (exclude Geodegrees, Hamming for simplicity).
+    # Metrics that support float-vector closeness ranking.
+    # Hamming is excluded: it requires int8 vectors (VectorNumericType.Int8) which this model doesn't support.
+    # Geodegrees is excluded: it uses geo-coordinates, not embedding vectors.
     DISTANCE_METRICS = [
         DistanceMetric.Angular,
         DistanceMetric.PrenormalizedAngular,
@@ -1117,6 +1048,106 @@ class TestCustomScoreRerankAllDistanceMetrics(MarqoTestCase):
                 for hit in res["hits"]:
                     self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit, msg=f"distance_metric={metric.value}: each hit must have _pre_rerank_score")
 
+    def test_raw_ranking_closeness_metric_values_match_formula_per_distance_metric(self):
+        """
+        Query Vespa directly (bypassing the custom searcher) to read raw ranking_closeness_metric_*
+        summary-feature values. Derives cosine_similarity from the prenormalized-angular values
+        (the known source of truth), then verifies that applying each metric's formula to cos_sim
+        reproduces the raw Vespa values — proving the rank-profile formulas are correct.
+        """
+        # First pass: collect raw values from Vespa for all metrics
+        raw_by_metric: Dict[DistanceMetric, Dict[str, float]] = {}
+        for metric in self.DISTANCE_METRICS:
+            with self.subTest(distance_metric=metric.value, phase="collect"):
+                index = self.index_by_metric[metric]
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=DOCS_TUXEDO_PLAN,
+                        tensor_fields=TENSOR_FIELDS_PLAN,
+                    ),
+                )
+                refreshed_index = index_meta_cache.get_index(
+                    self.config.index_management, index.name, force_refresh=True
+                )
+                tensor_ranking_field = next(
+                    f for f in refreshed_index.tensor_fields if f.name == "tensor_ranking_field"
+                )
+                emb_field = tensor_ranking_field.embeddings_field_name
+                dim = refreshed_index.model.get_dimension()
+
+                vec_result = self.config.inference.vectorise(InferenceRequest(
+                    modality=Modality.TEXT,
+                    contents=["tuxedo"],
+                    embeddingModelConfig=EmbeddingModelConfig(
+                        modelName=refreshed_index.model.name,
+                        modelProperties=refreshed_index.model.properties,
+                        normalizeEmbeddings=refreshed_index.normalize_embeddings,
+                    ),
+                    preprocessingConfig=TextPreprocessingConfig(
+                        shouldChunk=False,
+                    ),
+                ))
+                query_vec = vec_result.result[0][0][1]
+
+                result = self.vespa_client.query(
+                    yql=f"select * from sources {refreshed_index.schema_name} where "
+                        f"({{targetHits:100}}nearestNeighbor({emb_field}, marqo__query_embedding))",
+                    ranking="embedding_similarity",
+                    hits=10,
+                    model_restrict=refreshed_index.schema_name,
+                    query_features={"marqo__query_embedding": query_vec.tolist()},
+                )
+                hits = result.root.children if result.root and result.root.children else []
+                self.assertGreater(len(hits), 0, msg=f"{metric.value}: should return hits from Vespa")
+
+                feature_name = "ranking_closeness_metric_tensor_ranking_field"
+                closeness_by_id = {}
+                for hit in hits:
+                    fields = hit.fields or {}
+                    sf = fields.get("summaryfeatures", {})
+                    doc_id = fields.get("marqo__id", "unknown")
+                    self.assertIn(feature_name, sf,
+                                  msg=f"{metric.value}: summary-features must contain {feature_name}")
+                    closeness_by_id[doc_id] = sf[feature_name]
+
+                raw_by_metric[metric] = closeness_by_id
+
+        # Verify prenormalized-angular values match the hardcoded source of truth
+        for doc_id, text in DOC_TENSOR_RANKING_TEXT.items():
+            with self.subTest(doc_id=doc_id, phase="prenorm_source_of_truth"):
+                self.assertAlmostEqual(
+                    raw_by_metric[DistanceMetric.PrenormalizedAngular][doc_id],
+                    RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO[text], places=4,
+                    msg=f"prenorm {doc_id}: Vespa value must match RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO",
+                )
+
+        # Derive cos_sim from prenormalized-angular (source of truth): cos_sim = 2 - 1/closeness
+        # Then verify all other metrics' formulas produce matching values.
+        prenorm_values = raw_by_metric[DistanceMetric.PrenormalizedAngular]
+        for doc_id in prenorm_values:
+            cos_sim = 2.0 - 1.0 / prenorm_values[doc_id]
+            with self.subTest(doc_id=doc_id, phase="formula_verification"):
+                # Angular: 1/(1+acos(clamp(cos_sim, -1, 1)))
+                expected_angular = 1.0 / (1.0 + math.acos(min(1.0, max(-1.0, cos_sim))))
+                self.assertAlmostEqual(
+                    raw_by_metric[DistanceMetric.Angular][doc_id], expected_angular, places=4,
+                    msg=f"angular {doc_id}: formula(cos_sim={cos_sim:.6f}) = {expected_angular:.6f}",
+                )
+                # Euclidean: 1/(1+sqrt(2-2*cos_sim)) for unit vectors
+                expected_euclidean = 1.0 / (1.0 + math.sqrt(max(0, 2.0 - 2.0 * cos_sim)))
+                self.assertAlmostEqual(
+                    raw_by_metric[DistanceMetric.Euclidean][doc_id], expected_euclidean, places=4,
+                    msg=f"euclidean {doc_id}: formula(cos_sim={cos_sim:.6f}) = {expected_euclidean:.6f}",
+                )
+                # Dotproduct: (1+cos_sim)/2
+                expected_dp = (1.0 + cos_sim) / 2.0
+                self.assertAlmostEqual(
+                    raw_by_metric[DistanceMetric.DotProduct][doc_id], expected_dp, places=4,
+                    msg=f"dotproduct {doc_id}: formula(cos_sim={cos_sim:.6f}) = {expected_dp:.6f}",
+                )
+
 
 class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
     """
@@ -1128,16 +1159,27 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
+        # Use prenormalized-angular to match Marqo's default production index settings.
         index_request = cls.unstructured_marqo_index_request(
             model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
+            distance_metric=DistanceMetric.PrenormalizedAngular,
         )
         collapse_index_request = cls.unstructured_marqo_index_request(
             model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
+            distance_metric=DistanceMetric.PrenormalizedAngular,
             collapse_fields=[CollapseField(name="parent_id", minGroups=2)],
         )
-        cls.indexes = cls.create_indexes([index_request, collapse_index_request])
+        # Dedicated index for test_popularity_bm25_and_closeness_together_exact_score.
+        # BM25 scores depend on corpus statistics (IDF), so this test needs a clean index
+        # to match hardcoded RAW_BM25_LEX_RANKING_FIELD_TUXEDO values.
+        exact_score_index_request = cls.unstructured_marqo_index_request(
+            model=Model(name="open_clip/ViT-B-16-SigLIP/webli"),
+            distance_metric=DistanceMetric.PrenormalizedAngular,
+        )
+        cls.indexes = cls.create_indexes([index_request, collapse_index_request, exact_score_index_request])
         cls.index = cls.indexes[0]
         cls.collapse_index = cls.indexes[1]
+        cls.exact_score_index = cls.indexes[2]
 
     def _add_tuxedo_docs(self, **extras):
         """Add tuxedo plan docs (optionally with popularity, category, etc.) to self.index."""
@@ -1171,92 +1213,63 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                 msg=f"Doc {doc_id}: _pre_rerank_score should equal baseline score",
             )
 
-    def _custom_score_add_contributions_by_doc_id(
-        self, add_to_score_ops: List[Dict[str, Any]]
-    ) -> Dict[str, float]:
-        """
-        Run hybrid search with only the given marqo__score_* add_to_score modifiers (same query/index as plan).
-        Returns doc_id -> (_score - _pre_rerank_score) for each hit.
-        """
-        res = tensor_search.search(
-            config=self.config,
-            index_name=self.index.name,
-            text="tuxedo",
-            search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            score_modifiers=ScoreModifierLists(add_to_score=add_to_score_ops),
-            result_count=10,
-        )
-        return {
-            h["_id"]: h["_score"] - h[MARQO_DOC_PRE_RERANK_SCORE]
-            for h in res["hits"]
-        }
-
     @pytest.mark.skip_for_multinode("The lexical score can differ between nodes")
     def test_popularity_bm25_and_closeness_together_exact_score(self):
         """
         add_to_score with popularity (global), BM25 custom (lex_ranking_field), and closeness custom
         (tensor_ranking_field), each weight 1.0. For every hit assert:
-        _score == _pre_rerank_score + popularity + bm25_contribution + closeness_contribution.
+        _score == _pre_rerank_score + popularity + bm25_normalized + closeness_normalized,
+        using hardcoded sources of truth for bm25 and closeness.
+        Uses a dedicated index (self.exact_score_index) because BM25 scores depend on corpus
+        statistics (IDF) — other tests adding docs to self.index would change the BM25 values.
         """
         popularity_values = [0.1, 0.2, 0.3, 0.4, 0.5]  # doc1..doc5
         docs = _tuxedo_docs_with_extras(popularity=popularity_values)
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.index.name,
+                index_name=self.exact_score_index.name,
                 docs=docs,
                 tensor_fields=TENSOR_FIELDS_PLAN,
             ),
         )
         res_no_rerank = tensor_search.search(
             config=self.config,
-            index_name=self.index.name,
+            index_name=self.exact_score_index.name,
             text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
             result_count=10,
         )
-        bm25_only = [{"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0}]
-        closeness_only = [
-            {"field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field", "weight": 1.0}
-        ]
-        contrib_bm25 = self._custom_score_add_contributions_by_doc_id(bm25_only)
-        contrib_closeness = self._custom_score_add_contributions_by_doc_id(closeness_only)
         popularity_by_id = {f"doc{i + 1}": popularity_values[i] for i in range(5)}
+        max_bm25 = max(RAW_BM25_LEX_RANKING_FIELD_TUXEDO.values())
+        max_closeness = max(RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO.values())
 
-        add_to_score = [
-            {"field_name": "popularity", "weight": 1.0},
-            *bm25_only,
-            *closeness_only,
-        ]
         res = tensor_search.search(
             config=self.config,
-            index_name=self.index.name,
+            index_name=self.exact_score_index.name,
             text="tuxedo",
             search_method="HYBRID",
             hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            score_modifiers=ScoreModifierLists(add_to_score=add_to_score),
+            score_modifiers=ScoreModifierLists(add_to_score=[
+                {"field_name": "popularity", "weight": 1.0},
+                {"field_name": "marqo__score_bm25_field_lex_ranking_field", "weight": 1.0},
+                {"field_name": "marqo__score_closeness_retrieval_vector_field_tensor_ranking_field", "weight": 1.0},
+            ]),
             result_count=10,
         )
         self._assert_pre_rerank_score_matches_baseline(res, res_no_rerank)
         self.assertEqual(len(res["hits"]), 5, msg="All 5 plan docs must be returned")
         for hit in res["hits"]:
             doc_id = hit["_id"]
-            self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
             pre = hit[MARQO_DOC_PRE_RERANK_SCORE]
             pop = popularity_by_id[doc_id]
-            self.assertIn(doc_id, contrib_bm25)
-            self.assertIn(doc_id, contrib_closeness)
-            expected_score = pre + pop + contrib_bm25[doc_id] + contrib_closeness[doc_id]
+            expected_bm25 = RAW_BM25_LEX_RANKING_FIELD_TUXEDO[doc_id] / max_bm25
+            expected_closeness = RAW_PRENORMALIZED_ANGULAR_CLOSENESS_TUXEDO[DOC_TENSOR_RANKING_TEXT[doc_id]] / max_closeness
+            expected_score = pre + pop + expected_bm25 + expected_closeness
             self.assertAlmostEqual(
-                hit["_score"],
-                expected_score,
-                places=12,
-                msg=(
-                    f"Doc {doc_id}: _score must equal _pre_rerank_score + popularity + bm25 + closeness "
-                    f"({hit['_score']} vs {pre} + {pop} + {contrib_bm25[doc_id]} + {contrib_closeness[doc_id]})"
-                ),
+                hit["_score"], expected_score, places=4,
+                msg=f"{doc_id}: _score {hit['_score']} != pre({pre}) + pop({pop}) + bm25({expected_bm25}) + closeness({expected_closeness})",
             )
 
     @pytest.mark.skip_for_multinode("For multinode: exact score may not match with replicas")
