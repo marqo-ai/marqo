@@ -444,53 +444,53 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             filter_parts = []
 
             # Escape special characters in field name and value
-            node.field = self.escape(node.field)
-            node.value = self.escape(node.value)
+            escaped_field = self.escape(node.field)
+            escaped_value = self.escape(node.value)
 
             # Filter on `_id`
-            if node.field == MARQO_DOC_ID:
-                return f'({VESPA_FIELD_ID} contains "{node.value}")'
+            if escaped_field == MARQO_DOC_ID:
+                return f'({VESPA_FIELD_ID} contains "{escaped_value}")'
 
-            if self.get_marqo_index().is_collapse_field(node.field):
+            if self.get_marqo_index().is_collapse_field(escaped_field):
                 # collapse field is indexed as attribute, can be used directly in a filter term
-                return f'({node.field} contains "{node.value}")'
+                return f'({escaped_field} contains "{escaped_value}")'
 
             # Bool Filter
-            if node.value.lower() in self._FILTER_STRING_BOOL_VALUES:
-                filter_value = int(True if node.value.lower() == "true" else False)
+            if escaped_value.lower() in self._FILTER_STRING_BOOL_VALUES:
+                filter_value = int(True if escaped_value.lower() == "true" else False)
                 bool_filter_string = (f'({BOOL_FIELDS} contains '
-                                      f'sameElement(key contains "{node.field}", value = {filter_value}))')
+                                      f'sameElement(key contains "{escaped_field}", value = {filter_value}))')
                 filter_parts.append(bool_filter_string)
 
             # Short String Filter
             short_string_filter_string = (f'({SHORT_STRINGS_FIELDS} '
-                                          f'contains sameElement(key contains "{node.field}", '
-                                          f'value contains "{node.value}"))')
+                                          f'contains sameElement(key contains "{escaped_field}", '
+                                          f'value contains "{escaped_value}"))')
             filter_parts.append(short_string_filter_string)
 
             # String Array Filter
             if self.index_supports_partial_updates:
-                if node.field in self.get_marqo_index().name_to_string_array_field_map:
-                    string_array_field_name = f'{STRING_ARRAY}_{node.field}'
+                if escaped_field in self.get_marqo_index().name_to_string_array_field_map:
+                    string_array_field_name = f'{STRING_ARRAY}_{escaped_field}'
                     string_array_filter_string = (f'({string_array_field_name} contains '
-                                                  f'"{node.value}")')
+                                                  f'"{escaped_value}")')
                     filter_parts.append(string_array_filter_string)
             else:
                 string_array_filter_string = (f'({STRING_ARRAY} contains '
-                                              f'"{node.field}::{node.value}")')
+                                              f'"{escaped_field}::{escaped_value}")')
                 filter_parts.append(string_array_filter_string)
 
             # Numeric Filter
             numeric_filter_string = ""
             try:
-                numeric_value = int(node.value)
+                numeric_value = int(escaped_value)
                 numeric_filter_string = (
-                    f'({INT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value})) '
-                    f'OR ({FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))')
+                    f'({INT_FIELDS} contains sameElement(key contains "{escaped_field}", value = {numeric_value})) '
+                    f'OR ({FLOAT_FIELDS} contains sameElement(key contains "{escaped_field}", value = {numeric_value}))')
             except ValueError:
                 try:
-                    numeric_value = float(node.value)
-                    numeric_filter_string = f'({FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))'
+                    numeric_value = float(escaped_value)
+                    numeric_filter_string = f'({FLOAT_FIELDS} contains sameElement(key contains "{escaped_field}", value = {numeric_value}))'
                 except ValueError:
                     pass
 
@@ -503,7 +503,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
             # Escape special characters in field name
-            node.field = self.escape(node.field)
+            escaped_field = self.escape(node.field)
 
             lower = f'value >= {node.lower}' if node.lower is not None else ""
             higher = f'value <= {node.upper}' if node.upper is not None else ""
@@ -512,10 +512,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 raise InternalError('RangeTerm has no lower or upper bound')
 
             float_field_string = (f'({FLOAT_FIELDS} contains '
-                                  f'sameElement(key contains "{node.field}", {bound}))')
+                                  f'sameElement(key contains "{escaped_field}", {bound}))')
 
             int_field_string = (f'({INT_FIELDS} contains '
-                                f'sameElement(key contains "{node.field}", {bound}))')
+                                f'sameElement(key contains "{escaped_field}", {bound}))')
 
             return f'({float_field_string} OR {int_field_string})'
 
