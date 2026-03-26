@@ -134,5 +134,16 @@ class TestSemiStructuredInFilter(MarqoTestCase):
             with self.assertRaises(InvalidArgumentError) as cm:
                 self._get_filter('color IN (red, blue, green)')
 
-            # Should get the limit error first (checked before field check)
-            self.assertIn("MARQO_MAX_IN_FILTER_IDS", str(cm.exception))
+            self.assertIn("only supported for the '_id' field", str(cm.exception))
+            self.assertNotIn("MARQO_MAX_IN_FILTER_IDS", str(cm.exception))
+
+    def test_non_id_in_exceeds_default_limit_raises_field_error(self):
+        """Non-_id IN with 10,001 values raises field error, not limit error."""
+        ids = [f'val_{i}' for i in range(10001)]
+        filter_str = 'color IN (' + ', '.join(ids) + ')'
+
+        with self.assertRaises(InvalidArgumentError) as cm:
+            self._get_filter(filter_str)
+
+        self.assertIn("only supported for the '_id' field", str(cm.exception))
+        self.assertNotIn("MARQO_MAX_IN_FILTER_IDS", str(cm.exception))

@@ -509,6 +509,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return f'({float_field_string} OR {int_field_string})'
 
         def generate_in_filter_string(node: search_filter.InTerm) -> str:
+            if node.field != MARQO_DOC_ID:
+                raise InvalidArgumentError(
+                    "The 'IN' filter keyword is only supported for the '_id' field "
+                    "on semi-structured indexes."
+                )
+
             max_in_filter_ids = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_IN_FILTER_IDS)
             if max_in_filter_ids is not None and len(node.value_list) > max_in_filter_ids:
                 raise InvalidArgumentError(
@@ -516,16 +522,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     f"of {max_in_filter_ids} (MARQO_MAX_IN_FILTER_IDS)."
                 )
 
-            if node.field == MARQO_DOC_ID:
-                escaped_values = ', '.join(
-                    f'"{self.escape(v)}"' for v in node.value_list
-                )
-                return f'{VESPA_FIELD_ID} in ({escaped_values})'
-            else:
-                raise InvalidArgumentError(
-                    "The 'IN' filter keyword is only supported for the '_id' field "
-                    "on semi-structured indexes."
-                )
+            escaped_values = ', '.join(
+                f'"{self.escape(v)}"' for v in node.value_list
+            )
+            return f'{VESPA_FIELD_ID} in ({escaped_values})'
 
         def tree_to_filter_string(node: search_filter.Node) -> Optional[str]:
             # Skip any terms with excluded fields first - check at node level
