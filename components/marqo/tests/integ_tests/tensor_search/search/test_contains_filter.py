@@ -57,6 +57,7 @@ class TestContainsFilter(MarqoTestCase):
                     {"_id": "3", "title": "Python Programming", "description": "Learn python basics"},
                     {"_id": "4", "title": "hello again", "description": "Another greeting"},
                     {"_id": "5", "title": "Machine Learning", "description": "AI and ML concepts"},
+                    {"_id": "6", "title": "Real-time Systems", "description": "Low-latency computing"},
                 ],
                 tensor_fields=["title", "description"]
             )
@@ -184,6 +185,23 @@ class TestContainsFilter(MarqoTestCase):
         ids = self._get_ids(res)
         # Should only return docs with "hello" in title (docs 1 and 4)
         self.assertEqual(ids, ["1", "4"])
+
+    def test_contains_with_special_characters(self):
+        """Vespa tokenization splits hyphenated words, so CONTAINS matches individual parts.
+
+        Doc 6 has title "Real-time Systems". The tokenizer splits "Real-time" into tokens
+        "real" and "time" (lowercased). This test documents that CONTAINS matches on each
+        token independently when special characters like hyphens are present.
+        """
+        with self.subTest("title CONTAINS real should match doc 6"):
+            res = self._search("title CONTAINS real")
+            ids = self._get_ids(res)
+            self.assertIn("6", ids)
+
+        with self.subTest("title CONTAINS time should match doc 6"):
+            res = self._search("title CONTAINS time")
+            ids = self._get_ids(res)
+            self.assertIn("6", ids)
 
     def test_structured_index_contains_raises_error(self):
         """Using CONTAINS on a structured index should raise InvalidArgumentError."""
