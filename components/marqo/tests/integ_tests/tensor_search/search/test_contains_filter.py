@@ -4,6 +4,7 @@ from unittest import mock
 
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
@@ -21,8 +22,20 @@ class TestContainsFilter(MarqoTestCase):
             model=Model(name='hf/all-MiniLM-L6-v2')
         )
 
-        cls.indexes = cls.create_indexes([semi_structured_index])
+        structured_index = cls.structured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2'),
+            fields=[
+                FieldRequest(name="title", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="description", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+            ],
+            tensor_fields=["title", "description"]
+        )
+
+        cls.indexes = cls.create_indexes([semi_structured_index, structured_index])
         cls.semi_structured_index = cls.indexes[0]
+        cls.structured_index = cls.indexes[1]
 
     def setUp(self) -> None:
         super().setUp()
@@ -144,3 +157,15 @@ class TestContainsFilter(MarqoTestCase):
         """The CONTAINS keyword should be case-insensitive with mixed case."""
         res = self._search("title Contains hello")
         self.assertEqual(self._get_ids(res), ["1", "4"])
+
+    def test_structured_index_contains_raises_error(self):
+        """Using CONTAINS on a structured index should raise InvalidArgumentError."""
+        with self.assertRaises(InvalidArgumentError) as ctx:
+            tensor_search.search(
+                index_name=self.structured_index.name,
+                config=self.config,
+                text="test",
+                filter="title CONTAINS hello",
+                search_method=SearchMethod.TENSOR,
+            )
+        self.assertIn("CONTAINS", str(ctx.exception))
