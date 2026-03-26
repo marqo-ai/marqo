@@ -5,6 +5,7 @@ from unittest import mock
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
@@ -165,6 +166,24 @@ class TestContainsFilter(MarqoTestCase):
         # Doc 1 has "A simple greeting program" which contains the phrase "simple greeting"
         # Doc 4 has "Another greeting" which does NOT contain "simple greeting" as a phrase
         self.assertEqual(ids, ["1"])
+
+    def test_contains_with_hybrid_search(self):
+        """CONTAINS filter combined with hybrid search."""
+        res = tensor_search.search(
+            config=self.config,
+            index_name=self.semi_structured_index.name,
+            text="greeting",
+            filter="title CONTAINS hello",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0.5,
+            ),
+        )
+        ids = self._get_ids(res)
+        # Should only return docs with "hello" in title (docs 1 and 4)
+        self.assertEqual(ids, ["1", "4"])
 
     def test_structured_index_contains_raises_error(self):
         """Using CONTAINS on a structured index should raise InvalidArgumentError."""
