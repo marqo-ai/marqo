@@ -158,6 +158,14 @@ class TestContainsFilter(MarqoTestCase):
         res = self._search("title Contains hello")
         self.assertEqual(self._get_ids(res), ["1", "4"])
 
+    def test_contains_grouped_multiword_value(self):
+        """description CONTAINS (simple greeting) should match doc 1 only (phrase match)."""
+        res = self._search("description CONTAINS (simple greeting)")
+        ids = self._get_ids(res)
+        # Doc 1 has "A simple greeting program" which contains the phrase "simple greeting"
+        # Doc 4 has "Another greeting" which does NOT contain "simple greeting" as a phrase
+        self.assertEqual(ids, ["1"])
+
     def test_structured_index_contains_raises_error(self):
         """Using CONTAINS on a structured index should raise InvalidArgumentError."""
         with self.assertRaises(InvalidArgumentError) as ctx:
