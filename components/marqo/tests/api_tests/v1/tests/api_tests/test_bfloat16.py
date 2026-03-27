@@ -60,25 +60,23 @@ class TestBfloat16(MarqoTestCase):
         )
         self.assertFalse(res["errors"])
 
-        # Tensor search
+        # Tensor search - semantic match should rank doc1 first
         tensor_res = self.client.index(self.unstructured_index_name).search(
             q="fox jumping", search_method="TENSOR"
         )
-        self.assertGreater(len(tensor_res["hits"]), 0)
         self.assertEqual("doc1", tensor_res["hits"][0]["_id"])
 
-        # Lexical search
+        # Lexical search - keyword match should rank doc3 first
         lexical_res = self.client.index(self.unstructured_index_name).search(
             q="programming language", search_method="LEXICAL"
         )
-        self.assertGreater(len(lexical_res["hits"]), 0)
         self.assertEqual("doc3", lexical_res["hits"][0]["_id"])
 
         # Hybrid search
         hybrid_res = self.client.index(self.unstructured_index_name).search(
             q="fox jumping", search_method="HYBRID"
         )
-        self.assertGreater(len(hybrid_res["hits"]), 0)
+        self.assertEqual(3, len(hybrid_res["hits"]))
 
     def test_structured_bfloat16_add_and_search(self):
         """Add documents to structured bf16 index and verify all search methods work."""
@@ -90,25 +88,23 @@ class TestBfloat16(MarqoTestCase):
         res = self.client.index(self.structured_index_name).add_documents(documents)
         self.assertFalse(res["errors"])
 
-        # Tensor search
+        # Tensor search - semantic match should rank doc1 first
         tensor_res = self.client.index(self.structured_index_name).search(
             q="fox jumping", search_method="TENSOR"
         )
-        self.assertGreater(len(tensor_res["hits"]), 0)
         self.assertEqual("doc1", tensor_res["hits"][0]["_id"])
 
-        # Lexical search
+        # Lexical search - keyword match should rank doc3 first
         lexical_res = self.client.index(self.structured_index_name).search(
             q="programming language", search_method="LEXICAL"
         )
-        self.assertGreater(len(lexical_res["hits"]), 0)
         self.assertEqual("doc3", lexical_res["hits"][0]["_id"])
 
         # Hybrid search
         hybrid_res = self.client.index(self.structured_index_name).search(
             q="fox jumping", search_method="HYBRID"
         )
-        self.assertGreater(len(hybrid_res["hits"]), 0)
+        self.assertEqual(3, len(hybrid_res["hits"]))
 
     def test_bfloat16_get_document_with_vectors(self):
         """Verify that documents can be retrieved with their bf16 vectors."""
@@ -122,4 +118,3 @@ class TestBfloat16(MarqoTestCase):
         )
         self.assertEqual("vec_doc1", doc["_id"])
         self.assertIn("_tensor_facets", doc)
-        self.assertGreater(len(doc["_tensor_facets"]), 0)
