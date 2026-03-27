@@ -95,6 +95,9 @@ class Monitoring:
         Returns:
             Marqo index health status
         """
+        if index_name is not None:
+            self.index_management.get_index(index_name)  # raises IndexNotFoundError if not found
+
         # TODO - Check index specific metrics such as memory and disk usage
         inference_status = self._get_inference_health()
         vespa_status = self._get_vespa_health(hostname_filter=hostname_filter)
