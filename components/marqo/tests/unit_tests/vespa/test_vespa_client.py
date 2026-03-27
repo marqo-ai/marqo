@@ -622,6 +622,128 @@ class TestVespaClient(unittest.TestCase):
 
         mock_logger.warning.assert_not_called()
 
+    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
+    def test_get_batch_preserves_input_order_with_out_of_order_completion(self, mock_async_client_class):
+        """Test that get_batch returns responses in the same order as the input IDs,
+        even when the underlying async requests complete out of order.
+
+        This is a critical assumption used by partial_update_documents, which maps
+        get_batch response positions back to original document indices."""
+        from marqo.vespa.models.get_document_response import GetBatchDocumentResponse
+
+        schema = 'test_schema'
+        ids = ['doc_a', 'doc_b', 'doc_c', 'doc_d']
+
+        for not_found_ids, subtest_name in [
+            (set(), 'all documents found'),
+            ({'doc_a', 'doc_c'}, 'some documents not found'),
+        ]:
+            with self.subTest(msg=subtest_name):
+                completion_order = []
+
+                async def mock_get_document(semaphore, async_client, doc_id, fields, schema_name, timeout,
+                                            _not_found=not_found_ids, _order=completion_order):
+                    # Stagger so tasks complete in reverse: doc_d, doc_c, doc_b, doc_a
+                    delays = {'doc_a': 0.04, 'doc_b': 0.03, 'doc_c': 0.02, 'doc_d': 0.01}
+                    await asyncio.sleep(delays[doc_id])
+                    _order.append(doc_id)
+
+                    if doc_id in _not_found:
+                        return GetBatchDocumentResponse(
+                            status=404,
+                            pathId=f'/document/v1/{schema_name}/{schema_name}/docid/{doc_id}',
+                            id=f'id:{schema_name}:{schema_name}::{doc_id}',
+                            message='Document not found',
+                        )
+                    return GetBatchDocumentResponse(
+                        status=200,
+                        pathId=f'/document/v1/{schema_name}/{schema_name}/docid/{doc_id}',
+                        id=f'id:{schema_name}:{schema_name}::{doc_id}',
+                        fields={'doc_id_field': doc_id}
+                    )
+
+                with patch.object(self.vespa_client, '_get_document_async', side_effect=mock_get_document):
+                    result = self.vespa_client.get_batch(ids=ids, schema=schema)
+
+                # Verify requests actually completed out of order
+                self.assertNotEqual(completion_order, ids,
+                                    "Test setup error: requests should complete out of order due to staggered delays")
+
+                # Verify responses are returned in the same order as input IDs
+                self.assertEqual(len(result.responses), len(ids))
+                for i, expected_id in enumerate(ids):
+                    resp = result.responses[i]
+                    actual_id = resp.id.split('::')[-1] if resp.id else None
+                    self.assertEqual(actual_id, expected_id,
+                                     f"Response at position {i} should be for '{expected_id}', got '{actual_id}'")
+
+    def test_get_document_async_catches_invalid_url_error(self):
+        """Test that _get_document_async catches httpx.InvalidURL and returns a 400 response
+        instead of crashing. This handles IDs with non-printable ASCII characters."""
+        from marqo.vespa.models.get_document_response import GetBatchDocumentResponse
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.InvalidURL(
+            "Invalid non-printable ASCII character in URL"
+        )
+
+        async def _run():
+            semaphore = asyncio.Semaphore(1)
+            return await self.vespa_client._get_document_async(
+                semaphore, mock_client, 'doc\x00with\x01control\x7fchars', None, 'test_schema', 60
+            )
+
+        result = asyncio.run(_run())
+
+        self.assertIsInstance(result, GetBatchDocumentResponse)
+        self.assertEqual(result.status, 400)
+        self.assertIn("Invalid document ID", result.message)
+        self.assertIn("doc\x00with\x01control\x7fchars", result.message)
+        self.assertEqual(result.path_id, "")
+        self.assertIsNone(result.document)
+
+    @patch('marqo.vespa.vespa_client.httpx.AsyncClient')
+    def test_get_batch_handles_invalid_url_ids_with_valid_ids(self, mock_async_client_class):
+        """Test that get_batch returns proper 400 responses for IDs with non-printable ASCII
+        characters while still returning correct results for valid IDs, preserving order."""
+        from marqo.vespa.models.get_document_response import GetBatchDocumentResponse
+
+        schema = 'test_schema'
+        ids = ['valid_doc', 'doc\x00invalid', 'another_valid']
+
+        async def mock_get_document(semaphore, async_client, doc_id, fields, schema_name, timeout):
+            if '\x00' in doc_id:
+                return GetBatchDocumentResponse(
+                    status=400,
+                    pathId="",
+                    message=f"Invalid document ID: {doc_id}. Original error: Invalid URL"
+                )
+            return GetBatchDocumentResponse(
+                status=200,
+                pathId=f'/document/v1/{schema_name}/{schema_name}/docid/{doc_id}',
+                id=f'id:{schema_name}:{schema_name}::{doc_id}',
+                fields={'title': f'Title for {doc_id}'}
+            )
+
+        with patch.object(self.vespa_client, '_get_document_async', side_effect=mock_get_document):
+            result = self.vespa_client.get_batch(ids=ids, schema=schema)
+
+        self.assertEqual(len(result.responses), 3)
+        self.assertTrue(result.errors)
+
+        # First: valid doc
+        self.assertEqual(result.responses[0].status, 200)
+        self.assertEqual(result.responses[0].document.fields['title'], 'Title for valid_doc')
+
+        # Second: invalid URL doc
+        self.assertEqual(result.responses[1].status, 400)
+        self.assertIn("Invalid document ID", result.responses[1].message)
+        self.assertIsNone(result.responses[1].document)
+
+        # Third: valid doc
+        self.assertEqual(result.responses[2].status, 200)
+        self.assertEqual(result.responses[2].document.fields['title'], 'Title for another_valid')
+
     @patch('marqo.vespa.vespa_client.logger')
     def test_wait_for_convergence_retries_on_httpx_timeout(self, mock_logger):
         """Test that httpx timeout exceptions are caught and retried."""

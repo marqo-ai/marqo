@@ -495,7 +495,8 @@ class VespaClient:
             timeout: Timeout in seconds per request
 
         Returns:
-            List of GetDocumentResponse objects containing the documents fetched and any missing documents (404)
+            List of GetDocumentResponse objects containing the documents fetched and any missing documents (404).
+            The order of the returned results are preserved to match the order of the input IDs.
 
         """
         if not ids:
@@ -1056,6 +1057,10 @@ class VespaClient:
                     resp = await async_client.get(
                         f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}', timeout=timeout
                     )
+            except httpx.InvalidURL as e:
+                return GetBatchDocumentResponse(
+                    status=400, pathId="", message=f"Invalid document ID: {id}. Original error: {str(e)}"
+                )
             except httpx.HTTPError as e:
                 raise VespaError(e) from e
 
