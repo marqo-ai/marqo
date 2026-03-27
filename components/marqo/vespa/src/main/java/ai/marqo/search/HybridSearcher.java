@@ -31,6 +31,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.statistics.descriptive.DoubleStatistics;
@@ -52,6 +53,11 @@ public class HybridSearcher extends Searcher {
     private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
     private static String QUERY_INPUT_MULT_WEIGHTS_GLOBAL = "marqo__mult_weights_global";
     private static String QUERY_INPUT_ADD_WEIGHTS_GLOBAL = "marqo__add_weights_global";
+    private static String QUERY_INPUT_CUSTOM_SCORE_MULT_WEIGHTS_GLOBAL =
+            "marqo__custom_score_mult_weights_global";
+    private static String QUERY_INPUT_CUSTOM_SCORE_ADD_WEIGHTS_GLOBAL =
+            "marqo__custom_score_add_weights_global";
+
     private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
@@ -71,6 +77,18 @@ public class HybridSearcher extends Searcher {
 
     private static final String MARQO_METADATA_FIELDS = "marqo__fields";
 
+    /** Hit field for the score before applying custom/global modifiers (RRF score). Exposed as _pre_rerank_score in API. */
+    private static final String MARQO_PRE_RERANK_SCORE = "marqo__pre_rerank_score";
+
+    /** Key under which Vespa attaches rank profile summary-features to a hit. */
+    private static final String SUMMARY_FEATURES_FIELD = "summaryfeatures";
+
+    /** Returns FeatureData for custom score (bm25, ranking_closeness_metric_*) from hit summaryfeatures. */
+    private static FeatureData getSummaryFeaturesForHit(Hit hit) {
+        Object o = hit.getField(SUMMARY_FEATURES_FIELD);
+        return o instanceof FeatureData ? (FeatureData) o : null;
+    }
+
     @VisibleForTesting
     @JsonInclude(Include.NON_NULL)
     record MarqoMetadataFields(
@@ -85,6 +103,67 @@ public class HybridSearcher extends Searcher {
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    /**
+     * Parsed custom score rerank key. Matches Python ParsedCustomScoreKey.parse.
+     * Key formats: {scoreType}_field_{fieldName} or {scoreType}_{sum|max|avg}.
+     */
+    @VisibleForTesting
+    static final class CustomScoreKey {
+        final String scoreType;
+        final String fieldName; // null for aggregate
+        final String aggregateType; // null for single-field
+
+        CustomScoreKey(String scoreType, String fieldName, String aggregateType) {
+            this.scoreType = scoreType;
+            this.fieldName = fieldName;
+            this.aggregateType = aggregateType;
+        }
+
+        /**
+         * Parses a custom score rerank key (no prefix) into score type, field name and aggregate type.
+         * Key formats: {scoreType}_field_{fieldName} or {scoreType}_{sum|max|avg}.
+         *
+         * @param key Key without prefix, e.g. "bm25_field_title", "bm25_sum",
+         *     "closeness_retrieval_vector_field_variantImage"
+         * @return Parsed key or null if unsupported/invalid
+         */
+        @VisibleForTesting
+        static CustomScoreKey parseCustomScoreKey(String key) {
+            if (key == null || key.isEmpty() || !key.contains("_")) {
+                return null;
+            }
+            String[] supportedScoreTypes = {"bm25", "closeness_retrieval_vector"};
+            String[] aggregateTypes = {"sum", "max", "avg"};
+            for (String scoreType : supportedScoreTypes) {
+                String prefix = scoreType + "_";
+                if (!key.startsWith(prefix)) {
+                    continue;
+                }
+                String rest = key.substring(prefix.length());
+                if (Arrays.asList(aggregateTypes).contains(rest)) {
+                    return new CustomScoreKey(scoreType, null, rest);
+                }
+                if (rest.startsWith("field_")) {
+                    String fieldName = rest.substring(6);
+                    if (fieldName.isEmpty()) {
+                        return null;
+                    }
+                    return new CustomScoreKey(scoreType, fieldName, null);
+                }
+                return null;
+            }
+            return null;
+        }
+
+        /** Summary feature name for single-field BM25: bm25(marqo__lexical_<fieldName>). One per lexical field; no bm25(marqo__ranking_strings). */
+        static String bm25SummaryFeatureName(String fieldName) {
+            if (fieldName == null || fieldName.isEmpty()) {
+                return null;
+            }
+            return "bm25(marqo__lexical_" + fieldName + ")";
         }
     }
 
@@ -309,6 +388,15 @@ public class HybridSearcher extends Searcher {
         } else {
             throw new RuntimeException(
                     "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
+        }
+
+        // Fill summary-features before reranking when custom score uses ranking vector or BM25
+        boolean hasRankingVector = query.properties().getBoolean("marqo__hasRankingVector", false);
+        boolean hasRankingLexical =
+                query.properties().getBoolean("marqo__hasRankingLexical", false);
+        if (hasRankingVector || hasRankingLexical) {
+            Result resultToFill = new Result(query, hitsForPostProcessing);
+            execution.fill(resultToFill, "dummy-light-summary");
         }
 
         // Determine post-processing mode based on query parameters
@@ -992,15 +1080,26 @@ public class HybridSearcher extends Searcher {
             logHitGroup(excessHits, verbose);
         }
 
-        // Apply global score modifiers and rerank
-        // Skip whole process if global modifier weight tensors don't exist in query
+        // Apply global score modifiers and rerank when regular global weights and/or custom score
+        // rerank weights are present
         Tensor queryMultWeightsGlobal =
                 extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
         Tensor queryAddWeightsGlobal =
                 extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
+        Tensor customScoreMult =
+                extractTensorRankFeature(
+                        query, addQueryWrapper(QUERY_INPUT_CUSTOM_SCORE_MULT_WEIGHTS_GLOBAL));
+        Tensor customScoreAdd =
+                extractTensorRankFeature(
+                        query, addQueryWrapper(QUERY_INPUT_CUSTOM_SCORE_ADD_WEIGHTS_GLOBAL));
+        boolean hasGlobalWeights =
+                (queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
+                        || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty());
+        boolean hasCustomScoreWeights =
+                (customScoreMult != null && !customScoreMult.isEmpty())
+                        || (customScoreAdd != null && !customScoreAdd.isEmpty());
 
-        if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
-                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
+        if (hasGlobalWeights || hasCustomScoreWeights) {
             logIfVerbose("Applying global score modifiers and reranking.", verbose);
             resultToRerank = applyGlobalScoreModifiers(resultToRerank, query, verbose);
         } else if (query.properties().getBoolean("marqo__recency_apply_in_global_ranking_phase")) {
@@ -1102,9 +1201,19 @@ public class HybridSearcher extends Searcher {
      * @return A new Query object configured for probe lexical search.
      */
     Query createProbeLexialQuery(Query query, Integer probeDepth, boolean verbose) {
+        // Use dedicated probe lexical YQL when set (no custom-score extra rank terms); else main
+        // lexical.
+        String probeLexicalYql = query.properties().getString("marqo__yql.lexical.probe", null);
+        if (probeLexicalYql == null || probeLexicalYql.isEmpty()) {
+            probeLexicalYql = query.properties().getString("marqo__yql.lexical", "");
+        }
         Query probeLexicalQuery =
                 createSubQuery(
-                        query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+                        query,
+                        MARQO_SEARCH_METHOD_LEXICAL,
+                        MARQO_SEARCH_METHOD_LEXICAL,
+                        verbose,
+                        probeLexicalYql);
 
         // Overwrite the lexical score modifiers in the probe query
         probeLexicalQuery
@@ -1463,6 +1572,349 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
+     * Returns the set of match feature names from hit match features. FeatureData is not a Map;
+     * it exposes featureNames(). We use that so bm25(*) and closeness(field,*) keys are available
+     * for custom score extraction and aggregates.
+     */
+    private static Set<String> getMatchFeatureKeys(FeatureData matchFeatures) {
+        if (matchFeatures == null) {
+            return Collections.emptySet();
+        }
+        return new HashSet<>(matchFeatures.featureNames());
+    }
+
+    /**
+     * Extracts the custom score value for one key. Custom score reranking uses only
+     * summary-features (no fallback to match-features). For closeness_retrieval_vector the
+     * summary feature name is ranking_closeness_metric_<field_name>. For bm25 we use
+     * bm25(marqo__lexical_<field>) per lexical field; aggregate = sum/max/avg over those.
+     */
+    @VisibleForTesting
+    static Double extractCustomScoreForHit(
+            FeatureData matchFeatures,
+            String key,
+            CustomScoreKey parsed,
+            Set<String> matchFeatureKeys,
+            FeatureData summaryFeatures) {
+        return new HybridSearcher()
+                .extractCustomScoreForHit(
+                        matchFeatures, key, parsed, matchFeatureKeys, summaryFeatures, null, false);
+    }
+
+    /**
+     * Same as 5-arg but with optional keyForLog and verbose for logging (aggregation and read).
+     */
+    Double extractCustomScoreForHit(
+            FeatureData matchFeatures,
+            String key,
+            CustomScoreKey parsed,
+            Set<String> matchFeatureKeys,
+            FeatureData summaryFeatures,
+            String keyForLog,
+            boolean verbose) {
+        if (parsed == null) {
+            return null;
+        }
+        if ("bm25".equals(parsed.scoreType)) {
+            if (summaryFeatures == null) return null;
+            if (parsed.aggregateType != null) {
+                return aggregateFromSummaryFeatures(
+                        summaryFeatures,
+                        name -> name.startsWith("bm25(") && name.endsWith(")"),
+                        parsed.aggregateType,
+                        keyForLog,
+                        "bm25Values",
+                        false,
+                        verbose);
+            }
+            String featName = CustomScoreKey.bm25SummaryFeatureName(parsed.fieldName);
+            return getSingleFieldScoreWithLog(summaryFeatures, featName, keyForLog, verbose);
+        }
+        if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
+            if (summaryFeatures == null) return null;
+            if (parsed.aggregateType != null) {
+                // Same pattern as BM25: iterate summary-features. Treat null/NaN as 0 so all
+                // index tensor fields contribute (schema lists all ranking_closeness_metric_*).
+                return aggregateFromSummaryFeatures(
+                        summaryFeatures,
+                        name -> name.startsWith("ranking_closeness_metric_"),
+                        parsed.aggregateType,
+                        keyForLog,
+                        "closenessValues",
+                        true,
+                        verbose);
+            }
+            String featName = "ranking_closeness_metric_" + parsed.fieldName;
+            return getSingleFieldScoreWithLog(summaryFeatures, featName, keyForLog, verbose);
+        }
+        return null;
+    }
+
+    /**
+     * Gets a double from FeatureData. Summary-features may be scalar (e.g. bm25, ranking_closeness_metric_*)
+     * or tensor (e.g. tensor(float)(p{})); for tensors, returns the sum of all cells (single cell =
+     * that value). Schema emits ranking_closeness_metric_* as scalar via reduce(..., sum).
+     */
+    private static Double getFeatureDouble(FeatureData data, String name) {
+        if (data == null || name == null) return null;
+        try {
+            return data.getDouble(name);
+        } catch (IllegalStateException e) {
+            Tensor t = data.getTensor(name);
+            if (t == null) return null;
+            double sum = 0;
+            for (Iterator<Cell> it = t.cellIterator(); it.hasNext(); ) {
+                sum += it.next().getValue();
+            }
+            return Double.isFinite(sum) ? sum : null;
+        }
+    }
+
+    /** Reads one summary-feature value and optionally logs; used for single-field custom score keys. */
+    private Double getSingleFieldScoreWithLog(
+            FeatureData summaryFeatures, String featureName, String keyForLog, boolean verbose) {
+        Double score = featureName != null ? getFeatureDouble(summaryFeatures, featureName) : null;
+        if (keyForLog != null && score != null) {
+            logIfVerbose(
+                    "[CustomScoreRerank] read from summary-features key="
+                            + keyForLog
+                            + " featureName="
+                            + featureName
+                            + " value="
+                            + score,
+                    verbose);
+        }
+        return score;
+    }
+
+    /**
+     * Collects summary-feature values whose names pass the filter, aggregates them (sum/max/avg),
+     * and optionally logs. Used for both BM25 and closeness_retrieval_vector aggregate keys.
+     *
+     * @param useZeroForMissing when true, treat null/NaN as 0.0 so every listed summary-feature
+     *     contributes (e.g. closeness over all index tensor fields; schema lists all
+     *     ranking_closeness_metric_*). When false, skip null/NaN (BM25 behavior).
+     */
+    private Double aggregateFromSummaryFeatures(
+            FeatureData summaryFeatures,
+            Predicate<String> nameFilter,
+            String aggregateType,
+            String keyForLog,
+            String logLabel,
+            boolean useZeroForMissing,
+            boolean verbose) {
+        List<Double> values = new ArrayList<>();
+        for (String name : summaryFeatures.featureNames()) {
+            if (nameFilter.test(name)) {
+                Double v = getFeatureDouble(summaryFeatures, name);
+                if (useZeroForMissing) {
+                    values.add((v != null && !Double.isNaN(v)) ? v : 0.0);
+                } else if (v != null && !Double.isNaN(v)) {
+                    values.add(v);
+                }
+            }
+        }
+        Double result = aggregateValues(values, aggregateType);
+        if (keyForLog != null && result != null) {
+            logIfVerbose(
+                    "[CustomScoreRerank] aggregation key="
+                            + keyForLog
+                            + " aggregateType="
+                            + aggregateType
+                            + " "
+                            + logLabel
+                            + "="
+                            + values
+                            + " result="
+                            + result,
+                    verbose);
+        }
+        return result;
+    }
+
+    private static Double aggregateValues(List<Double> values, String aggregateType) {
+        if (values.isEmpty()) {
+            return null;
+        }
+        return switch (aggregateType) {
+            case "sum" -> values.stream().mapToDouble(Double::doubleValue).sum();
+            case "max" -> values.stream().mapToDouble(Double::doubleValue).max().orElse(Double.NaN);
+            case "avg" ->
+                    values.stream().mapToDouble(Double::doubleValue).average().orElse(Double.NaN);
+            default -> null;
+        };
+    }
+
+    /**
+     * Normalizes a value by dividing by the maximum (value / max). The highest value maps to 1.0;
+     * all others map to their proportion of the max. If max is zero, NaN, or negative, returns 1.0
+     * to avoid division by zero. Used for both BM25 and closeness custom score keys.
+     */
+    @VisibleForTesting
+    static double normalizeByMax(double value, double max) {
+        if (max <= 0 || Double.isNaN(max) || !Double.isFinite(max)) {
+            return 1.0;
+        }
+        return value / max;
+    }
+
+    /**
+     * Returns weight * normalizedScore for one custom-score cell, or null if the score is missing
+     * or the key is invalid. Scores are normalized by dividing by the max value across hits
+     * (value / max) using maxPerKey. Custom score values are read only from summaryFeatures.
+     * Tensor keys are always in canonical form (e.g. closeness_retrieval_vector_sum, bm25_sum)
+     * without the marqo__score_ prefix, as set by Python when building the query.
+     */
+    private Double getWeightedNormalizedScoreForCell(
+            Cell cell,
+            FeatureData hitMatchFeatures,
+            Set<String> matchFeatureKeys,
+            Map<String, Double> maxPerKey,
+            FeatureData summaryFeatures,
+            Logger logger,
+            boolean verbose) {
+        String key = cell.getKey().label(0);
+        CustomScoreKey parsed = CustomScoreKey.parseCustomScoreKey(key);
+        if (parsed == null) return null;
+        Double score =
+                extractCustomScoreForHit(
+                        hitMatchFeatures,
+                        key,
+                        parsed,
+                        matchFeatureKeys,
+                        summaryFeatures,
+                        key,
+                        verbose);
+        if (score == null || Double.isNaN(score)) return null;
+        double weight = cell.getValue().doubleValue();
+        double normalizedScore = score;
+        Double maxVal = maxPerKey != null ? maxPerKey.get(key) : null;
+        if (maxVal != null) {
+            normalizedScore = normalizeByMax(score, maxVal);
+        }
+        double modifierValue = weight * normalizedScore;
+        logIfVerbose(
+                "[CustomScoreRerank] apply modifier key="
+                        + key
+                        + " weight="
+                        + weight
+                        + " scoreValue="
+                        + score
+                        + " normalizedScore="
+                        + normalizedScore
+                        + " modifierValue="
+                        + modifierValue,
+                verbose);
+        return modifierValue;
+    }
+
+    /**
+     * Applies custom score rerank weights to add and mult modifiers: for each key in add weights,
+     * adds (weight * normalizedScore) to addModifier; for each key in mult weights, multiplies
+     * multModifier by (weight * normalizedScore). BM25 and closeness_retrieval_vector scores are
+     * normalized by dividing by the max value across hits (value / max).
+     */
+    private void applyCustomScoreContributions(
+            Double addModifier,
+            Double multModifier,
+            FeatureData hitMatchFeatures,
+            Set<String> matchFeatureKeys,
+            Tensor customAddWeights,
+            Tensor customMultWeights,
+            Map<String, Double> maxPerKey,
+            double[] outAdd,
+            double[] outMult,
+            boolean verbose,
+            FeatureData summaryFeatures) {
+        double add = addModifier != null ? addModifier : 0.0;
+        double mult = multModifier != null ? multModifier : 1.0;
+
+        if (customAddWeights != null && !customAddWeights.isEmpty()) {
+            for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
+                Double contrib =
+                        getWeightedNormalizedScoreForCell(
+                                it.next(),
+                                hitMatchFeatures,
+                                matchFeatureKeys,
+                                maxPerKey,
+                                summaryFeatures,
+                                logger,
+                                verbose);
+                if (contrib != null) add += contrib;
+            }
+        }
+
+        if (customMultWeights != null && !customMultWeights.isEmpty()) {
+            for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
+                Double contrib =
+                        getWeightedNormalizedScoreForCell(
+                                it.next(),
+                                hitMatchFeatures,
+                                matchFeatureKeys,
+                                maxPerKey,
+                                summaryFeatures,
+                                logger,
+                                verbose);
+                if (contrib != null) mult *= contrib;
+            }
+        }
+
+        outAdd[0] = add;
+        outMult[0] = mult;
+    }
+
+    /**
+     * Compute per-key max value across hits for all custom score keys (BM25 and
+     * closeness_retrieval_vector) present in add/mult weight tensors. Used for divide-by-max
+     * normalization (value / max). Tensor keys are always in canonical form (e.g. bm25_sum,
+     * closeness_retrieval_vector_sum). For aggregate keys, the value per hit is the aggregate
+     * (sum/max/avg); max is taken over those values, so normalization is after aggregation.
+     */
+    @VisibleForTesting
+    Map<String, Double> computeMaxPerKey(
+            HitGroup hits, Tensor customAddWeights, Tensor customMultWeights) {
+        Set<String> keys = new HashSet<>();
+        if (customAddWeights != null) {
+            for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
+                String key = it.next().getKey().label(0);
+                if (CustomScoreKey.parseCustomScoreKey(key) != null) keys.add(key);
+            }
+        }
+        if (customMultWeights != null) {
+            for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
+                String key = it.next().getKey().label(0);
+                if (CustomScoreKey.parseCustomScoreKey(key) != null) keys.add(key);
+            }
+        }
+        Map<String, Double> result = new HashMap<>();
+        for (String key : keys) {
+            CustomScoreKey parsed = CustomScoreKey.parseCustomScoreKey(key);
+            if (parsed == null) continue;
+            double max = Double.NEGATIVE_INFINITY;
+            for (Hit hit : hits) {
+                FeatureData summaryFeatures = getSummaryFeaturesForHit(hit);
+                if (summaryFeatures == null) continue;
+                Double v =
+                        extractCustomScoreForHit(
+                                null,
+                                key,
+                                parsed,
+                                Collections.emptySet(),
+                                summaryFeatures,
+                                null,
+                                false);
+                if (v != null && !Double.isNaN(v)) {
+                    max = Math.max(max, v);
+                }
+            }
+            if (Double.isFinite(max) && max > 0) {
+                result.put(key, max);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Apply global score modifiers to the hit group. Modifies hit scores, does not add/remove hits.
      * @param hits The hit group to apply global score modifiers to.
      * @param query The query to check recency mode.
@@ -1476,6 +1928,87 @@ public class HybridSearcher extends Searcher {
             return hits;
         }
 
+        Tensor customAddWeights =
+                extractTensorRankFeature(
+                        query, addQueryWrapper(QUERY_INPUT_CUSTOM_SCORE_ADD_WEIGHTS_GLOBAL));
+        Tensor customMultWeights =
+                extractTensorRankFeature(
+                        query, addQueryWrapper(QUERY_INPUT_CUSTOM_SCORE_MULT_WEIGHTS_GLOBAL));
+        boolean hasCustomScores =
+                (customAddWeights != null && !customAddWeights.isEmpty())
+                        || (customMultWeights != null && !customMultWeights.isEmpty());
+
+        logIfVerbose(
+                "[CustomScoreRerank] customAddWeights="
+                        + (customAddWeights == null ? "null" : "size=" + customAddWeights.size())
+                        + " customMultWeights="
+                        + (customMultWeights == null ? "null" : "size=" + customMultWeights.size())
+                        + " hasCustomScores="
+                        + hasCustomScores,
+                verbose);
+        if (hasCustomScores && customAddWeights != null && !customAddWeights.isEmpty()) {
+            for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
+                Cell cell = it.next();
+                String key = cell.getKey().label(0);
+                double weight = cell.getValue().doubleValue();
+                CustomScoreKey parsed = CustomScoreKey.parseCustomScoreKey(key);
+                if (parsed != null) {
+                    logIfVerbose(
+                            "[CustomScoreRerank] unpack add_to_score key="
+                                    + key
+                                    + " scoreType="
+                                    + parsed.scoreType
+                                    + " field="
+                                    + (parsed.fieldName != null ? parsed.fieldName : "n/a")
+                                    + " aggregateType="
+                                    + (parsed.aggregateType != null ? parsed.aggregateType : "n/a")
+                                    + " weight="
+                                    + weight,
+                            verbose);
+                }
+            }
+        }
+        if (hasCustomScores && customMultWeights != null && !customMultWeights.isEmpty()) {
+            for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
+                Cell cell = it.next();
+                String key = cell.getKey().label(0);
+                double weight = cell.getValue().doubleValue();
+                CustomScoreKey parsed = CustomScoreKey.parseCustomScoreKey(key);
+                if (parsed != null) {
+                    logIfVerbose(
+                            "[CustomScoreRerank] unpack multiply_score_by key="
+                                    + key
+                                    + " scoreType="
+                                    + parsed.scoreType
+                                    + " field="
+                                    + (parsed.fieldName != null ? parsed.fieldName : "n/a")
+                                    + " aggregateType="
+                                    + (parsed.aggregateType != null ? parsed.aggregateType : "n/a")
+                                    + " weight="
+                                    + weight,
+                            verbose);
+                }
+            }
+        }
+
+        Set<String> allMatchFeatureKeys = new HashSet<>();
+        Map<String, Double> maxPerKey = new HashMap<>();
+        if (hasCustomScores) {
+            Hit firstHit = hits.get(0);
+            FeatureData firstMf = (FeatureData) firstHit.getField("matchfeatures");
+            if (firstMf != null) {
+                allMatchFeatureKeys = getMatchFeatureKeys(firstMf);
+            }
+            logIfVerbose(
+                    "[CustomScoreRerank] match feature keys from first hit (count="
+                            + allMatchFeatureKeys.size()
+                            + "): "
+                            + allMatchFeatureKeys,
+                    verbose);
+            /* Compute max score for each key for divide-by-max normalization */
+            maxPerKey = computeMaxPerKey(hits, customAddWeights, customMultWeights);
+        }
+
         boolean applyRecency =
                 query.properties().getBoolean("marqo__recency_apply_in_global_ranking_phase");
 
@@ -1485,9 +2018,9 @@ public class HybridSearcher extends Searcher {
                         .getDouble(addQueryWrapper("marqo__recency_add_to_score_weight"))
                         .orElse(0.0);
 
+        int hitIndex = 0;
         for (Hit hit : hits) {
             logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
-            // Extract the mult and add modifiers from match-features
             hitMatchFeatures = (FeatureData) hit.getField("matchfeatures");
             if (hitMatchFeatures != null) {
                 mult_modifier = hitMatchFeatures.getDouble("global_mult_modifier");
@@ -1495,18 +2028,54 @@ public class HybridSearcher extends Searcher {
                 recencyScore = applyRecency ? hitMatchFeatures.getDouble("recency_score") : 1.0;
 
                 if (mult_modifier != null && add_modifier != null) {
-                    // Apply the modifiers to the hit's relevance
+                    double effectiveMult = mult_modifier;
+                    double effectiveAdd = add_modifier;
+                    if (hasCustomScores) {
+                        Set<String> hitMatchFeatureKeys = getMatchFeatureKeys(hitMatchFeatures);
+                        if (hitMatchFeatureKeys.isEmpty()) {
+                            hitMatchFeatureKeys = allMatchFeatureKeys;
+                        }
+                        FeatureData summaryFeatures = getSummaryFeaturesForHit(hit);
+                        double[] outAdd = new double[1];
+                        double[] outMult = new double[1];
+                        applyCustomScoreContributions(
+                                add_modifier,
+                                mult_modifier,
+                                hitMatchFeatures,
+                                hitMatchFeatureKeys,
+                                customAddWeights,
+                                customMultWeights,
+                                maxPerKey,
+                                outAdd,
+                                outMult,
+                                verbose,
+                                summaryFeatures);
+                        effectiveAdd = outAdd[0];
+                        effectiveMult = outMult[0];
+                        if (hitIndex == 0) {
+                            logIfVerbose(
+                                    String.format(
+                                            "[CustomScoreRerank] first hit add_modifier=%.5f"
+                                                    + " outAdd=%.5f outMult=%.5f maxPerKeySize=%d",
+                                            add_modifier, outAdd[0], outMult[0], maxPerKey.size()),
+                                    verbose);
+                        }
+                    }
+
                     original_score = hit.getRelevance().getScore();
-                    double baseScore = original_score * mult_modifier + add_modifier;
+                    // Expose pre-rerank score whenever we apply any global score modifiers
+                    hit.setField(MARQO_PRE_RERANK_SCORE, original_score);
+                    double baseScore = original_score * effectiveMult + effectiveAdd;
 
                     if (!applyRecency) {
                         modified_score = baseScore;
                     } else if (addToScoreWeight > 0) {
-                        // Additive mode: base + (recency * weight)
-                        modified_score = baseScore + (recencyScore * addToScoreWeight);
+                        modified_score =
+                                baseScore
+                                        + (recencyScore != null ? recencyScore : 1.0)
+                                                * addToScoreWeight;
                     } else {
-                        // Multiplicative mode (default): base * recency
-                        modified_score = baseScore * recencyScore;
+                        modified_score = baseScore * (recencyScore != null ? recencyScore : 1.0);
                     }
 
                     logIfVerbose(
@@ -1515,12 +2084,24 @@ public class HybridSearcher extends Searcher {
                                         + " recency score: %.5f, addToScoreWeight: %.5f, Modified"
                                         + " score: %.7f",
                                     original_score,
-                                    mult_modifier,
-                                    add_modifier,
-                                    recencyScore,
+                                    effectiveMult,
+                                    effectiveAdd,
+                                    recencyScore != null ? recencyScore : 1.0,
                                     addToScoreWeight,
                                     modified_score),
                             verbose);
+                    if (hasCustomScores && hit.getRelevance().getScore() != modified_score) {
+                        logIfVerbose(
+                                String.format(
+                                        "[CustomScoreRerank] hit=%s original=%.7f effectiveAdd=%.5f"
+                                                + " effectiveMult=%.5f modified=%.7f",
+                                        hit.getId(),
+                                        original_score,
+                                        effectiveAdd,
+                                        effectiveMult,
+                                        modified_score),
+                                verbose);
+                    }
                     hit.setRelevance(modified_score);
                 } else {
                     throw new RuntimeException(
@@ -1535,6 +2116,7 @@ public class HybridSearcher extends Searcher {
                                 + hit.getId()
                                 + " is missing matchfeatures.");
             }
+            hitIndex++;
         }
         return hits;
     }

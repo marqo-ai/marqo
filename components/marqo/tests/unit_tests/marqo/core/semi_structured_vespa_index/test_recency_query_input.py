@@ -364,8 +364,13 @@ class TestRecencyQueryInput(unittest.TestCase):
             with self.subTest(apply_mode=apply_mode):
                 query = self._create_hybrid_query_with_recency(apply_mode)
 
-                with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
-                    mock_parent.return_value = {'query_features': {}}
+                # Stub the base query so we don't run index-dependent code (version checks, etc.).
+                # The test only cares that _to_vespa_hybrid_query sets recency params on the result.
+                with patch.object(
+                    self.vespa_index,
+                    '_get_base_vespa_hybrid_query',
+                    return_value={'query_features': {}},
+                ):
                     result = self.vespa_index._to_vespa_hybrid_query(query)
 
                 # Verify recency is enabled

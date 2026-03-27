@@ -334,8 +334,8 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(f'expression: {embedding_similarity_expression}')
             rank_profiles.append('}')
 
-        # Global add and mult modifiers should be accessible in searcher
-        rank_profiles.append('match-features: global_mult_modifier global_add_modifier')
+        match_features = ['global_mult_modifier', 'global_add_modifier']
+        rank_profiles.append('match-features: ' + ' '.join(match_features))
 
         rank_profiles.append('}')
 
