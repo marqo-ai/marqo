@@ -88,6 +88,31 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
             self._remove_whitespace_in_schema(generated_schema)
         )
 
+    def test_semi_structured_index_schema_with_bfloat16(self):
+        """Test that the schema uses tensor<bfloat16> when vector_numeric_type is Bfloat16."""
+        lexical_fields = ['text_field']
+        tensor_fields = ['tensor_field']
+        expected_schema = self._read_schema_from_file(
+            'test_schemas/semi_structured_vespa_index_schema_one_lexical_one_tensor_field_bfloat16.sd'
+        )
+
+        test_marqo_index_request = self.unstructured_marqo_index_request(
+            name="test_semi_structured_schema",
+            hnsw_config=HnswConfig(ef_construction=512, m=16),
+            distance_metric=DistanceMetric.PrenormalizedAngular,
+            vector_numeric_type=VectorNumericType.Bfloat16,
+        )
+
+        _, index = SemiStructuredVespaSchema(test_marqo_index_request).generate_schema()
+        marqo_index = self._populate_fields(index, lexical_fields, tensor_fields)
+        generated_schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+
+        self.maxDiff = None
+        self.assertEqual(
+            self._remove_empty_lines_in_schema(expected_schema),
+            self._remove_empty_lines_in_schema(generated_schema)
+        )
+
     def test_semi_structured_index_schema_with_pre_2_16(self):
         """
         Test that the schema is generated correctly when the marqo version is older than 2.16.0.
