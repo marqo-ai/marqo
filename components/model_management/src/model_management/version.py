@@ -1,5 +1,3 @@
-__version__ = "2.25.0"
+from marqo_common.version import __version__, get_version
 
-
-def get_version() -> str:
-    return f"{__version__}"
+__all__ = ["__version__", "get_version"]
