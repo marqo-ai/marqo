@@ -173,6 +173,10 @@ schema {{ index.schema_name }} {
 
             query(marqo__collapse_sort_weights) tensor<double>(p{})
             {%- endif %}
+
+            # Custom Score Global Reranking
+            query(marqo__custom_score_mult_weights_global) tensor<double>(p{})
+            query(marqo__custom_score_add_weights_global) tensor<double>(p{})
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============
@@ -372,8 +376,52 @@ schema {{ index.schema_name }} {
             sort_field_value_1
             sort_field_value_2
             recency_score
+
             {% if collapse_field %}collapse_field_hash{% endif %}
         }
+
+        {# Per-field closeness score (similarity to marqo__query_embedding) for custom score rerank summary-features.
+           Formulas match Vespa's closeness() rank feature (to_rawscore) per distance metric (higher = closer).
+           Sources:
+             angular: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/angular_distance.cpp
+             prenormalized-angular: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/prenormalized_angular_distance.cpp
+             euclidean: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/euclidean_distance.cpp
+             dotproduct: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/mips_distance_transform.cpp
+             hamming: github.com/vespa-engine/vespa/blob/master/searchlib/src/vespa/searchlib/tensor/hamming_distance.cpp
+           Dotproduct note: Vespa's native closeness() for dotproduct returns the raw dot product, which is unbounded
+           and can be negative. We use (1 + cosine_similarity) / 2 instead: dividing by vector norms bounds the value
+           to [-1, 1] regardless of normalizeEmbeddings, then the (1+d)/2 transform maps to [0, 1].
+           Not supported for geodegrees. #}
+        {% if index.tensor_fields and index.distance_metric.value != 'geodegrees' %}
+        {% for field in index.tensor_fields %}
+        function ranking_closeness_metric_{{ field.name }}() {
+            {%- if index.distance_metric.value == 'angular' %}
+            expression: reduce(1.0 / (1.0 + acos(min(1.0, max(-1.0, cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x))))), sum)
+            {%- elif index.distance_metric.value == 'prenormalized-angular' %}
+            expression: reduce(1.0 / (2.0 - cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)), sum)
+            {%- elif index.distance_metric.value == 'euclidean' %}
+            expression: reduce(1.0 / (1.0 + euclidean_distance(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)), sum)
+            {%- elif index.distance_metric.value == 'dotproduct' %}
+            expression: reduce((1.0 + cosine_similarity(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding), x)) / 2.0, sum)
+            {%- elif index.distance_metric.value == 'hamming' %}
+            expression: reduce(1.0 / (1.0 + hamming(attribute({{ field.embeddings_field_name }}), query(marqo__query_embedding))), sum)
+            {%- endif %}
+        }
+        {% endfor %}
+        {% endif %}
+
+        {% if (index.tensor_fields and index.distance_metric.value != 'geodegrees') or index.lexical_fields %}
+        summary-features {
+            {% if index.tensor_fields and index.distance_metric.value != 'geodegrees' %}
+            {% for field in index.tensor_fields %}
+            ranking_closeness_metric_{{ field.name }}
+            {% endfor %}
+            {% endif %}
+            {% for lexical_field in index.lexical_fields %}
+            bm25({{ lexical_field.lexical_field_name }})
+            {% endfor %}
+        }
+        {% endif %}
     }
 
     {% if index.lexical_fields -%}
@@ -488,6 +536,10 @@ schema {{ index.schema_name }} {
 
             query(marqo__collapse_sort_weights) tensor<double>(p{})
             {%- endif %}
+
+            # Custom Score Global Reranking
+            query(marqo__custom_score_mult_weights_global) tensor<double>(p{})
+            query(marqo__custom_score_add_weights_global) tensor<double>(p{})
         }
     }
 
@@ -574,6 +626,11 @@ schema {{ index.schema_name }} {
         summary {{ field.chunk_field_name }} type array<string> {}
         summary {{ field.embeddings_field_name }} type tensor<float>(p{}, x[{{ dimension }}]) {}
         {%- endfor %}
+    }
+
+    {# Minimal dummy summary used when filling to compute ranking_score_fieldN and bm25 for custom score rerank #}
+    document-summary dummy-light-summary {
+        summary marqo__id type string {}
     }
 
     {% if collapse_field -%}

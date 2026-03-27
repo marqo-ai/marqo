@@ -771,6 +771,18 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             MARQO_COLLAPSE_SORT_BY_MINIMUM_VERSION
         )
 
+    @property
+    def index_supports_custom_score_rerank(self) -> bool:
+        """
+        Check if the index Vespa schema supports custom score rerankers (marqo__score_*).
+        Custom score rerankers require schema template version 2.26.0 or later.
+        """
+        return self._cache_or_get(
+            "index_supports_custom_score_rerank",
+            lambda: self.parsed_schema_template_version() >= constants.
+            MARQO_CUSTOM_SCORE_RERANKERS_MINIMUM_VERSION
+        )
+
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'
 _INDEX_NAME_PATTERN = r'[a-zA-Z_-][a-zA-Z0-9_-]*'

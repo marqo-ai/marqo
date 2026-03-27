@@ -109,6 +109,10 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__recency_grow_scale_seconds) double: 604800.0
             query(marqo__recency_grow_offset_seconds) double: 0.0
             query(marqo__recency_grow_from) double: 0.5
+
+            # Custom Score Global Reranking
+            query(marqo__custom_score_mult_weights_global) tensor<double>(p{})
+            query(marqo__custom_score_add_weights_global) tensor<double>(p{})
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============
@@ -268,6 +272,9 @@ schema marqo__test_00semi_00structured_00schema {
             recency_score
             
         }
+        summary-features {
+            bm25(marqo__lexical_text_field)
+        }
     }
 
     rank-profile bm25 inherits base_rank_profile {
@@ -312,5 +319,9 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__float_fields type map<string, double> {}
         
         summary text_field type string {source: marqo__lexical_text_field}
+    }
+
+    document-summary dummy-light-summary {
+        summary marqo__id type string {}
     }
 }

@@ -2,6 +2,7 @@ import time
 import unittest
 from typing import List
 
+from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoHybridQuery
 from marqo.core.models.marqo_index import (
     StructuredMarqoIndex, Model, TextPreProcessing, TextSplitMethod,
@@ -11,7 +12,9 @@ from marqo.core.models.marqo_index import (
 from marqo.core.models.hybrid_parameters import (
     HybridParameters, RankingMethod, RetrievalMethod
 )
+from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.exceptions import InternalError
 
 
 class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
@@ -150,6 +153,77 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
                 self.assertEqual(vespa_query['searchChain'], 'marqo')
                 self.assertIn('marqo__hybrid.retrievalMethod', vespa_query)
                 self.assertIn('marqo__hybrid.rankingMethod', vespa_query)
+
+    def test_get_individual_field_tensor_search_terms_non_ranking_includes_target_hits(self):
+        """With is_ranking_term=False derives from query and term includes targetHits."""
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        q = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['x'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_params,
+        )
+        terms = self.vespa_index._get_individual_field_tensor_search_terms(q)
+        self.assertGreater(len(terms), 0)
+        self.assertIn('targetHits', terms[0])
+
+    def test_hybrid_query_with_custom_score_modifiers_raises_on_structured(self):
+        """Custom score reranking is only supported for semi-structured indexes; structured has no such fields."""
+        from marqo.core.exceptions import InvalidFieldNameError
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        marqo_query = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_parameters,
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        with self.assertRaises(InvalidFieldNameError) as ctx:
+            self.vespa_index.to_vespa_query(marqo_query)
+        self.assertIn("score modifier", str(ctx.exception).lower())
+
+    def test_hybrid_query_without_custom_score_modifiers_no_custom_score_query_inputs(self):
+        """Without custom score modifiers, query_features must not contain custom score keys."""
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            alpha=0.5,
+            rrfK=60,
+        )
+        marqo_query = MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=hybrid_parameters,
+        )
+        vespa_query = self.vespa_index.to_vespa_query(marqo_query)
+        self.assertNotIn('marqo__custom_score_add_weights_global', str(vespa_query.get('query_features', {})))
+        self.assertNotIn('marqo__custom_score_mult_weights_global', str(vespa_query.get('query_features', {})))
 
 
 if __name__ == '__main__':

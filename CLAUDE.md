@@ -1,6 +1,12 @@
+# General Guidelines
+- All imports should be at the top of the file whenever possible.
+
 # Environment Setup
 
 Make sure the virtual environment is activated before running any commands.
+Use the environment variables in .env and the virtual environment in .venv.
+If you make changes to the searcher (HybridSearcher.java), make sure to build it with `mvn clean package` and redeploy
+the application package to Vespa before trying again.
 
 # Tests
 

@@ -27,5 +27,8 @@ QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR = "marqo__fields_to_rank_tensor"
 VESPA_DOC_HYBRID_RAW_TENSOR_SCORE = 'marqo__raw_tensor_score'
 VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE = 'marqo__raw_lexical_score'
 
+# Pre-rerank score (RRF score before global/custom score modifiers); returned in search hits when using score modifiers
+VESPA_DOC_PRE_RERANK_SCORE = 'marqo__pre_rerank_score'
+
 SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
 SUMMARY_ALL_VECTOR = 'all-vector-summary'

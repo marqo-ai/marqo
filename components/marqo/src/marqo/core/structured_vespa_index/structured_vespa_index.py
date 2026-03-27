@@ -1,6 +1,7 @@
-from typing import Union
+from typing import Dict, Any, List, Optional, Set, Tuple, Union
 
 import marqo.core.search.search_filter as search_filter
+from marqo.core import constants
 from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
                                    InvalidDataRangeError, MarqoDocumentParsingError, UnsupportedFeatureError)
 from marqo.core.models import MarqoQuery
@@ -9,7 +10,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
-from marqo.exceptions import InternalError
+from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 
@@ -333,6 +334,8 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_document[constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = value
             elif field == common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE:
                 marqo_document[constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = value
+            elif field == common.VESPA_DOC_PRE_RERANK_SCORE:
+                marqo_document[constants.MARQO_DOC_PRE_RERANK_SCORE] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
             elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS_2_8,
@@ -495,7 +498,7 @@ class StructuredVespaIndex(VespaIndex):
             'ranking': ranking,
             'language': marqo_query.language
         }
-        
+
         query = {k: v for k, v in query.items() if v is not None}
 
         return query
@@ -688,7 +691,6 @@ class StructuredVespaIndex(VespaIndex):
             fields_to_search = [f for f in searchable_attributes if f in self._marqo_index.tensor_field_map]
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
-
 
         if marqo_query.rerank_depth_tensor is not None:
             rerank_depth = max(marqo_query.rerank_depth_tensor, marqo_query.limit + marqo_query.offset)
@@ -909,17 +911,17 @@ class StructuredVespaIndex(VespaIndex):
 
         return f'{or_terms}{and_terms}'
 
-    def _get_lexical_contains_term(self, phrase:str, query: MarqoQuery) -> str:
+    def _get_lexical_contains_term(self, phrase: str, query: MarqoQuery) -> str:
         if isinstance(query, MarqoHybridQuery):
             searchable_attributes = query.hybrid_parameters.searchableAttributesLexical
         else:
             searchable_attributes = query.searchable_attributes
 
         if searchable_attributes is not None:
-            return "("+' OR '.join([
+            return "(" + ' OR '.join([
                 f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
                 for field in searchable_attributes
-            ])+")"
+            ]) + ")"
         else:
             return f'default contains "{phrase}"'
 
