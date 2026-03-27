@@ -111,15 +111,12 @@ public class HybridSearcher extends Searcher {
      * Key formats: {scoreType}_field_{fieldName} or {scoreType}_{sum|max|avg}.
      */
     @VisibleForTesting
-    static final class CustomScoreKeyParsed {
-        /** Shared instance for calling parseCustomScoreKey and bm25SummaryFeatureName. */
-        static final CustomScoreKeyParsed PARSER = new CustomScoreKeyParsed(null, null, null);
-
+    static final class CustomScoreKey {
         final String scoreType;
         final String fieldName; // null for aggregate
         final String aggregateType; // null for single-field
 
-        CustomScoreKeyParsed(String scoreType, String fieldName, String aggregateType) {
+        CustomScoreKey(String scoreType, String fieldName, String aggregateType) {
             this.scoreType = scoreType;
             this.fieldName = fieldName;
             this.aggregateType = aggregateType;
@@ -134,7 +131,7 @@ public class HybridSearcher extends Searcher {
          * @return Parsed key or null if unsupported/invalid
          */
         @VisibleForTesting
-        CustomScoreKeyParsed parseCustomScoreKey(String key) {
+        static CustomScoreKey parseCustomScoreKey(String key) {
             if (key == null || key.isEmpty() || !key.contains("_")) {
                 return null;
             }
@@ -147,14 +144,14 @@ public class HybridSearcher extends Searcher {
                 }
                 String rest = key.substring(prefix.length());
                 if (Arrays.asList(aggregateTypes).contains(rest)) {
-                    return new CustomScoreKeyParsed(scoreType, null, rest);
+                    return new CustomScoreKey(scoreType, null, rest);
                 }
                 if (rest.startsWith("field_")) {
                     String fieldName = rest.substring(6);
                     if (fieldName.isEmpty()) {
                         return null;
                     }
-                    return new CustomScoreKeyParsed(scoreType, fieldName, null);
+                    return new CustomScoreKey(scoreType, fieldName, null);
                 }
                 return null;
             }
@@ -162,7 +159,7 @@ public class HybridSearcher extends Searcher {
         }
 
         /** Summary feature name for single-field BM25: bm25(marqo__lexical_<fieldName>). One per lexical field; no bm25(marqo__ranking_strings). */
-        String bm25SummaryFeatureName(String fieldName) {
+        static String bm25SummaryFeatureName(String fieldName) {
             if (fieldName == null || fieldName.isEmpty()) {
                 return null;
             }
@@ -1596,7 +1593,7 @@ public class HybridSearcher extends Searcher {
     static Double extractCustomScoreForHit(
             FeatureData matchFeatures,
             String key,
-            CustomScoreKeyParsed parsed,
+            CustomScoreKey parsed,
             Set<String> matchFeatureKeys,
             FeatureData summaryFeatures) {
         return new HybridSearcher()
@@ -1610,7 +1607,7 @@ public class HybridSearcher extends Searcher {
     Double extractCustomScoreForHit(
             FeatureData matchFeatures,
             String key,
-            CustomScoreKeyParsed parsed,
+            CustomScoreKey parsed,
             Set<String> matchFeatureKeys,
             FeatureData summaryFeatures,
             String keyForLog,
@@ -1630,7 +1627,7 @@ public class HybridSearcher extends Searcher {
                         false,
                         verbose);
             }
-            String featName = CustomScoreKeyParsed.PARSER.bm25SummaryFeatureName(parsed.fieldName);
+            String featName = CustomScoreKey.bm25SummaryFeatureName(parsed.fieldName);
             return getSingleFieldScoreWithLog(summaryFeatures, featName, keyForLog, verbose);
         }
         if ("closeness_retrieval_vector".equals(parsed.scoreType)) {
@@ -1777,7 +1774,7 @@ public class HybridSearcher extends Searcher {
             Logger logger,
             boolean verbose) {
         String key = cell.getKey().label(0);
-        CustomScoreKeyParsed parsed = CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
+        CustomScoreKey parsed = CustomScoreKey.parseCustomScoreKey(key);
         if (parsed == null) return null;
         Double score =
                 extractCustomScoreForHit(
@@ -1880,18 +1877,18 @@ public class HybridSearcher extends Searcher {
         if (customAddWeights != null) {
             for (Iterator<Cell> it = customAddWeights.cellIterator(); it.hasNext(); ) {
                 String key = it.next().getKey().label(0);
-                if (CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key) != null) keys.add(key);
+                if (CustomScoreKey.parseCustomScoreKey(key) != null) keys.add(key);
             }
         }
         if (customMultWeights != null) {
             for (Iterator<Cell> it = customMultWeights.cellIterator(); it.hasNext(); ) {
                 String key = it.next().getKey().label(0);
-                if (CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key) != null) keys.add(key);
+                if (CustomScoreKey.parseCustomScoreKey(key) != null) keys.add(key);
             }
         }
         Map<String, Double> result = new HashMap<>();
         for (String key : keys) {
-            CustomScoreKeyParsed parsed = CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
+            CustomScoreKey parsed = CustomScoreKey.parseCustomScoreKey(key);
             if (parsed == null) continue;
             double max = Double.NEGATIVE_INFINITY;
             for (Hit hit : hits) {
@@ -1954,7 +1951,7 @@ public class HybridSearcher extends Searcher {
                 Cell cell = it.next();
                 String key = cell.getKey().label(0);
                 double weight = cell.getValue().doubleValue();
-                CustomScoreKeyParsed parsed = CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
+                CustomScoreKey parsed = CustomScoreKey.parseCustomScoreKey(key);
                 if (parsed != null) {
                     logIfVerbose(
                             "[CustomScoreRerank] unpack add_to_score key="
@@ -1976,7 +1973,7 @@ public class HybridSearcher extends Searcher {
                 Cell cell = it.next();
                 String key = cell.getKey().label(0);
                 double weight = cell.getValue().doubleValue();
-                CustomScoreKeyParsed parsed = CustomScoreKeyParsed.PARSER.parseCustomScoreKey(key);
+                CustomScoreKey parsed = CustomScoreKey.parseCustomScoreKey(key);
                 if (parsed != null) {
                     logIfVerbose(
                             "[CustomScoreRerank] unpack multiply_score_by key="
