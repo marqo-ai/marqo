@@ -1,7 +1,5 @@
 import uuid
 
-from marqo.client import Client
-
 from tests.marqo_test import MarqoTestCase
 
 
@@ -14,7 +12,6 @@ class TestBfloat16(MarqoTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.client = Client(**cls.client_settings)
 
         cls.create_indexes([
             {
