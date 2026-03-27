@@ -10,6 +10,8 @@ from marqo.core.models.hybrid_parameters import (
     HybridParameters, RankingMethod, RetrievalMethod
 )
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
+from marqo.core.models import MarqoQuery
+from marqo.exceptions import InvalidArgumentError
 
 
 class TestUnstructuredVespaIndexToVespaQuery(unittest.TestCase):
@@ -117,5 +119,18 @@ class TestUnstructuredVespaIndexToVespaQuery(unittest.TestCase):
                 self.assertIn('marqo__hybrid.rankingMethod', vespa_query)
 
 
+    def test_contains_filter_raises_error(self):
+        """CONTAINS filter is not supported for unstructured indexes."""
+        marqo_query = MarqoQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            limit=10,
+            filter='title CONTAINS hello',
+            score_modifiers=[],
+            expose_facets=False
+        )
+        with self.assertRaises(InvalidArgumentError):
+            self.vespa_index._get_filter_term(marqo_query)
+
+
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()
