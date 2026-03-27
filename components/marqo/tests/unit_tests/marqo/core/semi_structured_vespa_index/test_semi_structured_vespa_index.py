@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from marqo.core.models import MarqoQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+from marqo.exceptions import InvalidArgumentError
 from tests.unit_tests.marqo_test import MarqoTestCase
 
 
@@ -86,6 +87,55 @@ class TestSemiStructuredVespaIndex(MarqoTestCase):
                 )
                 result_filter_string = self.vespa_index._get_filter_term(marqo_query)
                 self.assertEqual(expected_result, result_filter_string)
+
+    def test_get_filter_string_equality_paths(self):
+        """Test equality filter paths: _id, bool, string array, and float numeric."""
+        test_cases = [
+            # _id filter (line 441)
+            ('_id:doc123', 'marqo__id contains "doc123"'),
+            # Bool filter (line 449)
+            ('title:true', 'marqo__bool_fields'),
+            # String array filter (line 463)
+            ('tags:foo', 'marqo__string_array_tags contains "foo"'),
+            # Float numeric filter (line 482)
+            ('title:3.14', 'marqo__float_fields'),
+        ]
+
+        for filter_string, expected_fragment in test_cases:
+            with self.subTest(filter_string=filter_string):
+                marqo_query = MarqoQuery(
+                    index_name=self.vespa_index._marqo_index.name,
+                    limit=10,
+                    filter=filter_string,
+                    score_modifiers=[],
+                    expose_facets=False
+                )
+                result_filter_string = self.vespa_index._get_filter_term(marqo_query)
+                self.assertIn(expected_fragment, result_filter_string)
+
+    def test_get_filter_string_contains(self):
+        """Test CONTAINS filter generates correct Vespa syntax for lexical fields."""
+        marqo_query = MarqoQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            limit=10,
+            filter='title CONTAINS hello',
+            score_modifiers=[],
+            expose_facets=False
+        )
+        result_filter_string = self.vespa_index._get_filter_term(marqo_query)
+        self.assertEqual('(marqo__lexical_title contains "hello")', result_filter_string)
+
+    def test_get_filter_string_contains_nonexistent_field_raises_error(self):
+        """Test CONTAINS filter raises error for a field not in the index."""
+        marqo_query = MarqoQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            limit=10,
+            filter='nonexistent CONTAINS hello',
+            score_modifiers=[],
+            expose_facets=False
+        )
+        with self.assertRaises(InvalidArgumentError):
+            self.vespa_index._get_filter_term(marqo_query)
 
     def test_vespa_to_marqo_conversion_should_handle_all_fields_from_search_result(self):
         vespa_doc = {
