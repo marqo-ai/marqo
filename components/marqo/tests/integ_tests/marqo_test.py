@@ -36,48 +36,14 @@ if os.path.exists(os.path.join(component_bath, '.env')):
 
 class TestImageUrls(str, Enum):
     __test__ = False  # Prevent pytest from collecting this class as a test
-    IMAGE0 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg'
-    IMAGE1 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg'
-    IMAGE2 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg'
-    IMAGE3 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg'
-    IMAGE4 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg'
-    COCO = 'https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg'
-    HIPPO_REALISTIC = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic_small.png'
-    HIPPO_REALISTIC_LARGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-    HIPPO_STATUE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png'
-
-    # --- Image URLs for testing different image formats ---
-    # These images are tested with OpenCLIP Encode
-    BMP_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_bmp_image.bmp'
-    TIFF_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_tiff_image.tiff'
-    GIF_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_gif_image.gif'
-    PNG_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_png_image.png'
-    JPG_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_jpg_image.jpg'
-    WEBP_IMAGE = 'https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_webp_image.webp'
-
-
-class TestAudioUrls(str, Enum):
-    __test__ = False
-    AUDIO1 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-100032-A-0.wav"
-    AUDIO2 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115545-C-48.wav"
-    AUDIO3 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-119125-A-45.wav"
-
-    MP3_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.mp3"
-    ACC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.aac"
-    OGG_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.ogg"
-
-    FLAC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.flac"
-
-
-class TestVideoUrls(str, Enum):
-    __test__ = False
-    VIDEO1 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
-    VIDEO2 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4"
-    VIDEO3 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--mI_-gaZLk_000018_000028.mp4"
-
-    MKV_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.mkv"
-    WEBM_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.webm"
-    AVI_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.avi"
+    IMAGE0 = 'https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg'
+    IMAGE1 = 'https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg'
+    IMAGE2 = 'https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg'
+    IMAGE3 = 'https://marqo-assets.s3.amazonaws.com/tests/images/image3.jpg'
+    IMAGE4 = 'https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg'
+    HIPPO_REALISTIC = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic_small.png'
+    HIPPO_REALISTIC_LARGE = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
+    HIPPO_STATUE = 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue_small.png'
 
 
 class MarqoTestCase(unittest.TestCase):
