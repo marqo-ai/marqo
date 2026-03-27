@@ -619,6 +619,9 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
 
+        if marqo_query.global_rerank_depth_start is not None:
+            query["marqo__hybrid.rerankDepthStartGlobal"] = marqo_query.global_rerank_depth_start
+
         return query
 
     def _get_tensor_fields_to_search(

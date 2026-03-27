@@ -635,6 +635,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
 
+        if marqo_query.global_rerank_depth_start is not None:
+            query["marqo__hybrid.rerankDepthStartGlobal"] = marqo_query.global_rerank_depth_start
+
         # Tell the custom searcher what type of custom score reranking will be done
         if applicable_custom_score_keys:
             has_bm25 = bool(self._get_fields_to_bm25_rerank_by(applicable_custom_score_keys))

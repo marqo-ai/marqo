@@ -240,6 +240,8 @@ public class HybridSearcher extends Searcher {
         Double alpha = query.properties().getDouble("marqo__hybrid.alpha", 0.5);
         Integer rerankDepthGlobal =
                 query.properties().getInteger("marqo__hybrid.rerankDepthGlobal", null);
+        Integer rerankDepthStartGlobal =
+                query.properties().getInteger("marqo__hybrid.rerankDepthStartGlobal", null);
         Integer limit = query.properties().getInteger("hits", null);
         Integer offset = query.properties().getInteger("offset", 0);
         Integer timeout = query.properties().getInteger("timeout", 1000);
@@ -268,6 +270,7 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("alpha found: %.2f", alpha), verbose);
         logIfVerbose(String.format("RRF k found: %d", rrf_k), verbose);
         logIfVerbose(String.format("Rerank count global found: %d", rerankDepthGlobal), verbose);
+        logIfVerbose(String.format("Rerank depth start global found: %d", rerankDepthStartGlobal), verbose);
         logIfVerbose(String.format("Limit found: %d", limit), verbose);
         logIfVerbose(String.format("Offset found: %d", offset), verbose);
         logIfVerbose(String.format("Timeout int found: %d", timeout), verbose);
@@ -415,6 +418,7 @@ public class HybridSearcher extends Searcher {
                             hitsForPostProcessing,
                             query,
                             rerankDepthGlobal,
+                            rerankDepthStartGlobal,
                             limit,
                             offset,
                             verbose);
@@ -1041,27 +1045,40 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Post-processes the result list, applying global score modifiers and reranking.
+     *
+     * <p>If rerankDepthStartGlobal is set, hits [0, rerankDepthStartGlobal) are preserved as-is
+     * (their scores and order are unchanged). Only hits [rerankDepthStartGlobal, rerankDepthGlobal)
+     * are subject to global score modifiers and reranking. For preserved hits,
+     * MARQO_PRE_RERANK_SCORE is set equal to their current score since no reranking occurs.
      */
     HitGroup postProcessResults(
             HitGroup hitsForPostProcessing,
             Query query,
             Integer rerankDepthGlobal,
+            Integer rerankDepthStartGlobal,
             int limit,
             int offset,
             boolean verbose) {
-        // Split original hits into 2 lists: result to rerank and excess hits
-        // Excess hits will not be reranked, and will be added back after reranking the other
-        // results
-        HitGroup resultToRerank = new HitGroup();
-        HitGroup excessHits = new HitGroup();
-
-        int idx = 0;
         // If rerank count global is not set, rerank all hits
         if (rerankDepthGlobal == null) {
             rerankDepthGlobal = hitsForPostProcessing.size();
         }
+        // Default start is 0 (rerank all hits within rerankDepthGlobal)
+        int rerankStart = (rerankDepthStartGlobal != null) ? rerankDepthStartGlobal : 0;
+
+        // Split original hits into three lists:
+        //   preservedHits:  hits [0, rerankStart) — kept as-is
+        //   resultToRerank: hits [rerankStart, rerankDepthGlobal) — subject to score modifiers
+        //   excessHits:     hits [rerankDepthGlobal, limit) — appended unsorted after reranking
+        HitGroup preservedHits = new HitGroup();
+        HitGroup resultToRerank = new HitGroup();
+        HitGroup excessHits = new HitGroup();
+
+        int idx = 0;
         for (Hit hit : hitsForPostProcessing) {
-            if (idx < rerankDepthGlobal) {
+            if (idx < rerankStart) {
+                preservedHits.add(hit);
+            } else if (idx < rerankDepthGlobal) {
                 resultToRerank.add(hit);
             } else if (idx < limit) {
                 // Total hits to return caps out at limit
@@ -1071,6 +1088,15 @@ public class HybridSearcher extends Searcher {
                 break;
             }
             idx++;
+        }
+
+        if (preservedHits.size() > 0) {
+            logIfVerbose("Preserved hits (will not be reranked): ", verbose);
+            logHitGroup(preservedHits, verbose);
+            // Set _preRerank_score = _score for preserved hits since they are not reranked
+            for (Hit hit : preservedHits.asList()) {
+                hit.setField(MARQO_PRE_RERANK_SCORE, hit.getRelevance().getScore());
+            }
         }
 
         logIfVerbose("Result list to rerank: ", verbose);
@@ -1149,14 +1175,19 @@ public class HybridSearcher extends Searcher {
         logIfVerbose("Reranked result list (SORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
+        // Concatenate: preserved segment + re-sorted reranked segment + excess hits
+        HitGroup finalHits = new HitGroup();
+        finalHits.addAll(preservedHits.asList());
+        finalHits.addAll(resultToRerank.asList());
+
         if (limit > rerankDepthGlobal) {
-            // Add excess hits to the end of reranked results then sort
+            // Add excess hits to the end of reranked results
             logIfVerbose(
                     String.format(
-                            "Adding %d excess hits to the end of reranked results and sorting.",
+                            "Adding %d excess hits to the end of reranked results.",
                             excessHits.size()),
                     verbose);
-            resultToRerank.addAll(excessHits.asList());
+            finalHits.addAll(excessHits.asList());
         }
 
         // Paginate and/or trim
@@ -1164,12 +1195,12 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(
                 String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
                 verbose);
-        resultToRerank.trim(0, limit);
+        finalHits.trim(0, limit);
 
         logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
-        logHitGroup(resultToRerank, verbose);
+        logHitGroup(finalHits, verbose);
 
-        return resultToRerank;
+        return finalHits;
     }
 
     void raiseErrorIfPresent(Result resultLexical, Result resultTensor) {

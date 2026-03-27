@@ -323,6 +323,7 @@ def _get_tensor_facets(marqo_doc_tensors: Dict[str, Any]) -> List[Dict[str, Any]
 
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
            result_count: int = 3, offset: int = 0, rerank_depth: Optional[int] = None,
+           rerank_depth_start: Optional[int] = None,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None, approximate_threshold: Optional[float] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
@@ -465,6 +466,14 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             f"This index was created with Marqo {marqo_index_version}."
         )
 
+    if rerank_depth_start is not None \
+            and marqo_index_version < constants.MARQO_RERANK_DEPTH_START_MINIMUM_VERSION:
+        raise core_exceptions.UnsupportedFeatureError(
+            f"The 'rerankDepthStart' search parameter is only supported for indexes created with Marqo version "
+            f"{str(constants.MARQO_RERANK_DEPTH_START_MINIMUM_VERSION)} or later. "
+            f"This index was created with Marqo {marqo_index_version}."
+        )
+
     if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search
@@ -506,6 +515,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             search_result = HybridSearch().search(
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
                 rerank_depth=rerank_depth,
+                rerank_depth_start=rerank_depth_start,
                 ef_search=ef_search, approximate=approximate, approximate_threshold=approximate_threshold,
                 searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,

@@ -300,6 +300,94 @@ class HybridSearcherTest {
     // empty mult weights or empty add weights
 
     @Nested
+    class RerankDepthStartTest {
+        private HitGroup createHits(int count) {
+            HitGroup hits = new HitGroup();
+            for (int i = 0; i < count; i++) {
+                hits.add(new Hit("index:test/0/doc" + i, 1.0 - (i * 0.1)));
+            }
+            return hits;
+        }
+
+        @Test
+        void nullRerankDepthStart_behavesLikeZero() {
+            // null rerankDepthStart should behave identically to rerankDepthStart=0
+            // (all hits within rerankDepth are subject to reranking)
+            HitGroup hits = createHits(5);
+            Query query = new Query("?q=test");
+            query.properties().set("hits", 5);
+
+            HitGroup resultNull = hybridSearcher.postProcessResults(hits, query, null, null, 5, 0, false);
+
+            HitGroup hits2 = createHits(5);
+            HitGroup resultZero = hybridSearcher.postProcessResults(hits2, query, null, 0, 5, 0, false);
+
+            assertThat(resultNull.size()).isEqualTo(resultZero.size());
+            for (int i = 0; i < resultNull.size(); i++) {
+                assertThat(resultNull.get(i).getId()).isEqualTo(resultZero.get(i).getId());
+                assertThat(resultNull.get(i).getRelevance().getScore())
+                        .isEqualTo(resultZero.get(i).getRelevance().getScore());
+            }
+        }
+
+        @Test
+        void preservedHitsRetainOriginalOrderAndScore() {
+            // With rerankDepthStart=3, hits [0,3) should be unchanged
+            // (no score modifiers applied, so scores stay the same anyway).
+            HitGroup hits = createHits(10);
+            // Record original scores of first 3 hits
+            double score0 = hits.get(0).getRelevance().getScore();
+            double score1 = hits.get(1).getRelevance().getScore();
+            double score2 = hits.get(2).getRelevance().getScore();
+            String id0 = hits.get(0).getId().toString();
+            String id1 = hits.get(1).getId().toString();
+            String id2 = hits.get(2).getId().toString();
+
+            Query query = new Query("?q=test");
+            query.properties().set("hits", 10);
+
+            HitGroup result = hybridSearcher.postProcessResults(hits, query, 10, 3, 10, 0, false);
+
+            // First 3 hits should be preserved as-is (same id, same score)
+            assertThat(result.get(0).getId().toString()).isEqualTo(id0);
+            assertThat(result.get(1).getId().toString()).isEqualTo(id1);
+            assertThat(result.get(2).getId().toString()).isEqualTo(id2);
+            assertThat(result.get(0).getRelevance().getScore()).isEqualTo(score0);
+            assertThat(result.get(1).getRelevance().getScore()).isEqualTo(score1);
+            assertThat(result.get(2).getRelevance().getScore()).isEqualTo(score2);
+        }
+
+        @Test
+        void preservedHitsHavePreRerankScoreSetToScore() {
+            // For preserved hits, _preRerank_score should equal _score
+            HitGroup hits = createHits(5);
+            double preservedScore = hits.get(0).getRelevance().getScore();
+
+            Query query = new Query("?q=test");
+            query.properties().set("hits", 5);
+
+            HitGroup result = hybridSearcher.postProcessResults(hits, query, 5, 1, 5, 0, false);
+
+            // Hit at position 0 is preserved
+            Object preRerankScore = result.get(0).getField("marqo__pre_rerank_score");
+            assertThat(preRerankScore).isNotNull();
+            assertThat((Double) preRerankScore).isEqualTo(preservedScore);
+        }
+
+        @Test
+        void totalResultCountRespectedWithPreservedAndRerankedHits() {
+            HitGroup hits = createHits(8);
+            Query query = new Query("?q=test");
+            query.properties().set("hits", 6);
+
+            // Preserve first 2, rerank [2,6), limit=6
+            HitGroup result = hybridSearcher.postProcessResults(hits, query, 6, 2, 6, 0, false);
+
+            assertThat(result.size()).isEqualTo(6);
+        }
+    }
+
+    @Nested
     class IdExtractorTest {
         @ParameterizedTest
         @CsvSource(

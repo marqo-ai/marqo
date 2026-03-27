@@ -200,6 +200,75 @@ class TestSearchQuery(unittest.TestCase):
             )
         self.assertIn("rerankDepth cannot be negative", str(cm.exception))
 
+    def test_rerank_depth_start_validation(self):
+        """Test rerankDepthStart validation."""
+        hybrid_parameters = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+        )
+
+        with self.subTest("valid: rerankDepthStart set with rerankDepth for hybrid RRF"):
+            query = SearchQuery(
+                q="test",
+                searchMethod=SearchMethod.HYBRID,
+                hybridParameters=hybrid_parameters,
+                rerankDepthStart=5,
+                rerankDepth=20,
+            )
+            self.assertEqual(query.rerankDepthStart, 5)
+            self.assertEqual(query.rerankDepth, 20)
+
+        with self.subTest("valid: rerankDepthStart=0 is allowed"):
+            query = SearchQuery(
+                q="test",
+                searchMethod=SearchMethod.HYBRID,
+                hybridParameters=hybrid_parameters,
+                rerankDepthStart=0,
+                rerankDepth=20,
+            )
+            self.assertEqual(query.rerankDepthStart, 0)
+
+        with self.subTest("invalid: rerankDepthStart negative"):
+            with self.assertRaises(ValidationError) as cm:
+                SearchQuery(
+                    q="test",
+                    searchMethod=SearchMethod.HYBRID,
+                    hybridParameters=hybrid_parameters,
+                    rerankDepthStart=-1,
+                )
+            self.assertIn("rerankDepthStart cannot be negative", str(cm.exception))
+
+        with self.subTest("invalid: rerankDepthStart >= rerankDepth"):
+            with self.assertRaises(ValidationError) as cm:
+                SearchQuery(
+                    q="test",
+                    searchMethod=SearchMethod.HYBRID,
+                    hybridParameters=hybrid_parameters,
+                    rerankDepthStart=20,
+                    rerankDepth=20,
+                )
+            self.assertIn("rerankDepthStart must be less than rerankDepth", str(cm.exception))
+
+        with self.subTest("invalid: rerankDepthStart > rerankDepth"):
+            with self.assertRaises(ValidationError) as cm:
+                SearchQuery(
+                    q="test",
+                    searchMethod=SearchMethod.HYBRID,
+                    hybridParameters=hybrid_parameters,
+                    rerankDepthStart=25,
+                    rerankDepth=20,
+                )
+            self.assertIn("rerankDepthStart must be less than rerankDepth", str(cm.exception))
+
+        with self.subTest("invalid: rerankDepthStart for LEXICAL search"):
+            with self.assertRaises(ValidationError) as cm:
+                SearchQuery(
+                    q="test",
+                    searchMethod=SearchMethod.LEXICAL,
+                    rerankDepthStart=5,
+                )
+            self.assertIn("'rerankDepthStart' is currently not supported for 'LEXICAL' search method", str(cm.exception))
+
     def test_image_download_headers_validation(self):
         """Test validation of image download headers."""
         # Should fail when both headers are set
