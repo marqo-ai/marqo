@@ -55,7 +55,9 @@ services:
 
   mmc:
     image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/model-management:latest
-    build: ./components/model_management
+    build:
+      context: ./components
+      dockerfile: model_management/Dockerfile
     stdin_open: true
     tty: true
     environment:

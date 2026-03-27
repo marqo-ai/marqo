@@ -441,6 +441,11 @@ wheels = [
 ]
 
 [[package]]
+name = "marqo-common"
+version = "0.1.0"
+source = { editable = "../common" }
+
+[[package]]
 name = "marqo-model-management"
 version = "0.0.1"
 source = { virtual = "." }
@@ -449,6 +454,7 @@ dependencies = [
     { name = "fsspec" },
     { name = "httpx" },
     { name = "jinja2" },
+    { name = "marqo-common" },
     { name = "orjson" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -474,6 +480,7 @@ requires-dist = [
     { name = "fsspec", specifier = ">=2025.9.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "marqo-common", editable = "../common" },
     { name = "orjson", specifier = ">=3.11.3" },
     { name = "pydantic", specifier = ">=2.11.9" },
     { name = "pydantic-settings", specifier = ">=2.10.1" },
