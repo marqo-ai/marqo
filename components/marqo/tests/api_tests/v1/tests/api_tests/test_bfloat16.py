@@ -1,3 +1,4 @@
+import struct
 import uuid
 
 from tests.marqo_test import MarqoTestCase
@@ -71,3 +72,15 @@ class TestBfloat16(MarqoTestCase):
         )
         self.assertEqual("vec_doc1", doc["_id"])
         self.assertIn("_tensor_facets", doc)
+
+        embedding = doc["_tensor_facets"][0]["_embedding"]
+        for val in embedding:
+            self.assertEqual(val, self._float_to_bfloat16(val),
+                             f"Value {val} does not have bfloat16 precision")
+
+    @staticmethod
+    def _float_to_bfloat16(value: float) -> float:
+        """Round-trip a float through bfloat16 precision by truncating the lower 16 bits."""
+        float32_bytes = struct.pack('>f', value)
+        bfloat16_bytes = float32_bytes[:2] + b'\x00\x00'
+        return struct.unpack('>f', bfloat16_bytes)[0]
