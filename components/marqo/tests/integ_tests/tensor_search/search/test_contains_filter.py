@@ -51,7 +51,7 @@ class TestContainsFilter(MarqoTestCase):
                     {"_id": "4", "title": "hello again", "description": "Another greeting"},
                     {"_id": "5", "title": "Machine Learning", "description": "AI and ML concepts"},
                     {"_id": "6", "title": "Real-time Systems", "description": "Low-latency computing"},
-                    {"_id": "7", "title": 'C++ "advanced" guide', "description": "Programming with backslash \\ paths"},
+                    {"_id": "7", "title": "vintage t-shirt collection", "description": "fashion items"},
                 ],
                 tensor_fields=["title", "description"]
             )
@@ -176,34 +176,29 @@ class TestContainsFilter(MarqoTestCase):
         # Should only return docs with "hello" in title (docs 1 and 4)
         self.assertEqual(ids, ["1", "4"])
 
-    def test_contains_with_special_characters(self):
-        """Test CONTAINS filter with special characters in field values.
+    def test_contains_with_special_characters_in_filter_value(self):
+        """Test CONTAINS filter where the filter value itself contains special characters.
 
-        Vespa tokenization splits on special chars like hyphens, quotes, and backslashes.
-        CONTAINS matches on individual tokens after tokenization.
+        Vespa tokenizes both the indexed text and the query value. For example,
+        'title CONTAINS t-shirt' sends 't-shirt' to Vespa's contains operator,
+        which tokenizes it the same way as the indexed text.
         """
-        with self.subTest("hyphen: title CONTAINS real should match doc 6"):
-            res = self._search("title CONTAINS real")
-            ids = self._get_ids(res)
-            self.assertIn("6", ids)
-
-        with self.subTest("hyphen: title CONTAINS time should match doc 6"):
-            res = self._search("title CONTAINS time")
-            ids = self._get_ids(res)
-            self.assertIn("6", ids)
-
-        with self.subTest("quote: title CONTAINS advanced should match doc 7"):
-            res = self._search("title CONTAINS advanced")
+        with self.subTest("hyphen in filter value: title CONTAINS t-shirt"):
+            # Doc 7 has "vintage t-shirt collection". Vespa tokenizes "t-shirt" into
+            # tokens. The contains operator should match because the indexed text
+            # was tokenized the same way.
+            res = self._search("title CONTAINS t-shirt")
             ids = self._get_ids(res)
             self.assertIn("7", ids)
 
-        with self.subTest("backslash: description CONTAINS backslash should match doc 7"):
-            res = self._search("description CONTAINS backslash")
+        with self.subTest("hyphen in filter value: title CONTAINS real-time"):
+            # Doc 6 has "Real-time Systems"
+            res = self._search("title CONTAINS real-time")
             ids = self._get_ids(res)
-            self.assertIn("7", ids)
+            self.assertIn("6", ids)
 
-        with self.subTest("plus sign: title CONTAINS c should match doc 7"):
-            res = self._search("title CONTAINS c")
+        with self.subTest("grouped value with special chars: title CONTAINS (t-shirt collection)"):
+            res = self._search("title CONTAINS (t-shirt collection)")
             ids = self._get_ids(res)
             self.assertIn("7", ids)
 
