@@ -364,6 +364,20 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'CONTAINS with escaped space in value'
             ),
             (
+                'a CONTAINS hel\\"lo',
+                SearchFilter(
+                    ContainsTerm('a', 'hel"lo', 'a CONTAINS hel\\"lo')
+                ),
+                'CONTAINS with escaped double quote in value'
+            ),
+            (
+                'a CONTAINS hel\\\\lo',
+                SearchFilter(
+                    ContainsTerm('a', 'hel\\lo', 'a CONTAINS hel\\\\lo')
+                ),
+                'CONTAINS with escaped backslash in value'
+            ),
+            (
                 '(a CONTAINS hello) OR b:2',
                 SearchFilter(
                     root=Or(

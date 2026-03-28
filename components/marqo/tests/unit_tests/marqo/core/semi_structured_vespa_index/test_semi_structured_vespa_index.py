@@ -91,13 +91,13 @@ class TestSemiStructuredVespaIndex(MarqoTestCase):
     def test_get_filter_string_equality_paths(self):
         """Test equality filter paths: _id, bool, string array, and float numeric."""
         test_cases = [
-            # _id filter (line 441)
+            # _id filter
             ('_id:doc123', 'marqo__id contains "doc123"'),
-            # Bool filter (line 449)
+            # Bool filter
             ('title:true', 'marqo__bool_fields'),
-            # String array filter (line 463)
+            # String array filter
             ('tags:foo', 'marqo__string_array_tags contains "foo"'),
-            # Float numeric filter (line 482)
+            # Float numeric filter
             ('title:3.14', 'marqo__float_fields'),
         ]
 
