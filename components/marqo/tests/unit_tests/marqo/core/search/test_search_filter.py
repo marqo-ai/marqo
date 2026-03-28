@@ -364,6 +364,13 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'CONTAINS with escaped space in value'
             ),
             (
+                'a CONTAINS t-shirt',
+                SearchFilter(
+                    ContainsTerm('a', 't-shirt', 'a CONTAINS t-shirt')
+                ),
+                'CONTAINS with hyphen in value'
+            ),
+            (
                 'a CONTAINS hel\\"lo',
                 SearchFilter(
                     ContainsTerm('a', 'hel"lo', 'a CONTAINS hel\\"lo')
