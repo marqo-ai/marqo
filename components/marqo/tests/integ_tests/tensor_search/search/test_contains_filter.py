@@ -1,6 +1,4 @@
-import os
 import unittest
-from unittest import mock
 
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
@@ -40,11 +38,6 @@ class TestContainsFilter(MarqoTestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        self.device_patcher = mock.patch.dict(os.environ, {
-            "MARQO_BEST_AVAILABLE_DEVICE": "cpu",
-            "MARQO_MAX_CPU_MODEL_MEMORY": "15"
-        })
-        self.device_patcher.start()
 
         # Add test documents
         self.add_documents(
@@ -58,14 +51,11 @@ class TestContainsFilter(MarqoTestCase):
                     {"_id": "4", "title": "hello again", "description": "Another greeting"},
                     {"_id": "5", "title": "Machine Learning", "description": "AI and ML concepts"},
                     {"_id": "6", "title": "Real-time Systems", "description": "Low-latency computing"},
+                    {"_id": "7", "title": 'C++ "advanced" guide', "description": "Programming with backslash \\ paths"},
                 ],
                 tensor_fields=["title", "description"]
             )
         )
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        self.device_patcher.stop()
 
     def _search(self, filter_str, text="", search_method=SearchMethod.TENSOR):
         return tensor_search.search(
@@ -187,21 +177,35 @@ class TestContainsFilter(MarqoTestCase):
         self.assertEqual(ids, ["1", "4"])
 
     def test_contains_with_special_characters(self):
-        """Vespa tokenization splits hyphenated words, so CONTAINS matches individual parts.
+        """Test CONTAINS filter with special characters in field values.
 
-        Doc 6 has title "Real-time Systems". The tokenizer splits "Real-time" into tokens
-        "real" and "time" (lowercased). This test documents that CONTAINS matches on each
-        token independently when special characters like hyphens are present.
+        Vespa tokenization splits on special chars like hyphens, quotes, and backslashes.
+        CONTAINS matches on individual tokens after tokenization.
         """
-        with self.subTest("title CONTAINS real should match doc 6"):
+        with self.subTest("hyphen: title CONTAINS real should match doc 6"):
             res = self._search("title CONTAINS real")
             ids = self._get_ids(res)
             self.assertIn("6", ids)
 
-        with self.subTest("title CONTAINS time should match doc 6"):
+        with self.subTest("hyphen: title CONTAINS time should match doc 6"):
             res = self._search("title CONTAINS time")
             ids = self._get_ids(res)
             self.assertIn("6", ids)
+
+        with self.subTest("quote: title CONTAINS advanced should match doc 7"):
+            res = self._search("title CONTAINS advanced")
+            ids = self._get_ids(res)
+            self.assertIn("7", ids)
+
+        with self.subTest("backslash: description CONTAINS backslash should match doc 7"):
+            res = self._search("description CONTAINS backslash")
+            ids = self._get_ids(res)
+            self.assertIn("7", ids)
+
+        with self.subTest("plus sign: title CONTAINS c should match doc 7"):
+            res = self._search("title CONTAINS c")
+            ids = self._get_ids(res)
+            self.assertIn("7", ids)
 
     def test_structured_index_contains_raises_error(self):
         """Using CONTAINS on a structured index should raise InvalidArgumentError."""
