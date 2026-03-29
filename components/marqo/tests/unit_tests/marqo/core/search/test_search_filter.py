@@ -459,6 +459,9 @@ class TestMarqoFilterStringParser(MarqoTestCase):
             ('a IN (1, 2, 3))', 'Unexpected )', 'extra parenthesis in IN term'),
             ('a IN (val1, val 2, val3)', 'Unexpected white space', 'ungrouped space in IN term'),
             ('a IN 1, 2, 3)', 'Expected (', 'IN term with no opening parenthesis'),
+
+            # Contains term tests
+            ('a CONTAINS [1 TO 10]', 'Unexpected [ after CONTAINS operator', 'RANGE in CONTAINS term'),
         ]
 
         for filter_string, expected_error_msg, msg in test_cases:
