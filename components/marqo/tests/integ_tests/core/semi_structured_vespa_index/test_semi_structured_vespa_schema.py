@@ -1,4 +1,5 @@
 import os
+import re
 from typing import cast
 
 from marqo.core.models.marqo_index import *
@@ -18,6 +19,15 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
     def _remove_empty_lines_in_schema(self, schema: str) -> str:
         return '\n'.join([line for line in schema.splitlines() if line.strip()])
+
+    def _remove_whitespace_in_schema(self, schema: str) -> str:
+        """Normalize whitespace so schema comparison is independent of indentation/spacing."""
+        chars = re.escape('{}=+-<>():,;[]|')
+        pattern = rf"(\s*([{chars}])\s*)"
+        schema = re.sub(pattern, r"\2", schema)
+        schema = re.sub(r' +', ' ', schema)
+        schema = re.sub(r'^\s+', '', schema, flags=re.MULTILINE)
+        return schema
 
     def test_semi_structured_index_schema_random_model(self):
         test_cases = [
@@ -50,8 +60,8 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
                 self.maxDiff = None
                 self.assertEqual(
-                    self._remove_empty_lines_in_schema(expected_schema),
-                    self._remove_empty_lines_in_schema(generated_schema)
+                    self._remove_whitespace_in_schema(expected_schema),
+                    self._remove_whitespace_in_schema(generated_schema)
                 )
 
     def test_semi_structured_index_schema_with_collapse_field(self):
@@ -74,8 +84,8 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
         self.maxDiff = None
         self.assertEqual(
-            self._remove_empty_lines_in_schema(expected_schema),
-            self._remove_empty_lines_in_schema(generated_schema)
+            self._remove_whitespace_in_schema(expected_schema),
+            self._remove_whitespace_in_schema(generated_schema)
         )
 
     def test_semi_structured_index_schema_with_pre_2_16(self):
@@ -118,12 +128,36 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
                 self.maxDiff = None
                 self.assertEqual(
-                    self._remove_empty_lines_in_schema(expected_schema),
-                    self._remove_empty_lines_in_schema(generated_schema)
+                    self._remove_whitespace_in_schema(expected_schema),
+                    self._remove_whitespace_in_schema(generated_schema)
                 )
 
                 # Verify the version was used in the index
                 self.assertEqual("2.15.0", marqo_index.marqo_version)
+
+    def test_semi_structured_index_schema_all_distance_metrics(self):
+        """Semi-structured Vespa schema generation for each distance metric (2 lexical + 2 tensor fields)."""
+        lexical_fields = ['text_field1', 'text_field2']
+        tensor_fields = ['tensor_field1', 'tensor_field2']
+
+        for distance_metric in DistanceMetric:
+            with self.subTest(f"Semi-structured index with distance metric: {distance_metric.value}"):
+                test_marqo_index_request = self.unstructured_marqo_index_request(
+                    name="test_semi_structured_schema",
+                    hnsw_config=HnswConfig(ef_construction=512, m=16),
+                    distance_metric=distance_metric,
+                )
+                _, index = SemiStructuredVespaSchema(test_marqo_index_request).generate_schema()
+                marqo_index = self._populate_fields(index, lexical_fields, tensor_fields)
+                generated_schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+                expected_schema = self._read_schema_from_file(
+                    f'test_schemas/semi_structured_vespa_index_schema_distance_metric_{distance_metric.value}.sd'
+                )
+                self.maxDiff = None
+                self.assertEqual(
+                    self._remove_whitespace_in_schema(expected_schema),
+                    self._remove_whitespace_in_schema(generated_schema),
+                )
 
     def _populate_fields(self, index, lexical_fields, tensor_fields, string_array_fields=None):
         marqo_index = cast(SemiStructuredMarqoIndex, index)

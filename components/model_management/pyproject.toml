@@ -15,6 +15,7 @@ dependencies = [
     "s3fs>=2025.9.0",
     "tqdm>=4.67.1",
     "uvicorn>=0.35.0",
+    "marqo-common",
 ]
 
 [dependency-groups]
@@ -46,6 +47,9 @@ source = [
     "src/",
     "*/marqo/components/model_management/src/",
 ]
+
+[tool.uv.sources]
+marqo-common = {path = "../common", editable = true}
 
 [tool.coverage.report]
 exclude_lines = [

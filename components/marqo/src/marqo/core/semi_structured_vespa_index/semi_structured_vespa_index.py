@@ -1,12 +1,13 @@
-from typing import Dict, Any, List, Optional, Type, Union, cast, Tuple
+from typing import Dict, Any, List, Optional, Type, Union, cast, Tuple, Set
 
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import RetrievalMethod
-from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
+from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod
+from marqo.core.models.custom_score_rerank import ParsedCustomScoreKey
+from marqo.core.models.marqo_index import DistanceMetric, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.search import search_filter
 from marqo.core.semi_structured_vespa_index import common
@@ -20,7 +21,10 @@ from marqo.core.structured_vespa_index.structured_vespa_index import StructuredV
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
+from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
@@ -33,6 +37,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     TODO the multi-inheritance makes the implementation difficult to reason about. Consider refactor to composition
       instead. e.g. extract different logics to different query component builders, and combined the result.
     """
+
     index_supports_partial_updates: bool = False
 
     def __init__(self, marqo_index: SemiStructuredMarqoIndex):
@@ -107,10 +112,547 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
 
+    # --- Custom score rerank support: duplicated from structured (to be deprecated) ---
+
+    def _get_individual_field_tensor_search_terms(self, marqo_query: MarqoTensorQuery) -> List[str]:
+        """Creates YQL tensor term per field from marqo_query; includes targetHits/approximate/hnsw options."""
+        if isinstance(marqo_query, MarqoHybridQuery):
+            attrs = marqo_query.hybrid_parameters.searchableAttributesTensor
+            fields_to_search = (
+                [f for f in attrs if f in self._marqo_index.tensor_field_map]
+                if attrs is not None
+                else list(self._marqo_index.tensor_field_map.keys())
+            )
+        else:
+            attrs = marqo_query.searchable_attributes
+            fields_to_search = (
+                [f for f in attrs if f in self._marqo_index.tensor_field_map]
+                if attrs is not None
+                else list(self._marqo_index.tensor_field_map.keys())
+            )
+
+        if marqo_query.rerank_depth_tensor is not None:
+            rerank_depth = max(marqo_query.rerank_depth_tensor, marqo_query.limit + marqo_query.offset)
+        else:
+            rerank_depth = marqo_query.limit + marqo_query.offset
+
+        if marqo_query.ef_search is not None:
+            rerank_depth = min(rerank_depth, marqo_query.ef_search)
+        else:
+            marqo_query.ef_search = max(
+                utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_DEFAULT_EF_SEARCH),
+                marqo_query.limit + marqo_query.offset
+            )
+        additional_hits = max(marqo_query.ef_search - rerank_depth, 0)
+
+        terms = []
+        for field in fields_to_search:
+            tensor_field = self._marqo_index.tensor_field_map[field]
+            embedding_field_name = tensor_field.embeddings_field_name
+            terms.append(
+                f'('
+                f'{{'
+                f'targetHits:{rerank_depth}, '
+                f'approximate:{str(marqo_query.approximate)}, '
+                f'hnsw.exploreAdditionalHits:{additional_hits}'
+                f'}}'
+                f'nearestNeighbor({embedding_field_name}, {common.QUERY_INPUT_EMBEDDING})'
+                f')'
+            )
+        return terms
+
+    def _generate_or_terms(
+        self,
+        marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery],
+        is_facets_term: bool = False,
+        is_ranking_term: bool = False,
+        attributes_to_search: Optional[List[str]] = None,
+    ) -> str:
+        """Generate the OR/weakAnd terms for the lexical search term."""
+        if not marqo_query.or_phrases:
+            return ''
+
+        if isinstance(marqo_query, MarqoHybridQuery):
+            score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
+            rerank_depth_lexical: Optional[int] = marqo_query.hybrid_parameters.rerankDepthLexical
+        else:
+            score_modifiers = marqo_query.score_modifiers
+            rerank_depth_lexical = None
+
+        if rerank_depth_lexical is not None:
+            rerank_depth_lexical = max(marqo_query.limit + marqo_query.offset, rerank_depth_lexical)
+
+        terms = [
+            self._get_lexical_contains_term(
+                phrase,
+                query=None if is_ranking_term else marqo_query,
+                attributes_to_search=attributes_to_search if is_ranking_term else None,
+                is_ranking_term=is_ranking_term,
+            )
+            for phrase in marqo_query.or_phrases
+        ]
+
+        # Avoid invalid YQL (e.g. weakAnd(, , ...)) when all terms are empty (e.g. no attrs survived).
+        if is_ranking_term and terms and not any(terms):
+            return ""
+
+        if is_facets_term:
+            return ' OR '.join(terms)
+        if is_ranking_term:
+            return f'weakAnd({", ".join(terms)})'
+        if rerank_depth_lexical is not None:
+            if rerank_depth_lexical <= 0:
+                raise InternalError('RerankDepthLexical is less than or equal to 0 in _get_lexical_search_term')
+            return f'{{targetHits:{rerank_depth_lexical}}}weakAnd({", ".join(terms)})'
+        if score_modifiers:
+            return ' OR '.join(terms)
+        return f'weakAnd({", ".join(terms)})'
+
+    def _get_lexical_search_term(
+        self,
+        marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery],
+        is_facets_term: bool = False,
+        is_ranking_term: bool = False,
+        attributes_to_search: Optional[List[str]] = None,
+    ) -> str:
+        """
+        Builds a lexical YQL search term for a query. It has an OR-query part (optional phrases)
+        plus an optional AND (required phrases).
+
+        Used in 2 scenarios:
+        1. Retrieval lexical term (is_ranking_term=False, most common use case)
+            - Uses marqo_query object and its searchable_attributes (if any).
+        2. Ranking lexical term (is_ranking_term=True)
+            - Uses given attributes_to_search, ignoring query-specified attributes. These attributes are determined by
+            user-input custom score rerank fields. Ranking terms do NOT fetch all scores, only those specified in
+            attributes_to_search.
+
+        Rules:
+        - Empty query → `false`; 
+        - OR-only `["*"]` with no AND → `true`
+        - OR phrases become weakAnd/OR (via ``_generate_or_terms``);
+        - AND phrases are joined with AND; each is a contains expression over lexical fields.
+        - For ranking terms: we attributes_to_search instead of marqo_query: if none of those fields are
+          lexically searchable, return `""` and SKIP OR/AND statement creation.
+        """
+        if not marqo_query.or_phrases and not marqo_query.and_phrases:
+            return 'false'
+        if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
+            return 'true'
+
+        # When building a ranking term, if no attributes survive filtering, return "" without building OR/AND statements.
+        if is_ranking_term and attributes_to_search is not None and attributes_to_search != ["*"]:
+            searchable = [
+                f for f in attributes_to_search
+                if f in self._marqo_index.field_map
+                and self._marqo_index.field_map[f].lexical_field_name is not None
+            ]
+            if not searchable:
+                return ""
+
+        or_terms = self._generate_or_terms(
+            marqo_query,
+            is_facets_term=is_facets_term,
+            is_ranking_term=is_ranking_term,
+            attributes_to_search=attributes_to_search,
+        )
+        if marqo_query.and_phrases:
+            and_terms = ' AND '.join([
+                self._get_lexical_contains_term(
+                    phrase,
+                    query=None if is_ranking_term else marqo_query,
+                    attributes_to_search=attributes_to_search if is_ranking_term else None,
+                    is_ranking_term=is_ranking_term,
+                )
+                for phrase in marqo_query.and_phrases
+            ])
+            if or_terms:
+                or_terms = f'({or_terms})'
+                and_terms = f' AND ({and_terms})'
+        else:
+            and_terms = ''
+        return f'{or_terms}{and_terms}'
+
+    def _get_lexical_contains_term(
+        self,
+        phrase: str,
+        query: Optional[MarqoQuery] = None,
+        attributes_to_search: Optional[List[str]] = None,
+        is_ranking_term: bool = False,
+    ) -> str:
+        """Build a single YQL contains expression for the given phrase."""
+        if is_ranking_term:
+            if attributes_to_search == ["*"]:
+                return f'default contains "{phrase}"'
+            searchable_attributes = [
+                f for f in (attributes_to_search or [])
+                if f in self._marqo_index.field_map
+                and self._marqo_index.field_map[f].lexical_field_name is not None
+            ]
+            if not searchable_attributes:
+                return ""
+            return "(" + " OR ".join([
+                f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
+                for field in searchable_attributes
+            ]) + ")"
+        if isinstance(query, MarqoHybridQuery):
+            searchable_attributes = query.hybrid_parameters.searchableAttributesLexical
+        else:
+            searchable_attributes = query.searchable_attributes if query else None
+        if searchable_attributes is not None:
+            return "(" + " OR ".join([
+                f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
+                for field in searchable_attributes
+            ]) + ")"
+        return f'default contains "{phrase}"'
+
+    def _filter_applicable_custom_score_keys(self, custom_score_keys: Set[str]) -> Set[str]:
+        """
+        Subset of ``custom_score_keys`` that should be sent to Vespa for this index.
+
+        Keys are **internal rerank keys** (suffix after ``marqo__score_``), i.e. the same dict keys
+        produced by ``_convert_hybrid_global_score_modifiers_to_tensors`` for ``custom_score_rerank``
+        (the ``marqo__score_`` prefix is stripped only in that method).
+
+        **Rules:** Per-field BM25/closeness keys and any key we cannot parse are kept (parse
+        failure is conservative: still send to Vespa). BM25 aggregate keys (``bm25_sum`` / max /
+        avg) are omitted when the index has no lexically searchable fields; closeness aggregate
+        keys are omitted when the index has no tensor fields—those aggregates would be meaningless.
+        """
+        applicable: Set[str] = set()
+        for key in custom_score_keys:
+            parsed = ParsedCustomScoreKey.parse(key)
+            if parsed is None:
+                applicable.add(key)
+                continue
+            # Aggregate keys are only applicable if the index has lexical/tensor fields respectively
+            if parsed.score_type == "bm25" and parsed.aggregate_type is not None:
+                if self._marqo_index.lexically_searchable_fields_names:
+                    applicable.add(key)
+            elif parsed.score_type == "closeness_retrieval_vector" and parsed.aggregate_type is not None:
+                if self._marqo_index.tensor_field_map:
+                    applicable.add(key)
+            else:
+                applicable.add(key)
+        return applicable
+
+    def _validate_custom_score_modifier_fields(self, custom_score_keys: Set[str]) -> None:
+        """
+        Validate custom score keys (internal suffix keys; see ``_filter_applicable_custom_score_keys``).
+        """
+        has_closeness = False
+        for key in custom_score_keys:
+            parsed = ParsedCustomScoreKey.parse(key)
+            if parsed is None:
+                continue
+            if parsed.score_type == "closeness_retrieval_vector":
+                has_closeness = True
+                break
+        if has_closeness and self._marqo_index.distance_metric == DistanceMetric.Geodegrees:
+            raise InvalidArgumentError(
+                "Custom score reranking with closeness_retrieval_vector is not supported for indexes using the "
+                "geodegrees distance metric. Use a different distance metric (e.g. angular, euclidean, dotproduct) "
+                "for the index if you need closeness-based score modifiers."
+            )
+        # BM25 aggregate with no lexical fields and closeness aggregate with no tensor fields are
+        # filtered out by _filter_applicable_custom_score_keys before validation; no error here.
+        # Per-field keys that reference non-existent fields are allowed: the searcher treats
+        # missing summary-features as no contribution (add 0, multiply by 1), so score is unchanged.
+
+    def _get_fields_to_bm25_rerank_by(self, custom_score_keys: Set[str]) -> List[str]:
+        """Return Marqo field names for BM25 custom rerank (or ['*'] for aggregate). Keys: internal suffix only."""
+        has_aggregate = False
+        fields: Set[str] = set()
+        for key in custom_score_keys:
+            parsed = ParsedCustomScoreKey.parse(key)
+            if parsed is None:
+                continue
+            if parsed.score_type == "bm25":
+                if parsed.aggregate_type is not None:
+                    has_aggregate = True
+                    break
+                if parsed.field_name is not None and parsed.field_name in self._marqo_index.field_map:
+                    lex = self._marqo_index.field_map[parsed.field_name].lexical_field_name
+                    if lex is not None:
+                        fields.add(parsed.field_name)
+        if has_aggregate:
+            return ["*"]
+        return sorted(fields)
+
+    def _simplify_bm25_extra_fields_for_rank(
+        self,
+        bm25_fields: List[str],
+        main_lexical_searchable_attributes: Optional[List[str]],
+    ) -> List[str]:
+        """Remove redundancy between main lexical term and BM25 extra term for rank()."""
+        if not bm25_fields:
+            return []
+        # When main lexical attrs is None, the main term is "default contains ..." (all fields).
+        # No extra BM25 rank term is needed; the main term already covers all lexical fields.
+        if main_lexical_searchable_attributes is None:
+            return []
+        if bm25_fields == ["*"]:
+            return ["*"]
+        main_set = set(main_lexical_searchable_attributes)
+        return [f for f in bm25_fields if f not in main_set]
+
+    def _get_fields_to_closeness_rerank_by(self, custom_score_keys: Set[str]) -> List[str]:
+        """Return Marqo tensor field names for closeness custom rerank (or all tensor fields for aggregate). Keys: internal suffix only."""
+        has_aggregate = False
+        fields: Set[str] = set()
+        for key in custom_score_keys:
+            parsed = ParsedCustomScoreKey.parse(key)
+            if parsed is None:
+                continue
+            if parsed.score_type == "closeness_retrieval_vector":
+                if parsed.aggregate_type is not None:
+                    has_aggregate = True
+                    break
+                if parsed.field_name is not None and parsed.field_name in self._marqo_index.tensor_field_map:
+                    fields.add(parsed.field_name)
+        if has_aggregate:
+            return list(self._marqo_index.tensor_field_map.keys())
+        return sorted(fields)
+
+    def _append_custom_score_rerank_terms(
+        self,
+        marqo_query: MarqoHybridQuery,
+        lexical_term: str,
+        tensor_term: str,
+        custom_score_keys: Set[str],
+    ) -> Tuple[str, str]:
+        """
+        ``custom_score_keys``: internal suffix keys (same as ``_filter_applicable_custom_score_keys``).
+
+        When custom score rerank is used with RRF ranking, append extra BM25 rank terms so that
+        the lexical and tensor retrievers can emit bm25 scores for custom-score fields.
+
+        - Lexical retriever: we add an extra rank(..., extra_bm25_term) so that BM25 is computed
+          for any custom-score BM25 fields that are not already covered by the main lexical term.
+          Fields already in the main lexical search are omitted to avoid duplicate scoring.
+        - Tensor retriever: we add an extra rank(..., extra_bm25_term) so that BM25 is computed
+          for all custom-score BM25 fields (there is no main lexical term to dedupe against).
+
+        If there are no custom score keys or ranking is not RRF, returns (lexical_term, tensor_term)
+        unchanged.
+        """
+        if not custom_score_keys or marqo_query.hybrid_parameters.rankingMethod != RankingMethod.RRF:
+            return (lexical_term, tensor_term)
+        bm25_fields = self._get_fields_to_bm25_rerank_by(custom_score_keys)
+        main_lexical_attrs = marqo_query.hybrid_parameters.searchableAttributesLexical
+        simplified_lexical = self._simplify_bm25_extra_fields_for_rank(bm25_fields, main_lexical_attrs)
+        simplified_tensor = bm25_fields  # tensor retriever has no main lexical term to dedupe against
+
+        extra_bm25_term_for_lexical = ""
+        if simplified_lexical:
+            extra_bm25_term_for_lexical = self._get_lexical_search_term(
+                marqo_query,
+                is_ranking_term=True,
+                attributes_to_search=simplified_lexical,
+            )
+        if extra_bm25_term_for_lexical:
+            lexical_term = f'rank({lexical_term}, {extra_bm25_term_for_lexical})'
+
+        extra_bm25_term_for_tensor = ""
+        if bm25_fields:
+            extra_bm25_term_for_tensor = self._get_lexical_search_term(
+                marqo_query,
+                is_ranking_term=True,
+                attributes_to_search=simplified_tensor,
+            )
+        if extra_bm25_term_for_tensor:
+            tensor_term = f'rank({tensor_term}, {extra_bm25_term_for_tensor})'
+
+        return (lexical_term, tensor_term)
+
+    def _get_base_vespa_hybrid_query(self, marqo_query):
+        """
+        Construct and return vespa hybrid query that includes the lexical & tensor subqueries, global score modifiers,
+        relevance cut off, custom score rerankers.
+
+        It does NOT include facets, sort by and collapse related query parameters yet.
+        Refactor of StructuredVespaIndex._to_vespa_hybrid_query, as StructuredVespaIndex will be deprecated.
+        """
+
+        # Tensor term
+        fields_to_search_tensor = self._get_tensor_fields_to_search(
+            searchable_attributes=marqo_query.hybrid_parameters.searchableAttributesTensor
+        )
+        tensor_term = "False"
+        if fields_to_search_tensor:
+            marqo_query.rerank_depth_tensor = marqo_query.hybrid_parameters.rerankDepthTensor
+            tensor_term = self._get_tensor_search_term(marqo_query)
+
+        # Lexical term
+        fields_to_search_lexical = self._get_lexical_fields_to_search(
+            searchable_attributes=marqo_query.hybrid_parameters.searchableAttributesLexical
+        )
+        lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search_lexical else "False"
+
+        # If retrieval and ranking methods are opposite (lexical/tensor), use the rank() operator
+        if (marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and
+                marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Tensor):
+            individual_tensor_terms = self._get_individual_field_tensor_search_terms(marqo_query)
+            lexical_term = f'rank({lexical_term}, {",".join(individual_tensor_terms)})'
+
+        elif (marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor and
+              marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical):
+            tensor_term = f'rank({tensor_term}, {lexical_term})'
+
+        # Filter term
+        filter_term = self._get_filter_term(marqo_query)
+        collapse_filter = marqo_query.collapse.sort_by.get_collapse_sort_by_filter_string() if marqo_query.collapse and marqo_query.collapse.sort_by else None
+        parts = [f'({p})' for p in [collapse_filter, filter_term] if p]
+        filter_term = (' AND ' + ' AND '.join(parts)) if parts else ''
+
+        select_attributes = self._get_select_attributes(marqo_query)
+        summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
+
+        # Base lexical YQL without custom-score extra rank() terms. Used for relevance-cutoff probe only.
+        lexical_yql_for_probe = (
+            f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
+        )
+
+        # Assign parameters to query
+        query_inputs = {
+            common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
+        }
+
+        # Separate fields to rank (lexical and tensor)
+        query_inputs.update({
+            common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {
+                f: 1 for f in fields_to_search_lexical
+            },
+            common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {
+                f: 1 for f in fields_to_search_tensor
+            }
+        })
+
+        """
+		# TODO: implement this if no longer using custom searcher for lexical/tensor and tensor/lexical
+		query_inputs.update({
+			f: 1 for f in fields_to_search_lexical
+		})
+		query_inputs.update({
+			f: 1 for f in fields_to_search_tensor
+		})
+		"""
+
+        # Extract score modifiers
+        hybrid_score_modifiers = self._get_hybrid_score_modifiers(marqo_query)
+        if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL]:
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL])
+        if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR]:
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR])
+        if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS])
+
+        # Add custom score rerank support for semi-structured indexes.
+        custom_score_keys: Set[str] = set()
+        applicable_custom_score_keys: Set[str] = set()
+        custom_score_rerank = hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)
+
+        # Calculate new terms for tensor and lexical retrievers
+        if custom_score_rerank:
+            mult_key = constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL
+            add_key = constants.QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL
+            # Keys are suffix after marqo__score_ (see _convert_hybrid_global_score_modifiers_to_tensors)
+            custom_score_keys = set(custom_score_rerank.get(mult_key, {}).keys()) | set(
+                custom_score_rerank.get(add_key, {}).keys()
+            )
+            # Ignore BM25 aggregate when no lexical fields and closeness aggregate when no tensor fields
+            applicable_custom_score_keys = self._filter_applicable_custom_score_keys(custom_score_keys)
+            query_inputs[mult_key] = {
+                k: v for k, v in custom_score_rerank.get(mult_key, {}).items()
+                if k in applicable_custom_score_keys
+            }
+            query_inputs[add_key] = {
+                k: v for k, v in custom_score_rerank.get(add_key, {}).items()
+                if k in applicable_custom_score_keys
+            }
+            if applicable_custom_score_keys:
+                self._validate_custom_score_modifier_fields(applicable_custom_score_keys)
+
+            lexical_term, tensor_term = self._append_custom_score_rerank_terms(
+                marqo_query, lexical_term, tensor_term, applicable_custom_score_keys
+            )
+
+        # When custom score rerank is used with attributes_to_retrieve, sub-query hits must include
+        # summaryfeatures (bm25, ranking_closeness_metric_*) or else these will be unavailable in the global step.
+        select_for_hybrid_yql = select_attributes
+        if applicable_custom_score_keys and marqo_query.attributes_to_retrieve is not None:
+            select_for_hybrid_yql = select_attributes + ', summaryfeatures'
+
+        tensor_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
+        lexical_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
+
+        query = {
+            'searchChain': 'marqo',
+            'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
+            'ranking': common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
+            'ranking.rerankCount': marqo_query.hybrid_parameters.rerankCount if \
+                marqo_query.hybrid_parameters.rerankCount else marqo_query.limit + marqo_query.offset,
+            # limits the number of results going to phase 2
+
+            'model_restrict': self._marqo_index.schema_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'ranking.matching.approximateThreshold': marqo_query.approximate_threshold,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'language': marqo_query.language,
+
+            # Custom searcher parameters
+            'marqo__yql.tensor': None if (
+                    marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical
+                    and
+                    marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
+            ) else tensor_yql,
+            'marqo__yql.lexical': lexical_yql,
+
+            'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
+            'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
+            'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
+            'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
+
+            'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
+            'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
+            'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose,
+
+        }
+
+        query = {k: v for k, v in query.items() if v is not None}
+
+        # When relevance cutoff is used, send a separate probe lexical YQL without custom-score
+        # extra rank() terms so the probe is unchanged by custom score rerank.
+        if getattr(marqo_query, "relevance_cutoff", None) is not None:
+            query["marqo__yql.lexical.probe"] = lexical_yql_for_probe
+
+        if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
+            query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
+            query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
+
+        if marqo_query.global_rerank_depth is not None:
+            query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
+
+        # Tell the custom searcher what type of custom score reranking will be done
+        if applicable_custom_score_keys:
+            has_bm25 = bool(self._get_fields_to_bm25_rerank_by(applicable_custom_score_keys))
+            has_closeness = bool(self._get_fields_to_closeness_rerank_by(applicable_custom_score_keys))
+            if has_closeness:
+                query["marqo__hasRankingVector"] = True
+                # Pass distance metric so searcher can min-max normalize only for dot product (others are already [0,1] in rank profile)
+                query["marqo__custom_score_closeness_distance_metric"] = (
+                    self._marqo_index.distance_metric.value
+                )
+            if has_bm25:
+                query["marqo__hasRankingLexical"] = True
+
+        return query
+
     def _to_vespa_hybrid_query(self, marqo_query):
-        # get base query from parents
-        # TODO we will need a refactoring to duplicate this
-        query = StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)
+        # get base query
+        query = self._get_base_vespa_hybrid_query(marqo_query)
 
         # add facets query
         if marqo_query.facets or marqo_query.track_total_hits:

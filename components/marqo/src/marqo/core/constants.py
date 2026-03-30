@@ -18,6 +18,7 @@ MARQO_SEARCH_METHOD_LEXICAL = 'lexical'
 MARQO_DOC_HYBRID_TENSOR_SCORE = '_tensor_score'
 MARQO_DOC_HYBRID_LEXICAL_SCORE = '_lexical_score'
 MARQO_DOC_RECENCY_SCORE = '_recency_score'
+MARQO_DOC_PRE_RERANK_SCORE = '_pre_rerank_score'
 
 MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse('2.10.0')
 MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse('2.11.0')
@@ -37,6 +38,7 @@ MARQO_RECENCY_SCORING_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.8')
 MARQO_RECENCY_ADDITIVE_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.9')
 MARQO_SECOND_PHASE_LEXICAL_SCORE_MODIFIERS_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.11')
 MARQO_COLLAPSE_SORT_BY_MINIMUM_VERSION = semver.VersionInfo.parse('2.24.13')
+MARQO_CUSTOM_SCORE_RERANKERS_MINIMUM_VERSION = semver.VersionInfo.parse('2.26.0')
 
 # For score modifiers
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9 = 'marqo__mult_weights'
@@ -46,8 +48,12 @@ QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL = 'marqo__add_weights_lexical'
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR = 'marqo__mult_weights_tensor'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR = 'marqo__add_weights_tensor'
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL = 'marqo__mult_weights_global'
+QUERY_INPUT_CUSTOM_SCORE_RERANK_ADD_WEIGHTS_GLOBAL = 'marqo__custom_score_add_weights_global'
+QUERY_INPUT_CUSTOM_SCORE_RERANK_MULT_WEIGHTS_GLOBAL = 'marqo__custom_score_mult_weights_global'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL = 'marqo__add_weights_global'
 MARQO_GLOBAL_SCORE_MODIFIERS = 'global'
+MARQO_CUSTOM_SCORE_RERANK_MODIFIERS = 'custom_score_rerank'
+MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX = "marqo__score_"
 
 # For recency scoring
 QUERY_INPUT_RECENCY_SHOULD_CALCULATE_SCORE = 'marqo__recency_should_calculate_score'

@@ -164,6 +164,10 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__recency_grow_from) double: 0.5
 
             query(marqo__collapse_sort_weights) tensor<double>(p{})
+            
+            # Custom Score Global Reranking
+            query(marqo__custom_score_mult_weights_global) tensor<double>(p{})
+            query(marqo__custom_score_add_weights_global) tensor<double>(p{})
         }
 
         # ============ RECENCY SCORING FUNCTIONS ============
@@ -330,6 +334,19 @@ schema marqo__test_00semi_00structured_00schema {
             sort_field_value_2
             recency_score
             collapse_field_hash
+
+        }
+        function ranking_closeness_metric_tensor_field1() {
+            expression: reduce(1.0 / (2.0 - cosine_similarity(attribute(marqo__embeddings_tensor_field1), query(marqo__query_embedding), x)), sum)
+        }
+        function ranking_closeness_metric_tensor_field2() {
+            expression: reduce(1.0 / (2.0 - cosine_similarity(attribute(marqo__embeddings_tensor_field2), query(marqo__query_embedding), x)), sum)
+        }
+        summary-features {
+            ranking_closeness_metric_tensor_field1
+            ranking_closeness_metric_tensor_field2
+            bm25(marqo__lexical_text_field1)
+            bm25(marqo__lexical_text_field2)
         }
     }
 
@@ -428,6 +445,10 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__recency_grow_from) double: 0.5
 
             query(marqo__collapse_sort_weights) tensor<double>(p{})
+            
+            # Custom Score Global Reranking
+            query(marqo__custom_score_mult_weights_global) tensor<double>(p{})
+            query(marqo__custom_score_add_weights_global) tensor<double>(p{})
         }
     }
 
@@ -502,6 +523,10 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__embeddings_tensor_field1 type tensor<float>(p{}, x[32]) {}
         summary marqo__chunks_tensor_field2 type array<string> {}
         summary marqo__embeddings_tensor_field2 type tensor<float>(p{}, x[32]) {}
+    }
+
+    document-summary dummy-light-summary {
+        summary marqo__id type string {}
     }
 
     document-summary collapse-minimal-summary {
