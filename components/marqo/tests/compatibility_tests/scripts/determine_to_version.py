@@ -3,6 +3,7 @@ import subprocess
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../common/src'))
 from marqo.version import __version__
 import semver
 
