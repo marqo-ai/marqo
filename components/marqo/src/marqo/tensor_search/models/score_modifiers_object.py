@@ -6,6 +6,7 @@ from pydantic.v1 import BaseModel, validator, ValidationError
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.api.exceptions import InvalidArgError
 from marqo import marqo_docs
+from marqo.core.constants import MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX
 
 class ScoreModifierValidationError(InvalidArgError):
     def __init__(self, modifier: Dict[str, Any], message: str, link: str = None):
@@ -77,3 +78,11 @@ class ScoreModifierLists(BaseModel):
         ) for x in self.add_to_score] if self.add_to_score is not None else []
 
         return mult + add
+
+    @property
+    def uses_custom_score_rerank(self) -> bool:
+        """True if any modifier uses custom score reranking (field name starts with marqo__score_)."""
+        return any(
+            m.field.startswith(MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX)
+            for m in self.to_marqo_score_modifiers()
+        )
