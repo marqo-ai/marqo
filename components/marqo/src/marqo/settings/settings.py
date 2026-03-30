@@ -21,7 +21,8 @@ class Settings(BaseSettings):
 
     marqo_max_in_filter_ids: int = Field(
         10000, alias="MARQO_MAX_IN_FILTER_IDS", description=
-        "Maximum number of IDs allowed in a single _id IN(...) filter expression."
+        "Maximum number of IDs allowed in a single _id IN(...) filter expression.",
+        ge=0
     )
 
     @field_validator("marqo_default_models_s3_bucket")
@@ -33,12 +34,6 @@ class Settings(BaseSettings):
             value = "s3://" + value
         # Remove trailing slashes from the path portion only, preserving the s3:// prefix
         value = "s3://" + value[len("s3://"):].rstrip("/")
-        return value
-
-    @field_validator("marqo_max_in_filter_ids")
-    def validate_marqo_max_in_filter_ids(cls, value):
-        if value < 0:
-            raise ValueError("MARQO_MAX_IN_FILTER_IDS must be an integer >= 0.")
         return value
 
 

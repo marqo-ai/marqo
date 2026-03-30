@@ -315,15 +315,16 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
 
     @pytest.mark.skip_for_multinode
     def test_id_in_with_facets_exclude_terms(self):
-        """_id IN filter works with facets and excludeTerms.
+        """_id IN filter works with facets and excludeTerms on the IN statement.
 
         The filter restricts hits to doc_0 and doc_10 (both cat_0).
-        excludeTerms removes the category:cat_0 restriction from the facet scope,
-        so facets count all three docs in the IN list (doc_0, doc_1, doc_10).
+        excludeTerms removes the _id IN restriction from the facet scope,
+        so facets count all docs matching category:cat_0 across the full index
+        (1000 docs — one per every 10 of the 10,000 inserted docs).
         """
         filter_str = "_id IN (doc_0, doc_1, doc_10) AND category:cat_0"
         facets = FacetsParameters(fields={"category": FieldFacetsConfiguration(
-            type="string", excludeTerms=["category:cat_0"]
+            type="string", excludeTerms=["_id IN (doc_0,doc_1,doc_10)"]
         )})
 
         res = tensor_search.search(
@@ -338,13 +339,13 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
             )
         )
 
-        # Hits are filtered by the full filter (including category:cat_0)
+        # Hits are filtered by the full filter (IN list AND category:cat_0)
         result_ids = {hit["_id"] for hit in res["hits"]}
         self.assertEqual({"doc_0", "doc_10"}, result_ids)
 
-        # Facets are computed without the category:cat_0 restriction (excludeTerms removed it),
-        # so all three IN-list docs are counted across their categories.
+        # Facets are computed without the _id IN restriction (excludeTerms removed it),
+        # so the facet scope is just category:cat_0 across all 10,000 docs → 1000 matches.
         self.assertDictEqual(
-            {"category": {"cat_0": {"count": 2}, "cat_1": {"count": 1}}},
+            {"category": {"cat_0": {"count": 1000}}},
             res["facets"]
         )
