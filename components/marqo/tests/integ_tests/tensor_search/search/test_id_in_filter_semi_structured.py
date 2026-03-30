@@ -6,11 +6,16 @@ in setUpClass, then tests filter queries including 10,000-ID lists.
 import os
 from unittest import mock
 
+import pytest
+
 from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration
+from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import Model, SemiStructuredMarqoIndex
 from marqo.exceptions import InvalidArgumentError
-from marqo.tensor_search import tensor_search, utils
-from marqo.tensor_search.enums import EnvVars, SearchMethod
+from marqo.settings.settings import Settings, get_settings
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
@@ -38,22 +43,21 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
             f"Expected SemiStructuredMarqoIndex, got {type(cls.index)}"
 
         # Add 10,000 documents once for all tests
-        with mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"}):
-            batch_size = 64
-            for start in range(0, cls.NUM_DOCS, batch_size):
-                end = min(start + batch_size, cls.NUM_DOCS)
-                docs = [
-                    {"_id": f"doc_{i}", "title": f"product {i}", "category": f"cat_{i % 10}"}
-                    for i in range(start, end)
-                ]
-                cls.add_documents(
-                    config=cls.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=cls.index.name,
-                        docs=docs,
-                        tensor_fields=["title"],
-                    )
+        batch_size = 64
+        for start in range(0, cls.NUM_DOCS, batch_size):
+            end = min(start + batch_size, cls.NUM_DOCS)
+            docs = [
+                {"_id": f"doc_{i}", "title": f"product {i}", "category": f"cat_{i % 10}"}
+                for i in range(start, end)
+            ]
+            cls.add_documents(
+                config=cls.config,
+                add_docs_params=AddDocsParams(
+                    index_name=cls.index.name,
+                    docs=docs,
+                    tensor_fields=["title"],
                 )
+            )
 
     def setUp(self) -> None:
         # Skip base class setUp which clears all documents.
@@ -205,7 +209,7 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         ids = [f"doc_{i}" for i in range(max_ids + 1)]
         filter_str = "_id IN (" + ", ".join(ids) + ")"
 
-        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: str(max_ids)}):
+        with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=max_ids)):
             with self.assertRaises(InvalidArgumentError) as cm:
                 tensor_search.search(
                     config=self.config, index_name=self.index.name,
@@ -222,7 +226,7 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
         ids = [f"doc_{i}" for i in range(max_ids)]
         filter_str = "_id IN (" + ", ".join(ids) + ")"
 
-        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: str(max_ids)}):
+        with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=max_ids)):
             res = tensor_search.search(
                 config=self.config, index_name=self.index.name,
                 text="product", result_count=10,
@@ -233,5 +237,114 @@ class TestIdInFilterSemiStructured(MarqoTestCase):
 
     def test_id_in_default_limit_is_10000(self):
         """Default MARQO_MAX_IN_FILTER_IDS is 10,000."""
-        default_limit = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_IN_FILTER_IDS)
-        self.assertEqual(10000, default_limit)
+        self.assertEqual(10000, get_settings().marqo_max_in_filter_ids)
+
+    def test_id_in_and_or_filter(self):
+        """_id IN (...) AND (_id:doc0 OR _id:doc1) returns the intersection."""
+        # IN list has doc_0, doc_1, doc_2. The OR clause matches doc_0 and doc_1.
+        # AND semantics: result = {doc_0, doc_1}
+        filter_str = "_id IN (doc_0, doc_1, doc_2) AND (_id:doc_0 OR _id:doc_1)"
+
+        res = tensor_search.search(
+            config=self.config, index_name=self.index.name,
+            text="product", result_count=10,
+            filter=filter_str, search_method=SearchMethod.TENSOR
+        )
+
+        result_ids = {hit["_id"] for hit in res["hits"]}
+        self.assertEqual({"doc_0", "doc_1"}, result_ids)
+
+    def test_id_in_or_or_filter(self):
+        """_id IN (...) OR (_id:doc0 OR _id:doc1) returns the union."""
+        # IN list has doc_2 and doc_3. OR clause adds doc_0 and doc_1.
+        # OR semantics: result = {doc_0, doc_1, doc_2, doc_3}
+        filter_str = "_id IN (doc_2, doc_3) OR (_id:doc_0 OR _id:doc_1)"
+
+        res = tensor_search.search(
+            config=self.config, index_name=self.index.name,
+            text="product", result_count=10,
+            filter=filter_str, search_method=SearchMethod.TENSOR
+        )
+
+        result_ids = {hit["_id"] for hit in res["hits"]}
+        self.assertEqual({"doc_0", "doc_1", "doc_2", "doc_3"}, result_ids)
+
+    def test_id_in_and_not_or_filter(self):
+        """_id IN (...) AND NOT (_id:doc0 OR _id:doc1) excludes the OR'd IDs."""
+        # IN list has doc_0 through doc_3. NOT clause excludes doc_0 and doc_1.
+        # Result: {doc_2, doc_3}
+        filter_str = "_id IN (doc_0, doc_1, doc_2, doc_3) AND NOT (_id:doc_0 OR _id:doc_1)"
+
+        res = tensor_search.search(
+            config=self.config, index_name=self.index.name,
+            text="product", result_count=10,
+            filter=filter_str, search_method=SearchMethod.TENSOR
+        )
+
+        result_ids = {hit["_id"] for hit in res["hits"]}
+        self.assertEqual({"doc_2", "doc_3"}, result_ids)
+
+    @pytest.mark.skip_for_multinode
+    def test_id_in_with_facets(self):
+        """_id IN filter works with the facets feature.
+
+        Documents: doc_0 (cat_0), doc_1 (cat_1), doc_10 (cat_0).
+        Expects category facets: {cat_0: 2, cat_1: 1}.
+        """
+        filter_str = "_id IN (doc_0, doc_1, doc_10)"
+        facets = FacetsParameters(fields={"category": FieldFacetsConfiguration(type="string")})
+
+        res = tensor_search.search(
+            config=self.config, index_name=self.index.name,
+            text="product", result_count=10,
+            filter=filter_str,
+            facets=facets,
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            )
+        )
+
+        result_ids = {hit["_id"] for hit in res["hits"]}
+        self.assertEqual({"doc_0", "doc_1", "doc_10"}, result_ids)
+        self.assertDictEqual(
+            {"category": {"cat_0": {"count": 2}, "cat_1": {"count": 1}}},
+            res["facets"]
+        )
+
+    @pytest.mark.skip_for_multinode
+    def test_id_in_with_facets_exclude_terms(self):
+        """_id IN filter works with facets and excludeTerms.
+
+        The filter restricts hits to doc_0 and doc_10 (both cat_0).
+        excludeTerms removes the category:cat_0 restriction from the facet scope,
+        so facets count all three docs in the IN list (doc_0, doc_1, doc_10).
+        """
+        filter_str = "_id IN (doc_0, doc_1, doc_10) AND category:cat_0"
+        facets = FacetsParameters(fields={"category": FieldFacetsConfiguration(
+            type="string", excludeTerms=["category:cat_0"]
+        )})
+
+        res = tensor_search.search(
+            config=self.config, index_name=self.index.name,
+            text="product", result_count=10,
+            filter=filter_str,
+            facets=facets,
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF
+            )
+        )
+
+        # Hits are filtered by the full filter (including category:cat_0)
+        result_ids = {hit["_id"] for hit in res["hits"]}
+        self.assertEqual({"doc_0", "doc_10"}, result_ids)
+
+        # Facets are computed without the category:cat_0 restriction (excludeTerms removed it),
+        # so all three IN-list docs are counted across their categories.
+        self.assertDictEqual(
+            {"category": {"cat_0": {"count": 2}, "cat_1": {"count": 1}}},
+            res["facets"]
+        )
