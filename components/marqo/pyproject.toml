@@ -26,6 +26,7 @@ dependencies = [
     "validators>=0.35.0",
     "marqo-common",
     "pydantic-settings>=2.12.0",
+    "requests>=2.32.5",
 ]
 
 [dependency-groups]
