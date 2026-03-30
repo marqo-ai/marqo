@@ -24,6 +24,8 @@ from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
 from marqo.settings.settings import get_settings
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
