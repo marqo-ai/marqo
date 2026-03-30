@@ -11,6 +11,7 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.settings.settings import get_settings
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 
@@ -830,8 +831,8 @@ class StructuredVespaIndex(VespaIndex):
                     else:
                         raise InternalError('RangeTerm has no lower or upper bound')
                 elif isinstance(node, search_filter.InTerm):
-                    max_in_filter_ids = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_IN_FILTER_IDS)
-                    if max_in_filter_ids is not None and len(node.value_list) > max_in_filter_ids:
+                    max_in_filter_ids = get_settings().marqo_max_in_filter_ids
+                    if len(node.value_list) > max_in_filter_ids:
                         raise InvalidArgumentError(
                             f"The IN filter contains {len(node.value_list)} values, which exceeds the maximum "
                             f"of {max_in_filter_ids} (MARQO_MAX_IN_FILTER_IDS)."
