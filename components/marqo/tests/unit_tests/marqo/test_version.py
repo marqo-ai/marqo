@@ -1,4 +1,3 @@
-import re
 from unittest import TestCase
 
 from marqo_common.version import __version__ as common_version, get_version as common_get_version
