@@ -23,8 +23,7 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
-from marqo.tensor_search import utils
-from marqo.tensor_search.enums import EnvVars
+from marqo.settings.settings import get_settings
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
@@ -1057,8 +1056,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     "on semi-structured indexes."
                 )
 
-            max_in_filter_ids = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_IN_FILTER_IDS)
-            if max_in_filter_ids is not None and len(node.value_list) > max_in_filter_ids:
+            max_in_filter_ids = get_settings().marqo_max_in_filter_ids
+            if len(node.value_list) > max_in_filter_ids:
                 raise InvalidArgumentError(
                     f"The IN filter contains {len(node.value_list)} values, which exceeds the maximum "
                     f"of {max_in_filter_ids} (MARQO_MAX_IN_FILTER_IDS)."

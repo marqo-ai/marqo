@@ -1,10 +1,9 @@
-import os
 from unittest import mock
 
 from marqo.core.models import MarqoQuery
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.exceptions import InvalidArgumentError
-from marqo.tensor_search.enums import EnvVars
+from marqo.settings.settings import Settings
 from tests.unit_tests.marqo_test import MarqoTestCase
 
 
@@ -111,7 +110,7 @@ class TestSemiStructuredInFilter(MarqoTestCase):
         ids = [f'id_{i}' for i in range(max_ids + 1)]
         filter_str = '_id IN (' + ', '.join(ids) + ')'
 
-        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: str(max_ids)}):
+        with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=max_ids)):
             with self.assertRaises(InvalidArgumentError) as cm:
                 self._get_filter(filter_str)
 
@@ -124,13 +123,13 @@ class TestSemiStructuredInFilter(MarqoTestCase):
         ids = [f'id_{i}' for i in range(max_ids)]
         filter_str = '_id IN (' + ', '.join(ids) + ')'
 
-        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: str(max_ids)}):
+        with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=max_ids)):
             result = self._get_filter(filter_str)
             self.assertTrue(result.startswith('marqo__id in ('))
 
     def test_non_id_in_exceeds_max_limit_raises_field_error_not_limit_error(self):
         """Non-_id IN raises field error even if limit is also exceeded."""
-        with mock.patch.dict(os.environ, {EnvVars.MARQO_MAX_IN_FILTER_IDS: "1"}):
+        with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=1)):
             with self.assertRaises(InvalidArgumentError) as cm:
                 self._get_filter('color IN (red, blue, green)')
 
