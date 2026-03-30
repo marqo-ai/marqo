@@ -11,6 +11,7 @@ from marqo.core.models.marqo_index import StructuredMarqoIndex, Model, TextPrePr
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.structured_vespa_index.structured_vespa_schema import StructuredVespaSchema
 from marqo.core.exceptions import InvalidFieldNameError
+from marqo.exceptions import InvalidArgumentError
 
 
 class TestStructuredVespaIndexGetFilterString(unittest.TestCase):
@@ -117,3 +118,15 @@ class TestStructuredVespaIndexGetFilterString(unittest.TestCase):
                 else:
                     result_filter_string = self.vespa_index._get_filter_term(marqo_query)
                     self.assertIn(expected_result, result_filter_string)
+
+    def test_contains_filter_raises_error(self):
+        """CONTAINS filter is not supported for structured indexes."""
+        marqo_query = MarqoQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            limit=10,
+            filter='title CONTAINS hello',
+            score_modifiers=[],
+            expose_facets=False
+        )
+        with self.assertRaises(InvalidArgumentError):
+            self.vespa_index._get_filter_term(marqo_query)
