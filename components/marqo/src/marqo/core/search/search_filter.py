@@ -374,10 +374,9 @@ class MarqoFilterStringParser:
                         read_space_until = ')'
                     elif len(self._get_current_term_value()) == 0 and c == '[' and not read_space_until:  # start of term value
                         read_space_until = ']'
-                        if self._term_type == MarqoFilterStringParser._TermType.In:
-                            self._error('Unexpected [ after IN operator.', filter_string, i)
-                        elif self._term_type == MarqoFilterStringParser._TermType.Contains:
-                            self._error('Unexpected [ after CONTAINS operator.', filter_string, i)
+                        if self._term_type in (MarqoFilterStringParser._TermType.In,
+                                               MarqoFilterStringParser._TermType.Contains):
+                            self._error('[ and ] are only usable with the RANGE operator.', filter_string, i)
                         else:
                             self._term_type = MarqoFilterStringParser._TermType.Range
                     else:

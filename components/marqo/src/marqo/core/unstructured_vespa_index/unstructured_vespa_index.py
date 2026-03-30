@@ -229,7 +229,7 @@ class UnstructuredVespaIndex(VespaIndex):
                 elif isinstance(node, search_filter.InTerm):
                     raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
                 elif isinstance(node, search_filter.ContainsTerm):
-                    raise InvalidArgumentError("The 'CONTAINS' filter keyword is not yet supported for unstructured indexes")
+                    raise InvalidArgumentError("The 'CONTAINS' filter keyword is not yet supported for legacy unstructured indexes")
             raise InternalError(f'Unknown node type {type(node)}')
 
         if marqo_query.filter is not None:

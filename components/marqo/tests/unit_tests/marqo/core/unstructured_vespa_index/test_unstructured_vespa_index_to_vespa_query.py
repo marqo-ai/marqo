@@ -120,7 +120,7 @@ class TestUnstructuredVespaIndexToVespaQuery(unittest.TestCase):
 
 
     def test_contains_filter_raises_error(self):
-        """CONTAINS filter is not supported for unstructured indexes."""
+        """CONTAINS filter is not supported for legacy unstructured indexes."""
         marqo_query = MarqoQuery(
             index_name=self.vespa_index._marqo_index.name,
             limit=10,

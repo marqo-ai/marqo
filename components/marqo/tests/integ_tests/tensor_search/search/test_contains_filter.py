@@ -32,9 +32,15 @@ class TestContainsFilter(MarqoTestCase):
             tensor_fields=["title", "description"]
         )
 
-        cls.indexes = cls.create_indexes([semi_structured_index, structured_index])
+        legacy_unstructured_index = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/all-MiniLM-L6-v2'),
+            marqo_version='2.12.0'
+        )
+
+        cls.indexes = cls.create_indexes([semi_structured_index, structured_index, legacy_unstructured_index])
         cls.semi_structured_index = cls.indexes[0]
         cls.structured_index = cls.indexes[1]
+        cls.legacy_unstructured_index = cls.indexes[2]
 
     def setUp(self) -> None:
         super().setUp()
@@ -48,10 +54,11 @@ class TestContainsFilter(MarqoTestCase):
                     {"_id": "1", "title": "Hello World", "description": "A simple greeting program"},
                     {"_id": "2", "title": "World Cup", "description": "Football tournament"},
                     {"_id": "3", "title": "Python Programming", "description": "Learn python basics"},
-                    {"_id": "4", "title": "hello again", "description": "Another greeting"},
-                    {"_id": "5", "title": "Machine Learning", "description": "AI and ML concepts"},
+                    {"_id": "4", "title": "hello again", "description": "Another farewell"},
+                    {"_id": "5", "title": "Machine Learning", "description": "AI and ML concepts", "score": 5},
                     {"_id": "6", "title": "Real-time Systems", "description": "Low-latency computing"},
                     {"_id": "7", "title": "vintage t-shirt collection", "description": "fashion items"},
+                    {"_id": "8", "title": "key:value pairs", "description": 'She said "hello" loudly'},
                 ],
                 tensor_fields=["title", "description"]
             )
@@ -69,10 +76,25 @@ class TestContainsFilter(MarqoTestCase):
     def _get_ids(self, res):
         return sorted([hit["_id"] for hit in res["hits"]])
 
+    def test_no_filter_returns_all_docs(self):
+        """Searching without a filter should return all documents."""
+        res = tensor_search.search(
+            index_name=self.semi_structured_index.name,
+            config=self.config,
+            text="",
+            search_method=SearchMethod.TENSOR,
+        )
+        self.assertEqual(self._get_ids(res), ["1", "2", "3", "4", "5", "6", "7", "8"])
+
     def test_basic_contains_match(self):
         """title CONTAINS hello should match docs 1 and 4 (case-insensitive after tokenization)."""
         res = self._search("title CONTAINS hello")
         self.assertEqual(self._get_ids(res), ["1", "4"])
+
+    def test_contains_does_not_match_substring(self):
+        """CONTAINS does token-level matching, not substring matching."""
+        res = self._search("title CONTAINS ello")
+        self.assertEqual(len(res["hits"]), 0)
 
     def test_case_insensitivity(self):
         """title CONTAINS WORLD should match docs 1 and 2."""
@@ -85,29 +107,38 @@ class TestContainsFilter(MarqoTestCase):
         self.assertEqual(len(res["hits"]), 0)
 
     def test_not_contains(self):
-        """NOT (title CONTAINS hello) should match docs 2, 3, 5."""
-        res = self._search("NOT (title CONTAINS hello)", text="world programming learning")
-        ids = self._get_ids(res)
-        # All results should NOT have "hello" in title
-        for doc_id in ids:
-            self.assertNotIn(doc_id, ["1", "4"])
-        # Should include at least some of docs 2, 3, 5
-        self.assertTrue(len(ids) > 0)
+        """NOT (title CONTAINS hello) should match all docs except 1 and 4."""
+        with self.subTest("with parentheses"):
+            res = self._search("NOT (title CONTAINS hello)")
+            self.assertEqual(self._get_ids(res), ["2", "3", "5", "6", "7", "8"])
+
+        with self.subTest("without parentheses"):
+            res = self._search("NOT title CONTAINS hello")
+            self.assertEqual(self._get_ids(res), ["2", "3", "5", "6", "7", "8"])
 
     def test_contains_with_and(self):
-        """title CONTAINS hello AND description CONTAINS greeting should match docs 1 and 4."""
-        res = self._search("title CONTAINS hello AND description CONTAINS greeting")
-        self.assertEqual(self._get_ids(res), ["1", "4"])
+        """title CONTAINS hello AND description CONTAINS simple should match only doc 1.
+
+        Doc 1 has title "Hello World" and description "A simple greeting program".
+        Doc 4 has title "hello again" but description "Another farewell" (no "simple").
+        """
+        res = self._search("title CONTAINS hello AND description CONTAINS simple")
+        self.assertEqual(self._get_ids(res), ["1"])
 
     def test_contains_with_or(self):
-        """title CONTAINS python OR description CONTAINS greeting should match docs 1, 3, 4."""
+        """title CONTAINS python OR description CONTAINS greeting should match docs 1, 3."""
         res = self._search("title CONTAINS python OR description CONTAINS greeting")
-        self.assertEqual(self._get_ids(res), ["1", "3", "4"])
+        self.assertEqual(self._get_ids(res), ["1", "3"])
 
     def test_contains_combined_with_equality(self):
         """title CONTAINS world AND description:(Football tournament) should match doc 2."""
         res = self._search("title CONTAINS world AND description:(Football tournament)")
         self.assertEqual(self._get_ids(res), ["2"])
+
+    def test_contains_combined_with_range(self):
+        """title CONTAINS learning AND score:[1 TO 10] should match doc 5."""
+        res = self._search("title CONTAINS learning AND score:[1 TO 10]")
+        self.assertEqual(self._get_ids(res), ["5"])
 
     def test_contains_across_fields_no_overlap(self):
         """title CONTAINS hello AND description CONTAINS ai should return 0 hits."""
@@ -117,10 +148,7 @@ class TestContainsFilter(MarqoTestCase):
     def test_contains_with_tensor_search(self):
         """CONTAINS filter combined with tensor search."""
         res = self._search("title CONTAINS hello", text="greeting", search_method=SearchMethod.TENSOR)
-        ids = self._get_ids(res)
-        # Should only return docs with "hello" in title
-        for doc_id in ids:
-            self.assertIn(doc_id, ["1", "4"])
+        self.assertEqual(self._get_ids(res), ["1", "4"])
 
     def test_contains_with_lexical_search(self):
         """CONTAINS filter combined with lexical search."""
@@ -132,7 +160,7 @@ class TestContainsFilter(MarqoTestCase):
 
     def test_not_contains_with_and(self):
         """NOT (title CONTAINS hello) AND title CONTAINS world should match doc 2 only."""
-        res = self._search("NOT (title CONTAINS hello) AND title CONTAINS world", text="world cup")
+        res = self._search("NOT (title CONTAINS hello) AND title CONTAINS world")
         self.assertEqual(self._get_ids(res), ["2"])
 
     def test_nonexistent_field_raises_error(self):
@@ -154,8 +182,6 @@ class TestContainsFilter(MarqoTestCase):
         """description CONTAINS (simple greeting) should match doc 1 only (phrase match)."""
         res = self._search("description CONTAINS (simple greeting)")
         ids = self._get_ids(res)
-        # Doc 1 has "A simple greeting program" which contains the phrase "simple greeting"
-        # Doc 4 has "Another greeting" which does NOT contain "simple greeting" as a phrase
         self.assertEqual(ids, ["1"])
 
     def test_contains_with_hybrid_search(self):
@@ -173,26 +199,16 @@ class TestContainsFilter(MarqoTestCase):
             ),
         )
         ids = self._get_ids(res)
-        # Should only return docs with "hello" in title (docs 1 and 4)
         self.assertEqual(ids, ["1", "4"])
 
     def test_contains_with_special_characters_in_filter_value(self):
-        """Test CONTAINS filter where the filter value itself contains special characters.
-
-        Vespa tokenizes both the indexed text and the query value. For example,
-        'title CONTAINS t-shirt' sends 't-shirt' to Vespa's contains operator,
-        which tokenizes it the same way as the indexed text.
-        """
+        """Test CONTAINS filter where the filter value itself contains special characters."""
         with self.subTest("hyphen in filter value: title CONTAINS t-shirt"):
-            # Doc 7 has "vintage t-shirt collection". Vespa tokenizes "t-shirt" into
-            # tokens. The contains operator should match because the indexed text
-            # was tokenized the same way.
             res = self._search("title CONTAINS t-shirt")
             ids = self._get_ids(res)
             self.assertIn("7", ids)
 
         with self.subTest("hyphen in filter value: title CONTAINS real-time"):
-            # Doc 6 has "Real-time Systems"
             res = self._search("title CONTAINS real-time")
             ids = self._get_ids(res)
             self.assertIn("6", ids)
@@ -202,11 +218,46 @@ class TestContainsFilter(MarqoTestCase):
             ids = self._get_ids(res)
             self.assertIn("7", ids)
 
+    def test_contains_with_colon_in_value(self):
+        """Test CONTAINS filter where the indexed text contains a colon."""
+        # Doc 8 has title "key:value pairs". Vespa tokenizes "key:value" into "key" and "value".
+        res = self._search("title CONTAINS key")
+        ids = self._get_ids(res)
+        self.assertIn("8", ids)
+
+    def test_contains_with_quote_in_value(self):
+        """Test CONTAINS filter where the indexed text contains quotes."""
+        # Doc 8 has description 'She said "hello" loudly'. The token "hello" should match.
+        res = self._search("description CONTAINS hello")
+        ids = self._get_ids(res)
+        self.assertIn("8", ids)
+
     def test_structured_index_contains_raises_error(self):
         """Using CONTAINS on a structured index should raise InvalidArgumentError."""
         with self.assertRaises(InvalidArgumentError) as ctx:
             tensor_search.search(
                 index_name=self.structured_index.name,
+                config=self.config,
+                text="test",
+                filter="title CONTAINS hello",
+                search_method=SearchMethod.TENSOR,
+            )
+        self.assertIn("CONTAINS", str(ctx.exception))
+
+    def test_legacy_unstructured_index_contains_raises_error(self):
+        """Using CONTAINS on a legacy unstructured index should raise InvalidArgumentError."""
+        # Add a doc to the legacy index first
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.legacy_unstructured_index.name,
+                docs=[{"_id": "1", "title": "Hello World"}],
+                tensor_fields=["title"]
+            )
+        )
+        with self.assertRaises(InvalidArgumentError) as ctx:
+            tensor_search.search(
+                index_name=self.legacy_unstructured_index.name,
                 config=self.config,
                 text="test",
                 filter="title CONTAINS hello",

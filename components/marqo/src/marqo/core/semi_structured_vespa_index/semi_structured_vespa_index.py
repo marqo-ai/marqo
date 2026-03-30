@@ -521,16 +521,16 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         def generate_contains_filter_string(node: search_filter.ContainsTerm) -> str:
             escaped_field = self.escape(node.field)
+            escaped_value = self.escape(node.value)
             marqo_index = self.get_marqo_index()
+            # field_map only contains lexical fields for semi-structured indexes
             if escaped_field not in marqo_index.field_map:
                 raise InvalidArgumentError(
-                    f"CONTAINS filter requires a lexical field, but '{escaped_field}' "
-                    f"is not a lexical field in index '{marqo_index.name}'. "
+                    f"CONTAINS filter field '{escaped_field}' is not found in index '{marqo_index.name}'. "
                     f"Available lexical fields: {', '.join(sorted(marqo_index.lexically_searchable_fields_names))}"
                 )
             field = marqo_index.field_map[escaped_field]
             lexical_field_name = field.lexical_field_name
-            escaped_value = self.escape(node.value)
             return f'({lexical_field_name} contains "{escaped_value}")'
 
         def tree_to_filter_string(node: search_filter.Node) -> Optional[str]:
