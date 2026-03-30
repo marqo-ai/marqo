@@ -51,10 +51,10 @@ class TestContainsFilter(MarqoTestCase):
             add_docs_params=AddDocsParams(
                 index_name=self.semi_structured_index.name,
                 docs=[
-                    {"_id": "1", "title": "Hello World", "description": "A simple greeting program"},
+                    {"_id": "1", "title": "Hello World", "description": "A simple greeting program", "score": 3},
                     {"_id": "2", "title": "World Cup", "description": "Football tournament"},
                     {"_id": "3", "title": "Python Programming", "description": "Learn python basics"},
-                    {"_id": "4", "title": "hello again", "description": "Another farewell"},
+                    {"_id": "4", "title": "hello again", "description": "Another farewell", "score": 15},
                     {"_id": "5", "title": "Machine Learning", "description": "AI and ML concepts", "score": 5},
                     {"_id": "6", "title": "Real-time Systems", "description": "Low-latency computing"},
                     {"_id": "7", "title": "vintage t-shirt collection", "description": "fashion items"},
@@ -136,9 +136,13 @@ class TestContainsFilter(MarqoTestCase):
         self.assertEqual(self._get_ids(res), ["2"])
 
     def test_contains_combined_with_range(self):
-        """title CONTAINS learning AND score:[1 TO 10] should match doc 5."""
-        res = self._search("title CONTAINS learning AND score:[1 TO 10]")
-        self.assertEqual(self._get_ids(res), ["5"])
+        """title CONTAINS hello AND score:[1 TO 10] should match only doc 1.
+
+        Docs 1 and 4 both have "hello" in title. Doc 1 has score=3 (in range),
+        doc 4 has score=15 (out of range). The AND narrows to doc 1 only.
+        """
+        res = self._search("title CONTAINS hello AND score:[1 TO 10]")
+        self.assertEqual(self._get_ids(res), ["1"])
 
     def test_contains_across_fields_no_overlap(self):
         """title CONTAINS hello AND description CONTAINS ai should return 0 hits."""
@@ -221,16 +225,28 @@ class TestContainsFilter(MarqoTestCase):
     def test_contains_with_colon_in_value(self):
         """Test CONTAINS filter where the indexed text contains a colon."""
         # Doc 8 has title "key:value pairs". Vespa tokenizes "key:value" into "key" and "value".
-        res = self._search("title CONTAINS key")
-        ids = self._get_ids(res)
-        self.assertIn("8", ids)
+        with self.subTest("token match: title CONTAINS key"):
+            res = self._search("title CONTAINS key")
+            ids = self._get_ids(res)
+            self.assertIn("8", ids)
+
+        with self.subTest("grouped value with colon: title CONTAINS (key:)"):
+            res = self._search("title CONTAINS (key:)")
+            ids = self._get_ids(res)
+            self.assertIn("8", ids)
 
     def test_contains_with_quote_in_value(self):
         """Test CONTAINS filter where the indexed text contains quotes."""
         # Doc 8 has description 'She said "hello" loudly'. The token "hello" should match.
-        res = self._search("description CONTAINS hello")
-        ids = self._get_ids(res)
-        self.assertIn("8", ids)
+        with self.subTest("token match: description CONTAINS hello"):
+            res = self._search("description CONTAINS hello")
+            ids = self._get_ids(res)
+            self.assertIn("8", ids)
+
+        with self.subTest('grouped value with quotes: description CONTAINS (\\"hello\\")'):
+            res = self._search('description CONTAINS (\\"hello\\")')
+            ids = self._get_ids(res)
+            self.assertIn("8", ids)
 
     def test_structured_index_contains_raises_error(self):
         """Using CONTAINS on a structured index should raise InvalidArgumentError."""
