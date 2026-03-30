@@ -138,10 +138,10 @@ jobs:
           python-version: '3.9'
           cache: "pip"
 
-      # Step to install the semver package
-      - name: Install semver
+      # Step to install dependencies for version determination
+      - name: Install dependencies
         run: |
-          pip install semver
+          pip install semver ../common
 
       # Step to determine the target version
       - name: Determine to_version
