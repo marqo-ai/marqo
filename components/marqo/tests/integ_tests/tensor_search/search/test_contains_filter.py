@@ -71,6 +71,7 @@ class TestContainsFilter(MarqoTestCase):
             text=text,
             filter=filter_str,
             search_method=search_method,
+            result_count=10,
         )
 
     def _get_ids(self, res):
@@ -83,6 +84,7 @@ class TestContainsFilter(MarqoTestCase):
             config=self.config,
             text="",
             search_method=SearchMethod.TENSOR,
+            result_count=10,
         )
         self.assertEqual(self._get_ids(res), ["1", "2", "3", "4", "5", "6", "7", "8"])
 
