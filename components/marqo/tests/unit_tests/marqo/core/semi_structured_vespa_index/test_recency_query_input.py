@@ -699,8 +699,7 @@ class TestRecencyQueryInput(unittest.TestCase):
         # Override to use default apply_to_subqueries (None)
         query.recency_parameters = recency_params
 
-        with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
-            mock_parent.return_value = {'query_features': {}}
+        with patch.object(self.vespa_index, '_get_base_vespa_hybrid_query', return_value={'query_features': {}}):
             result = self.vespa_index._to_vespa_hybrid_query(query)
 
         # Flags should be top-level query properties, not in query_features
@@ -723,8 +722,7 @@ class TestRecencyQueryInput(unittest.TestCase):
         query = self._create_hybrid_query_with_recency("all")
         query.recency_parameters = recency_params
 
-        with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
-            mock_parent.return_value = {'query_features': {}}
+        with patch.object(self.vespa_index, '_get_base_vespa_hybrid_query', return_value={'query_features': {}}):
             result = self.vespa_index._to_vespa_hybrid_query(query)
 
         self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], True)
@@ -744,8 +742,7 @@ class TestRecencyQueryInput(unittest.TestCase):
         query = self._create_hybrid_query_with_recency("all")
         query.recency_parameters = recency_params
 
-        with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
-            mock_parent.return_value = {'query_features': {}}
+        with patch.object(self.vespa_index, '_get_base_vespa_hybrid_query', return_value={'query_features': {}}):
             result = self.vespa_index._to_vespa_hybrid_query(query)
 
         self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], False)
@@ -765,8 +762,7 @@ class TestRecencyQueryInput(unittest.TestCase):
         query = self._create_hybrid_query_with_recency("all")
         query.recency_parameters = recency_params
 
-        with patch('marqo.core.structured_vespa_index.structured_vespa_index.StructuredVespaIndex._to_vespa_hybrid_query') as mock_parent:
-            mock_parent.return_value = {'query_features': {}}
+        with patch.object(self.vespa_index, '_get_base_vespa_hybrid_query', return_value={'query_features': {}}):
             result = self.vespa_index._to_vespa_hybrid_query(query)
 
         self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], False)
