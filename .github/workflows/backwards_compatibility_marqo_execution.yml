@@ -111,6 +111,25 @@ jobs:
           export PYTHONPATH=./:$PYTHONPATH
           python ./scripts/vespa_local/vespa_local.py full-start
 
+      - name: Validate image inputs
+        env:
+          TO_API_IMAGE: ${{ inputs.to_api_image || github.event.inputs.to_api_image }}
+          TO_INFERENCE_ORCHESTRATOR_IMAGE: ${{ inputs.to_inference_orchestrator_image || github.event.inputs.to_inference_orchestrator_image }}
+          TO_MODEL_MANAGEMENT_IMAGE: ${{ inputs.to_model_management_image || github.event.inputs.to_model_management_image }}
+        run: |
+          missing=()
+          [ -z "$TO_API_IMAGE" ] && missing+=("to_api_image")
+          [ -z "$TO_INFERENCE_ORCHESTRATOR_IMAGE" ] && missing+=("to_inference_orchestrator_image")
+          [ -z "$TO_MODEL_MANAGEMENT_IMAGE" ] && missing+=("to_model_management_image")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing required image inputs: ${missing[*]}"
+            exit 1
+          fi
+          echo "All image inputs provided:"
+          echo "  API: $TO_API_IMAGE"
+          echo "  Inference Orchestrator: $TO_INFERENCE_ORCHESTRATOR_IMAGE"
+          echo "  Model Management: $TO_MODEL_MANAGEMENT_IMAGE"
+
       # Step to run the compatibility test. This step can run both backwards_compatibility and rollback tests, based on the MODE argument
       - name: Run backwards compatibility test
         id: run-backwards-compatibility
