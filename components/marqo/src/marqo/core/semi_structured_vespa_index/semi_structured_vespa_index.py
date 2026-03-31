@@ -23,6 +23,7 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.settings.settings import get_settings
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
@@ -1061,6 +1062,25 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             return f'({float_field_string} OR {int_field_string})'
 
+        def generate_in_filter_string(node: search_filter.InTerm) -> str:
+            if node.field != MARQO_DOC_ID:
+                raise InvalidArgumentError(
+                    "The 'IN' filter keyword is only supported for the '_id' field "
+                    "on semi-structured indexes."
+                )
+
+            max_in_filter_ids = get_settings().marqo_max_in_filter_ids
+            if len(node.value_list) > max_in_filter_ids:
+                raise InvalidArgumentError(
+                    f"The IN filter contains {len(node.value_list)} values, which exceeds the maximum "
+                    f"of {max_in_filter_ids} (MARQO_MAX_IN_FILTER_IDS)."
+                )
+
+            escaped_values = ', '.join(
+                f'"{self.escape(v)}"' for v in node.value_list
+            )
+            return f'{VESPA_FIELD_ID} in ({escaped_values})'
+
         def generate_contains_filter_string(node: search_filter.ContainsTerm) -> str:
             escaped_field = self.escape(node.field)
             escaped_value = self.escape(node.value)
@@ -1120,7 +1140,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 elif isinstance(node, search_filter.RangeTerm):
                     return generate_range_filter_string(node)
                 elif isinstance(node, search_filter.InTerm):
-                    raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
+                    return generate_in_filter_string(node)
                 elif isinstance(node, search_filter.ContainsTerm):
                     return generate_contains_filter_string(node)
 
