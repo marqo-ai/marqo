@@ -142,17 +142,16 @@ class TestSortByModels(TestCase):
         )
         self.assertEqual(query.sort_by.min_sort_candidates, 11)
 
-    def test_sort_by_explicit_sort_candidates_checked_against_limit_and_offset(self):
-        """Ensure an error is raised if minSortCandidates is less than offset + limit."""
-        with self.assertRaises(ValidationError) as e:
-            _ = SearchQuery(
-                q="explicit test",
-                searchMethod=SearchMethod.HYBRID,
-                sortBy=SortByModel(fields=[SortByField(fieldName="value")], min_sort_candidates=77),
-                limit=50,
-                offset=29
-            )
-        self.assertIn("minSortCandidates must be at least as large as offset + limit", str(e.exception))
+    def test_sort_by_explicit_sort_candidates_adjusted_to_offset_plus_limit(self):
+        """Ensure minSortCandidates is adjusted to offset + limit when it's smaller."""
+        query = SearchQuery(
+            q="explicit test",
+            searchMethod=SearchMethod.HYBRID,
+            sortBy=SortByModel(fields=[SortByField(fieldName="value")], min_sort_candidates=77),
+            limit=50,
+            offset=29
+        )
+        self.assertEqual(79, query.sort_by.min_sort_candidates)
 
     def test_sort_by_sort_candidates_with_default_limit_and_offset(self):
         query = SearchQuery(
