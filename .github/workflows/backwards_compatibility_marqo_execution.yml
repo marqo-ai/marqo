@@ -82,11 +82,11 @@ jobs:
           repository: ${{ github.repository }} #Check out the repository that contains this action since the tests exist in the same repository
           fetch-depth: 0
 
-      # Step to set up Python 3.9
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
+      # Step to set up Python 3.11
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.9"
+          python-version: "3.11"
           cache: "pip"
       # Step to install dependencies from requirements.txt
       - name: Install Dependencies
