@@ -1131,7 +1131,7 @@ requires-dist = [
     { name = "python-json-logger", specifier = ">=4.0.0" },
     { name = "python-magic", specifier = ">=0.4.27" },
     { name = "readerwriterlock", specifier = ">=1.0.9" },
-    { name = "requests", specifier = ">=2.32.5" },
+    { name = "requests", specifier = ">=2.33.1" },
     { name = "semver", specifier = ">=3.0.4" },
     { name = "uvicorn", specifier = ">=0.37.0" },
     { name = "validators", specifier = ">=0.35.0" },
