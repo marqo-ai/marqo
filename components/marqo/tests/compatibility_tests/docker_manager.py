@@ -183,9 +183,9 @@ class DockerManager:
         if num_provided == 0:
             # No images provided → use defaults
             self.logger.info(f"Starting Marqo container with ECR images for version: {version}")
-            api_image = f"{os_ecr_name_space}/api:{version}"
-            inference_orchestrator_image = f"{os_ecr_name_space}/inference-orchestrator:{version}"
-            model_management_image = f"{os_ecr_name_space}/model-management:{version}"
+            api_image = f"{os_ecr_name_space}/api:{version}-cloud"
+            inference_orchestrator_image = f"{os_ecr_name_space}/inference-orchestrator:{version}-cloud"
+            model_management_image = f"{os_ecr_name_space}/model-management:{version}-cloud"
         elif num_provided == 3:
             # All provided → use as-is
             self.logger.info("Starting Marqo container with all custom images.")

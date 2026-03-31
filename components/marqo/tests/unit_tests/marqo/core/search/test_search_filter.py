@@ -259,6 +259,141 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                     )),
                 "Many parenthesis, nested groupings"
             ),
+            # CONTAINS term divider tests
+            (
+                'a CONTAINS hello',
+                SearchFilter(
+                    ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                ),
+                'basic CONTAINS term'
+            ),
+            (
+                'a contains hello',
+                SearchFilter(
+                    ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                ),
+                'lowercase contains term'
+            ),
+            (
+                'a Contains hello',
+                SearchFilter(
+                    ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                ),
+                'mixed case Contains term'
+            ),
+            (
+                'a CONTAINS (hello world)',
+                SearchFilter(
+                    ContainsTerm('a', 'hello world', 'a CONTAINS (hello world)')
+                ),
+                'CONTAINS with grouped value'
+            ),
+            (
+                'a CONTAINS hello AND b:2',
+                SearchFilter(
+                    root=And(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=EqualityTerm('b', '2', 'b:2')
+                    )
+                ),
+                'AND with CONTAINS term'
+            ),
+            (
+                'a CONTAINS hello OR b:2',
+                SearchFilter(
+                    root=Or(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=EqualityTerm('b', '2', 'b:2')
+                    )
+                ),
+                'OR with CONTAINS term'
+            ),
+            (
+                'NOT a CONTAINS hello',
+                SearchFilter(
+                    root=Not(
+                        ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                    ),
+                ),
+                'NOT CONTAINS term'
+            ),
+            (
+                'a CONTAINS hello AND b CONTAINS world',
+                SearchFilter(
+                    root=And(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=ContainsTerm('b', 'world', 'b CONTAINS world')
+                    )
+                ),
+                'AND with two CONTAINS terms'
+            ),
+            (
+                'a CONTAINS hello AND b:(Football tournament)',
+                SearchFilter(
+                    root=And(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=EqualityTerm('b', 'Football tournament', 'b:(Football tournament)')
+                    )
+                ),
+                'CONTAINS combined with equality'
+            ),
+            (
+                'NOT (a CONTAINS hello) AND b CONTAINS world',
+                SearchFilter(
+                    root=And(
+                        left=Not(
+                            ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                        ),
+                        right=ContainsTerm('b', 'world', 'b CONTAINS world')
+                    )
+                ),
+                'NOT CONTAINS with AND'
+            ),
+            (
+                '(a CONTAINS hello)',
+                SearchFilter(
+                    ContainsTerm('a', 'hello', 'a CONTAINS hello')
+                ),
+                'CONTAINS in parentheses'
+            ),
+            (
+                'a CONTAINS hello\\ world',
+                SearchFilter(
+                    ContainsTerm('a', 'hello world', 'a CONTAINS hello\\ world')
+                ),
+                'CONTAINS with escaped space in value'
+            ),
+            (
+                'a CONTAINS t-shirt',
+                SearchFilter(
+                    ContainsTerm('a', 't-shirt', 'a CONTAINS t-shirt')
+                ),
+                'CONTAINS with hyphen in value'
+            ),
+            (
+                'a CONTAINS hel\\"lo',
+                SearchFilter(
+                    ContainsTerm('a', 'hel"lo', 'a CONTAINS hel\\"lo')
+                ),
+                'CONTAINS with escaped double quote in value'
+            ),
+            (
+                'a CONTAINS hel\\\\lo',
+                SearchFilter(
+                    ContainsTerm('a', 'hel\\lo', 'a CONTAINS hel\\\\lo')
+                ),
+                'CONTAINS with escaped backslash in value'
+            ),
+            (
+                '(a CONTAINS hello) OR b:2',
+                SearchFilter(
+                    root=Or(
+                        left=ContainsTerm('a', 'hello', 'a CONTAINS hello'),
+                        right=EqualityTerm('b', '2', 'b:2')
+                    )
+                ),
+                'CONTAINS as only term in complex expression with OR'
+            ),
             # A bit of everything
             (
                 '(a:1 AND NOT (b:[1 TO 10] OR (c IN (x, y, (hello world)))))',
@@ -320,10 +455,13 @@ class TestMarqoFilterStringParser(MarqoTestCase):
             ('a IN (1, 2 OR 3)', 'Unexpected white space', 'OR in IN term'),
             ('a IN (1, 2 AND 3)', 'Unexpected white space', 'AND in IN term'),
             ('a IN (1, 2 NOT 3)', 'Unexpected white space', 'NOT in IN term'),
-            ('a IN (1, 2, 3, [0 TO 1])', 'Unexpected [ after IN operator', 'RANGE in IN term'),
+            ('a IN (1, 2, 3, [0 TO 1])', '[ and ] are only usable with the RANGE operator', 'RANGE in IN term'),
             ('a IN (1, 2, 3))', 'Unexpected )', 'extra parenthesis in IN term'),
             ('a IN (val1, val 2, val3)', 'Unexpected white space', 'ungrouped space in IN term'),
             ('a IN 1, 2, 3)', 'Expected (', 'IN term with no opening parenthesis'),
+
+            # Contains term tests
+            ('a CONTAINS [1 TO 10]', '[ and ] are only usable with the RANGE operator', 'RANGE in CONTAINS term'),
         ]
 
         for filter_string, expected_error_msg, msg in test_cases:

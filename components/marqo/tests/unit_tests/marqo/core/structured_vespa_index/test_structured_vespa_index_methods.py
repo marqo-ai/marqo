@@ -153,3 +153,15 @@ class TestStructuredVespaIndexGetFilterString(unittest.TestCase):
         with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=max_ids)):
             result = self._get_filter(filter_str)
         self.assertIn('title in (', result)
+
+    def test_contains_filter_raises_error(self):
+        """CONTAINS filter is not supported for structured indexes."""
+        marqo_query = MarqoQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            limit=10,
+            filter='title CONTAINS hello',
+            score_modifiers=[],
+            expose_facets=False
+        )
+        with self.assertRaises(InvalidArgumentError):
+            self.vespa_index._get_filter_term(marqo_query)
