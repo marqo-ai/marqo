@@ -1019,6 +1019,58 @@ class TestSearch(MarqoTestCase):
 
                     self.assertEqual(result, expected_result)
 
+    def test_lexical_search_optional_terms_do_not_filter_results(self):
+        """Test that unquoted (optional) terms in a lexical query do not prevent results
+        from being returned. Optional terms should only contribute to scoring via rank(),
+        not filter the recall set.
+
+        Regression test for a bug where optional terms were ANDed with required terms,
+        causing queries with a required term and optional punctuation like '-' to return
+        no results because '-' is stripped by Vespa's tokenizer during indexing.
+        """
+        docs_list = [
+            {"_id": "doc1", "text_field_1": "Quick brown fox jumps over the lazy dog"},
+            {"_id": "doc2", "text_field_1": "Quick silver racing through the forest"},
+            {"_id": "doc3", "text_field_1": "Aluminum portable water bottle large capacity"},
+            {"_id": "doc4", "text_field_1": "Vintage wooden bookshelf with drawers"},
+        ]
+
+        test_cases = [
+            # Unquoted punctuation should not kill the query
+            ('"Quick" -', {'doc1', 'doc2'}, 'required "Quick" with optional punctuation "-"'),
+            # Multiple required terms with unquoted punctuation
+            ('"Aluminum" "portable" -', {'doc3'}, 'required "Aluminum" "portable" with optional punctuation'),
+            # Unquoted optional terms should not filter, only boost scoring
+            ('"Quick" fox', {'doc1', 'doc2'}, 'required "Quick" with optional "fox"'),
+            # All required (quoted) should still work as AND
+            ('"Quick" "fox"', {'doc1'}, 'two required terms should AND together'),
+            # All optional (unquoted) should still work via weakAnd
+            ('Quick fox', {'doc1', 'doc2'}, 'all optional terms use weakAnd'),
+        ]
+
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                for query, expected_ids, msg in test_cases:
+                    with self.subTest(query=query, msg=msg):
+                        res = tensor_search.search(
+                            text=query, config=self.config, index_name=index.name,
+                            search_method=SearchMethod.LEXICAL
+                        )
+                        result_ids = {hit['_id'] for hit in res['hits']}
+                        self.assertTrue(
+                            expected_ids.issubset(result_ids),
+                            f"Expected {expected_ids} to be in results but got {result_ids}"
+                        )
+
     def test_search_query_ExpectedErrorRaisedForInvalidSearchMethod(self):
         """Test that the ValidationError is raised when an incorrect search method is provided."""
         invalid_search_methods = [
