@@ -77,6 +77,49 @@ class TestSettings(unittest.TestCase):
             self.assertEqual(settings.marqo_default_models_s3_bucket, "s3://marqo-default-models-os")
 
 
+class TestRandomConnectionCloseRateSetting(unittest.TestCase):
+    """Tests for the marqo_search_random_connection_close_rate setting."""
+
+    def test_default_rate_is_zero(self):
+        """Test that the default random connection close rate is 0."""
+        with patch.dict("os.environ", {}, clear=True):
+            settings = Settings()
+            self.assertEqual(settings.marqo_search_random_connection_close_rate, 0)
+
+    def test_rate_from_env_var(self):
+        """Test setting rate via MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE env var."""
+        test_cases = [
+            ("0", 0.0),
+            ("0.0", 0.0),
+            ("0.5", 0.5),
+            ("1.0", 1.0),
+            ("0.01", 0.01),
+        ]
+        for env_value, expected in test_cases:
+            with self.subTest(env_value=env_value):
+                with patch.dict("os.environ", {"MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE": env_value}, clear=True):
+                    settings = Settings()
+                    self.assertAlmostEqual(settings.marqo_search_random_connection_close_rate, expected)
+
+    def test_rate_rejects_value_above_1(self):
+        """Test that a rate above 1.0 is rejected."""
+        with patch.dict("os.environ", {"MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE": "1.5"}, clear=True):
+            with self.assertRaises(ValidationError):
+                Settings()
+
+    def test_rate_rejects_negative_value(self):
+        """Test that a negative rate is rejected."""
+        with patch.dict("os.environ", {"MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE": "-0.1"}, clear=True):
+            with self.assertRaises(ValidationError):
+                Settings()
+
+    def test_rate_rejects_non_numeric_value(self):
+        """Test that a non-numeric rate is rejected."""
+        with patch.dict("os.environ", {"MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE": "abc"}, clear=True):
+            with self.assertRaises(ValidationError):
+                Settings()
+
+
 class TestGetSettings(unittest.TestCase):
     """Tests for the get_settings function."""
 

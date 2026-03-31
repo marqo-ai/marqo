@@ -284,28 +284,24 @@ class TestSortByFeature(MarqoTestCase):
         self.assertEqual(6, response_without_sort_depth["_sortCandidates"])
 
     def test_sort_candidate_must_larger_than_limit_plus_offset(self):
-        with self.assertRaises(MarqoWebError) as cm:
-            self.client.index(self.unstructured_index_name).search(
-                q="test",
-                search_method="HYBRID",
-                limit=1,
-                offset=2,
-                sort_by={
-                    "fields": [
-                        {
-                            "fieldName": "title",
-                            "order": "asc",
-                            "missing": "last"
-                        },
-                    ],
-                    "minSortCandidates": 2
-                }
-            )
-
-        self.assertIn(
-            "minSortCandidates must be at least as large as offset + limit",
-            str(cm.exception)
+        res = self.client.index(self.unstructured_index_name).search(
+            q="test",
+            search_method="HYBRID",
+            limit=1,
+            offset=2,
+            sort_by={
+                "fields": [
+                    {
+                        "fieldName": "title",
+                        "order": "asc",
+                        "missing": "last"
+                    },
+                ],
+                "minSortCandidates": 2
+            }
         )
+        # sort candidates should be returned even if it's less than limit + offset
+        self.assertIn("_sortCandidates", res)
 
     def test_sort_by_can_not_sort_more_than_3_fields(self):
         with self.assertRaises(MarqoWebError) as cm:

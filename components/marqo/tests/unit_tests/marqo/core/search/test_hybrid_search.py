@@ -585,6 +585,84 @@ class TestRecencyValidation(TestCase):
         self.assertIn("growFrom", str(ctx.exception))
         self.assertIn(str(constants.MARQO_RECENCY_GROW_MINIMUM_VERSION), str(ctx.exception))
 
+    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
+    def test_center_recency_on_old_schema_version_raises_error(self, mock_metrics):
+        """Test that recency center parameter on old schema version raises UnsupportedFeatureError."""
+        self._setup_metrics_mock(mock_metrics)
+
+        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.schema_template_version = "2.25.0"
+        marqo_index.marqo_version = "2.25.0"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.25.0")
+        type(marqo_index).index_supports_recency_scoring = PropertyMock(return_value=True)
+        type(marqo_index).index_supports_recency_grow = PropertyMock(return_value=True)
+        type(marqo_index).index_supports_recency_center_and_subqueries = PropertyMock(return_value=False)
+
+        config = Mock(spec=Config)
+
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            decay_function="exponential",
+            decay_to=0.5,
+            center=1234.0,
+        )
+
+        hybrid_search = HybridSearch()
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            hybrid_search.search(
+                config=config,
+                marqo_index=marqo_index,
+                query="test",
+                hybrid_parameters=HybridParameters(),
+                recency_parameters=recency_params
+            )
+
+        self.assertIn("center", str(ctx.exception))
+        self.assertIn(str(constants.MARQO_RECENCY_CENTER_AND_SUBQUERIES_MINIMUM_VERSION), str(ctx.exception))
+
+    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
+    def test_apply_to_subqueries_on_old_schema_version_raises_error(self, mock_metrics):
+        """Test that recency applyToSubqueries parameter on old schema version raises UnsupportedFeatureError."""
+        self._setup_metrics_mock(mock_metrics)
+
+        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.schema_template_version = "2.25.0"
+        marqo_index.marqo_version = "2.25.0"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.25.0")
+        type(marqo_index).index_supports_recency_scoring = PropertyMock(return_value=True)
+        type(marqo_index).index_supports_recency_grow = PropertyMock(return_value=True)
+        type(marqo_index).index_supports_recency_center_and_subqueries = PropertyMock(return_value=False)
+
+        config = Mock(spec=Config)
+
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            decay_function="exponential",
+            decay_to=0.5,
+            apply_to_subqueries=["tensor"],
+        )
+
+        hybrid_search = HybridSearch()
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            hybrid_search.search(
+                config=config,
+                marqo_index=marqo_index,
+                query="test",
+                hybrid_parameters=HybridParameters(),
+                recency_parameters=recency_params
+            )
+
+        self.assertIn("applyToSubqueries", str(ctx.exception))
+        self.assertIn(str(constants.MARQO_RECENCY_CENTER_AND_SUBQUERIES_MINIMUM_VERSION), str(ctx.exception))
+
     @patch('marqo.core.search.hybrid_search.vespa_index_factory')
     @patch('marqo.core.search.hybrid_search.run_vectorise_pipeline')
     @patch('marqo.core.search.hybrid_search.utils.parse_lexical_query')
