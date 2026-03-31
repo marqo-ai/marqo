@@ -51,7 +51,6 @@ class TestLexicalSearchOptionalTerms(MarqoTestCase):
         )
 
     def setUp(self):
-        super().setUp()
         self.device_patcher = mock.patch.dict(os.environ, {
             "MARQO_BEST_AVAILABLE_DEVICE": "cpu",
         })
