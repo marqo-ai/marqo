@@ -2,6 +2,7 @@ import re
 import time
 import unittest
 from typing import List, Set, Optional
+from unittest import mock
 
 from marqo import version
 from marqo.core.models import MarqoTensorQuery, MarqoLexicalQuery, MarqoQuery
@@ -12,6 +13,7 @@ from marqo.core.structured_vespa_index.structured_vespa_index import StructuredV
 from marqo.core.structured_vespa_index.structured_vespa_schema import StructuredVespaSchema
 from marqo.core.exceptions import InvalidFieldNameError
 from marqo.exceptions import InvalidArgumentError
+from marqo.settings.settings import Settings
 
 
 class TestStructuredVespaIndexGetFilterString(unittest.TestCase):
@@ -118,6 +120,39 @@ class TestStructuredVespaIndexGetFilterString(unittest.TestCase):
                 else:
                     result_filter_string = self.vespa_index._get_filter_term(marqo_query)
                     self.assertIn(expected_result, result_filter_string)
+
+    def _get_filter(self, filter_string: str) -> str:
+        marqo_query = MarqoQuery(
+            index_name=self.vespa_index._marqo_index.name,
+            limit=10,
+            filter=filter_string,
+            score_modifiers=[],
+            expose_facets=False
+        )
+        return self.vespa_index._get_filter_term(marqo_query)
+
+    def test_in_filter_exceeds_max_limit_raises_error(self):
+        """IN filter exceeding MARQO_MAX_IN_FILTER_IDS raises InvalidArgumentError."""
+        max_ids = 3
+        ids = [f'val_{i}' for i in range(max_ids + 1)]
+        filter_str = 'title IN (' + ', '.join(ids) + ')'
+
+        with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=max_ids)):
+            with self.assertRaises(InvalidArgumentError) as cm:
+                self._get_filter(filter_str)
+
+        self.assertIn("MARQO_MAX_IN_FILTER_IDS", str(cm.exception))
+        self.assertIn(str(max_ids), str(cm.exception))
+
+    def test_in_filter_at_max_limit_succeeds(self):
+        """IN filter with exactly MARQO_MAX_IN_FILTER_IDS values succeeds."""
+        max_ids = 5
+        ids = [f'val_{i}' for i in range(max_ids)]
+        filter_str = 'title IN (' + ', '.join(ids) + ')'
+
+        with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=max_ids)):
+            result = self._get_filter(filter_str)
+        self.assertIn('title in (', result)
 
     def test_contains_filter_raises_error(self):
         """CONTAINS filter is not supported for structured indexes."""

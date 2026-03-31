@@ -19,6 +19,12 @@ class Settings(BaseSettings):
         "The S3 bucket from which Marqo downloads default models."
     )
 
+    marqo_max_in_filter_ids: int = Field(
+        10000, alias="MARQO_MAX_IN_FILTER_IDS", description=
+        "Maximum number of IDs allowed in a single _id IN(...) filter expression.",
+        ge=0
+    )
+
     marqo_search_random_connection_close_rate: float = Field(
         0, ge=0.0, le=1.0, alias="MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE",
         description="The rate of search requests that will randomly close the connection to enforce a new connect "
