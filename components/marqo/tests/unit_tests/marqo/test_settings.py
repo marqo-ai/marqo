@@ -76,6 +76,39 @@ class TestSettings(unittest.TestCase):
             settings = Settings()
             self.assertEqual(settings.marqo_default_models_s3_bucket, "s3://marqo-default-models-os")
 
+    def test_max_in_filter_ids_default(self):
+        """Test that the default MARQO_MAX_IN_FILTER_IDS is 10,000."""
+        with patch.dict("os.environ", {}, clear=True):
+            settings = Settings()
+            self.assertEqual(settings.marqo_max_in_filter_ids, 10000)
+
+    def test_max_in_filter_ids_from_env_var(self):
+        """Test setting MARQO_MAX_IN_FILTER_IDS via environment variable."""
+        test_cases = [0, 1, 100, 7670, 10000, 50000]
+        for value in test_cases:
+            with self.subTest(value=value):
+                with patch.dict("os.environ", {"MARQO_MAX_IN_FILTER_IDS": str(value)}, clear=True):
+                    settings = Settings()
+                    self.assertEqual(settings.marqo_max_in_filter_ids, value)
+
+    def test_max_in_filter_ids_negative_raises_error(self):
+        """Test that a negative MARQO_MAX_IN_FILTER_IDS raises a validation error."""
+        with patch.dict("os.environ", {"MARQO_MAX_IN_FILTER_IDS": "-1"}, clear=True):
+            with self.assertRaises(ValidationError):
+                Settings()
+
+    def test_max_in_filter_ids_non_int_raises_error(self):
+        """Test that a non-integer MARQO_MAX_IN_FILTER_IDS raises a validation error."""
+        with patch.dict("os.environ", {"MARQO_MAX_IN_FILTER_IDS": "not_a_number"}, clear=True):
+            with self.assertRaises(ValidationError):
+                Settings()
+
+    def test_max_in_filter_ids_zero_is_valid(self):
+        """Test that zero is a valid MARQO_MAX_IN_FILTER_IDS (disables the filter)."""
+        with patch.dict("os.environ", {"MARQO_MAX_IN_FILTER_IDS": "0"}, clear=True):
+            settings = Settings()
+            self.assertEqual(settings.marqo_max_in_filter_ids, 0)
+
 
 class TestRandomConnectionCloseRateSetting(unittest.TestCase):
     """Tests for the marqo_search_random_connection_close_rate setting."""
