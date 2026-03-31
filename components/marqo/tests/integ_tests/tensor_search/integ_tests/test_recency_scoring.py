@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 import math
 import pytest
 
+from pydantic.v1 import ValidationError
+
 from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
@@ -18,7 +20,8 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.recency_parameters import RecencyParameters
+from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase
 from marqo.tensor_search.models.relevance_cutoff_model import (
     RelevanceCutoffModel, RelevanceCutoffMethod
 )
@@ -435,12 +438,16 @@ class TestRecencyScoring(MarqoTestCase):
 
         return max(floor_value, score)
 
-    def _get_doc_age_seconds(self, hit: Dict) -> Optional[float]:
+    def _get_doc_age_seconds(self, hit: Dict, center: Optional[float] = None) -> Optional[float]:
         """Get the age in seconds for a document based on its timestamp field.
 
+        Args:
+            hit: Search result document
+            center: Fixed reference timestamp (Unix epoch seconds). Uses now() if None.
+
         Returns:
-            - Positive value: past document (timestamp < now)
-            - Negative value: future document (timestamp > now)
+            - Positive value: past document (timestamp < reference)
+            - Negative value: future document (timestamp > reference)
             - None: document has no timestamp field
         """
         doc_id = hit.get('_id')
@@ -450,8 +457,8 @@ class TestRecencyScoring(MarqoTestCase):
         # Use the actual timestamp from the document
         timestamp = hit.get('timestamp')
         if timestamp is not None:
-            current_time = datetime.now().timestamp()
-            return current_time - timestamp  # Can be negative for future docs
+            reference_time = center if center is not None else datetime.now().timestamp()
+            return reference_time - timestamp  # Can be negative for future docs
         return None
 
     # ============== Verification Helpers ==============
@@ -471,7 +478,7 @@ class TestRecencyScoring(MarqoTestCase):
             self.assertIsNotNone(actual_score, f"Recency score should be present for {doc_id}")
 
             # Calculate expected score
-            age_seconds = self._get_doc_age_seconds(hit)
+            age_seconds = self._get_doc_age_seconds(hit, center=recency_params.center)
             if age_seconds is not None:
                 expected_score = self._calculate_expected_score(
                     age_seconds, recency_params.scale, recency_params.offset, recency_params.decay_function, recency_params.decay_to,
@@ -1328,13 +1335,10 @@ class TestRecencyScoring(MarqoTestCase):
 
     def test_non_hybrid_search_method_not_supported(self):
         """Recency requires HYBRID search method (validated at API layer)."""
-        from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
-
         for search_method in ["TENSOR", "LEXICAL"]:
             with self.subTest(search_method=search_method):
-                with self.assertRaises(ValueError) as ctx:
-                    BulkSearchQueryEntity(
-                        index=self.main_index.name,
+                with self.assertRaises(ValidationError) as ctx:
+                    SearchQuery(
                         q="product",
                         searchMethod=search_method,
                         recencyParameters={
@@ -1351,15 +1355,45 @@ class TestRecencyScoring(MarqoTestCase):
                     "Error should mention HYBRID search"
                 )
 
+    def test_apply_to_subqueries_non_hybrid_fails(self):
+        """applyToSubqueries requires HYBRID search method."""
+        for search_method in ["TENSOR", "LEXICAL"]:
+            with self.subTest(search_method=search_method):
+                with self.assertRaises(ValidationError) as ctx:
+                    SearchQuery(
+                        q="product",
+                        searchMethod=search_method,
+                        recencyParameters={
+                            "recencyField": "timestamp",
+                            "scale": "7d",
+                            "decayTo": 0.5,
+                            "applyToSubqueries": ["tensor"],
+                        }
+                    )
+                self.assertIn("HYBRID", str(ctx.exception))
+
+    def test_apply_to_subqueries_non_disjunction_fails(self):
+        """applyToSubqueries requires disjunction retrieval method."""
+        with self.assertRaises(ValidationError) as ctx:
+            SearchQuery(
+                q="product",
+                searchMethod="HYBRID",
+                hybridParameters={"retrievalMethod": "lexical", "rankingMethod": "lexical"},
+                recencyParameters={
+                    "recencyField": "timestamp",
+                    "scale": "7d",
+                    "decayTo": 0.5,
+                    "applyToSubqueries": ["tensor"],
+                }
+            )
+        self.assertIn("disjunction", str(ctx.exception).lower())
+
     def test_sort_by_with_non_exclude_global_fails(self):
         """sortBy + recency should fail unless exclude-global."""
-        from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
-
         for phase in ["all", "only-global"]:
             with self.subTest(phase=phase):
-                with self.assertRaises(ValueError) as ctx:
-                    BulkSearchQueryEntity(
-                        index=self.main_index.name,
+                with self.assertRaises(ValidationError) as ctx:
+                    SearchQuery(
                         q="product",
                         searchMethod="HYBRID",
                         recencyParameters={
@@ -1533,17 +1567,224 @@ class TestRecencyScoring(MarqoTestCase):
                  "grow_from": 0.5, "grow_function": "exponential"},
                 "Grow parameters must be either all provided or all omitted"
             ),
+            (
+                "negative center value",
+                {"recency_field": "timestamp", "center": -1.0},
+                "ensure this value is greater than or equal to 0"
+            ),
+            (
+                "invalid apply_to_subqueries value",
+                {"recency_field": "timestamp", "apply_to_subqueries": ["invalid"]},
+                "unexpected value; permitted:"
+            ),
+            (
+                "mixed invalid apply_to_subqueries",
+                {"recency_field": "timestamp", "apply_to_subqueries": ["tensor", "bad"]},
+                "unexpected value; permitted:"
+            ),
         ]
 
         for description, kwargs, expected_error in validation_cases:
             with self.subTest(case=description):
-                with self.assertRaises(ValueError) as ctx:
+                with self.assertRaises(ValidationError) as ctx:
                     RecencyParameters(**kwargs)
                 self.assertIn(
                     expected_error,
                     str(ctx.exception),
                     f"Error for '{description}' should contain '{expected_error}'"
                 )
+
+    def test_apply_to_subqueries_deduplicates(self):
+        """Duplicate values in applyToSubqueries are deduplicated."""
+        params = RecencyParameters(
+            recency_field="timestamp",
+            apply_to_subqueries=["tensor", "tensor"]
+        )
+        self.assertEqual(["tensor"], params.apply_to_subqueries)
+
+        params2 = RecencyParameters(
+            recency_field="timestamp",
+            apply_to_subqueries=["lexical", "tensor", "lexical"]
+        )
+        self.assertEqual(["lexical", "tensor"], params2.apply_to_subqueries)
+
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
+    def test_apply_to_subqueries_controls_recency_application(self):
+        """Test that applyToSubqueries controls which subquery scores are modified by recency.
+
+        Uses apply_in_ranking_phase="exclude-global" to isolate the subquery effect —
+        recency only modifies first-phase subquery scores, not the global RRF score.
+        Uses rerankDepthTensor=20 to ensure all documents appear in the tensor result set.
+
+        Baseline: no recency parameters at all.
+        For each variant, verifies:
+        - _recency_score is present and correctly calculated
+        - []: _tensor_score and _lexical_score unchanged from baseline
+        - ["tensor"]: _tensor_score = baseline * recency, _lexical_score unchanged
+        - ["lexical"]: _lexical_score = baseline * recency, _tensor_score unchanged
+        - ["tensor", "lexical"]: both scores = baseline * recency
+        """
+        self._add_shared_documents()
+
+        recency_base_params = dict(
+            recency_field="timestamp",
+            scale="60d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.3,
+            grow_from=0.2,
+            grow_function="linear",
+            grow_scale="45d",
+            grow_offset="1d",
+            apply_in_ranking_phase="exclude-global",
+        )
+
+        hybrid_params = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            rerankDepthTensor=20,
+        )
+
+        # Baseline: no recency at all
+        baseline_result = tensor_search.search(
+            config=self.config,
+            index_name=self.main_index.name,
+            text="product",
+            search_method=SearchMethod.HYBRID,
+            hybrid_parameters=hybrid_params,
+            result_count=20,
+        )
+        baseline_scores = self._extract_scores(baseline_result['hits'])
+
+        # (apply_to, recency_on_tensor, recency_on_lexical)
+        test_cases = [
+            ([], False, False),
+            (["tensor"], True, False),
+            (["lexical"], False, True),
+            (["tensor", "lexical"], True, True),
+        ]
+
+        for apply_to, recency_on_tensor, recency_on_lexical in test_cases:
+            with self.subTest(apply_to_subqueries=apply_to):
+                recency_params = RecencyParameters(
+                    **recency_base_params,
+                    apply_to_subqueries=apply_to,
+                )
+                result = tensor_search.search(
+                    config=self.config,
+                    index_name=self.main_index.name,
+                    text="product",
+                    search_method=SearchMethod.HYBRID,
+                    hybrid_parameters=hybrid_params,
+                    recency_parameters=recency_params,
+                    result_count=20,
+                )
+                hits = result['hits']
+                self.assertGreater(len(hits), 0)
+
+                # 1. Verify _recency_score is present and correct
+                self._verify_recency_behavior(hits, recency_params)
+
+                variant_scores = self._extract_scores(hits)
+
+                # Verify baseline and variant return the same doc IDs
+                baseline_ids = set(baseline_scores)
+                variant_ids = set(variant_scores)
+                self.assertEqual(baseline_ids, variant_ids,
+                    f"Baseline and variant should return the same doc IDs. "
+                    f"Only in baseline: {baseline_ids - variant_ids}, "
+                    f"Only in variant: {variant_ids - baseline_ids}")
+
+                for doc_id in variant_scores:
+                    b = baseline_scores[doc_id]
+                    v = variant_scores[doc_id]
+                    recency = v['recency']
+
+                    # 2. Check tensor scores (skip if baseline has no tensor score)
+                    if b['tensor'] is not None:
+                        if recency_on_tensor:
+                            expected_tensor = b['tensor'] * recency
+                            self.assertAlmostEqual(
+                                expected_tensor, v['tensor'], places=5,
+                                msg=f"Doc {doc_id}: tensor score should be baseline * recency"
+                            )
+                        else:
+                            self.assertAlmostEqual(
+                                b['tensor'], v['tensor'], places=5,
+                                msg=f"Doc {doc_id}: tensor score should match baseline"
+                            )
+
+                    # 3. Check lexical scores (skip if baseline has no lexical score)
+                    if b['lexical'] is not None:
+                        if recency_on_lexical:
+                            expected_lexical = b['lexical'] * recency
+                            self.assertAlmostEqual(
+                                expected_lexical, v['lexical'], places=5,
+                                msg=f"Doc {doc_id}: lexical score should be baseline * recency"
+                            )
+                        else:
+                            self.assertAlmostEqual(
+                                b['lexical'], v['lexical'], places=5,
+                                msg=f"Doc {doc_id}: lexical score should match baseline"
+                            )
+
+    @pytest.mark.skip_for_multinode(
+        "Multi-nodes will return different lexical results so we can not assert on the results.")
+    def test_center_produces_reproducible_scores(self):
+        """Test that center parameter produces the same scores across multiple queries.
+
+        Uses center=now-20min so all three documents are in the past relative to center,
+        covering a range of ages: recent (20min), medium (4d), and old (14d).
+        """
+        now = datetime.now()
+        documents = [
+            {"_id": "doc-recent", "title": "recent document about technology",
+             "timestamp": (now - timedelta(hours=1)).timestamp()},
+            {"_id": "doc-medium", "title": "medium age document about technology",
+             "timestamp": (now - timedelta(days=4)).timestamp()},
+            {"_id": "doc-old", "title": "old document about technology",
+             "timestamp": (now - timedelta(days=14)).timestamp()},
+        ]
+        self.add_documents(
+            self.config,
+            AddDocsParams(index_name=self.main_index.name, docs=documents, tensor_fields=["title"]),
+        )
+
+        fixed_center = (now - timedelta(minutes=20)).timestamp()
+        recency_params = RecencyParameters(
+            recency_field="timestamp", scale="7d", decay_to=0.5, center=fixed_center
+        )
+
+        results_1 = tensor_search.search(
+            config=self.config, index_name=self.main_index.name,
+            text="technology", search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF),
+            recency_parameters=recency_params, result_count=10,
+        )
+
+        time.sleep(2)
+
+        results_2 = tensor_search.search(
+            config=self.config, index_name=self.main_index.name,
+            text="technology", search_method=SearchMethod.HYBRID,
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction, rankingMethod=RankingMethod.RRF),
+            recency_parameters=recency_params, result_count=10,
+        )
+
+        # Verify recency scores are correctly calculated for both runs
+        self._verify_recency_behavior(results_1['hits'], recency_params)
+        self._verify_recency_behavior(results_2['hits'], recency_params)
+
+        # Verify both runs produce identical ordering and scores
+        self.assertEqual(len(results_1["hits"]), len(results_2["hits"]))
+        for hit1, hit2 in zip(results_1["hits"], results_2["hits"]):
+            self.assertEqual(hit1["_id"], hit2["_id"])
+            self.assertEqual(hit1["_recency_score"], hit2["_recency_score"],
+                             f"Recency score mismatch for {hit1['_id']}")
+            self.assertAlmostEqual(hit1["_score"], hit2["_score"], places=5)
 
 
 if __name__ == '__main__':

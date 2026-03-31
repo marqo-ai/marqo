@@ -122,7 +122,8 @@ jobs:
         id: build-and-push-model-management
         uses: docker/build-push-action@v6
         with:
-          context: ./components/model_management
+          context: ./components
+          file: ./components/model_management/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.prepare.outputs.model_tags }}

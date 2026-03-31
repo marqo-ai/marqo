@@ -1,19 +1,20 @@
+from concurrent.futures import ThreadPoolExecutor
+from json import JSONDecodeError
+
 import asyncio
+import certifi
+import httpcore
+import httpx
 import io
+import orjson
 import os
+import random
+import ssl
 import tarfile
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
-from json import JSONDecodeError
 from typing import Dict, Any, List, Optional, Union, Tuple
 from urllib.parse import urlparse
-
-import httpcore
-import httpx
-import orjson
-import ssl
-import certifi
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
@@ -21,9 +22,10 @@ from marqo.core.models import MarqoIndex
 from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.marqo_docs import update_documents_response
+from marqo.settings.settings import get_settings, Settings
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
-from marqo.vespa.models import VespaDocument, QueryResult, Error, FeedBatchDocumentResponse, FeedBatchResponse, \
+from marqo.vespa.models import VespaDocument, QueryResult, Error, FeedBatchResponse, \
     FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
@@ -33,6 +35,7 @@ from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitD
 
 logger = marqo.logging.get_logger(__name__)
 
+settings: Settings = get_settings()
 
 class VespaClient:
     _VESPA_ERROR_CODE_TO_EXCEPTION = {
@@ -262,8 +265,20 @@ class VespaClient:
             f"{status_info}"
         )
 
+    def _should_drop_connection(self, seed: Optional[int] = None) -> bool:
+        """
+        Whether to drop the connection or not, based on a random value and the configured drop rate.
+        :return: True if the connection should be dropped, False otherwise
+        """
+        if settings.marqo_search_random_connection_close_rate <= 0:
+            return False
+        else:
+            rng = random.Random(seed)
+            return  rng.random()< settings.marqo_search_random_connection_close_rate
+
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
-              query_features: Dict[str, Any] = None, timeout: Optional[float] = None, **kwargs) -> QueryResult:
+              query_features: Dict[str, Any] = None, timeout: Optional[float] = None,
+              drop_connection_random_seed: Optional[int]=None, **kwargs) -> QueryResult:
         """
         Query Vespa.
         Args:
@@ -273,6 +288,9 @@ class VespaClient:
             model_restrict: Schema to restrict the query to
             query_features: Query features
             timeout: The Vespa query timeout in milliseconds. If not set, the default timeout will be used.
+            drop_connection_random_seed: An optional random seed for dropping connection randomly.
+                This is for testing purpose to make the random behavior deterministic.
+                If not set, the random seed will be truly random.
             **kwargs: Additional query parameters
         Returns:
             Query result as a VespaQueryResult object
@@ -303,8 +321,16 @@ class VespaClient:
 
         logger.debug(f'Query: {query}')
 
+        if self._should_drop_connection(seed=drop_connection_random_seed):
+            logger.debug('Dropping connection for this query according to a set rate ')
+            headers = {"Connection": "close"}
+        else:
+            headers = None
+
         try:
-            resp = self.http_client.post(f'{self.query_url}/search/', json=query, timeout=httpx_client_timeout)
+            resp = self.http_client.post(
+                f'{self.query_url}/search/', json=query, timeout=httpx_client_timeout, headers=headers
+            )
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
