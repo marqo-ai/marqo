@@ -150,7 +150,8 @@ jobs:
         id: build-and-push-model-management
         uses: docker/build-push-action@v6
         with:
-          context: ./components/model_management
+          context: ./components
+          file: ./components/model_management/Dockerfile
           push: true
           platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management:${{ env.IMAGE_TAG }}
