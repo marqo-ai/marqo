@@ -109,8 +109,8 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
 
         self.maxDiff = None
         self.assertEqual(
-            self._remove_empty_lines_in_schema(expected_schema),
-            self._remove_empty_lines_in_schema(generated_schema)
+            self._remove_whitespace_in_schema(expected_schema),
+            self._remove_whitespace_in_schema(generated_schema)
         )
 
     def test_semi_structured_index_schema_with_pre_2_16(self):

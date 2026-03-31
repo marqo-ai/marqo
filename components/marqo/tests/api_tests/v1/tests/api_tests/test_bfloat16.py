@@ -54,11 +54,12 @@ class TestBfloat16(MarqoTestCase):
         )
         self.assertEqual("doc3", lexical_res["hits"][0]["_id"])
 
-        # Hybrid search
+        # Hybrid search - still works with bf16 vectors, should return all relevant docs
         hybrid_res = self.client.index(self.unstructured_index_name).search(
             q="fox jumping", search_method="HYBRID"
         )
-        self.assertEqual(3, len(hybrid_res["hits"]))
+        hits = [hit["_id"] for hit in hybrid_res["hits"]]
+        self.assertEqual(["doc1", "doc2", "doc3"], hits)
 
     def test_bfloat16_get_document_with_vectors(self):
         """Verify that documents can be retrieved with their bf16 vectors."""
