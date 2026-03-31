@@ -147,7 +147,11 @@ jobs:
       - name: Determine to_version
         id: get-to-version
         run: |
-          VERSION=$(python tests/compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.to_version }}" ]; then
+            VERSION="${{ github.event.inputs.to_version }}"
+          else
+            VERSION=$(python tests/compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
+          fi
           echo "to_version=${VERSION}" >> $GITHUB_OUTPUT
       # Step to generate the list of versions to test
       - name: Generate version list #this code block just generates the from_version list and stores it in a versions variable as a list

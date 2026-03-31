@@ -26,7 +26,6 @@ jobs:
       - name: Get current version
         id: version
         run: |
-          
           pip install ../common
           
           VERSION=$(python -c "import sys; sys.path.append('./src'); from marqo.version import __version__; print('.'.join(__version__.split('.')[:2]))")
