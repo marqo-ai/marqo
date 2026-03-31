@@ -109,7 +109,7 @@ schema {{ index.schema_name }} {
             indexing: summary
         }
 
-        field {{ field.embeddings_field_name }} type tensor<float>(p{}, x[{{ dimension }}]) {
+        field {{ field.embeddings_field_name }} type tensor<{{ index.vector_numeric_type.value }}>(p{}, x[{{ dimension }}]) {
             indexing: attribute | index | summary
             attribute {
                 distance-metric: {{ index.distance_metric.value }}
@@ -143,7 +143,7 @@ schema {{ index.schema_name }} {
             query({{ field.embeddings_field_name }}): 0
             {% endfor -%}
             query(marqo__bm25_aggregator): 0
-            query(marqo__query_embedding) tensor<float>(x[{{ dimension }}])
+            query(marqo__query_embedding) tensor<{{ index.vector_numeric_type.value }}>(x[{{ dimension }}])
             query(marqo__mult_weights_lexical) tensor<double>(p{})
             query(marqo__add_weights_lexical) tensor<double>(p{})
             query(marqo__mult_weights_tensor) tensor<double>(p{})
@@ -506,7 +506,7 @@ schema {{ index.schema_name }} {
         inputs {
             query(marqo__fields_to_rank_lexical) tensor<int8>(p{})
             query(marqo__fields_to_rank_tensor) tensor<int8>(p{})
-            query(marqo__query_embedding) tensor<float>(x[{{ dimension }}])
+            query(marqo__query_embedding) tensor<{{ index.vector_numeric_type.value }}>(x[{{ dimension }}])
             query(marqo__mult_weights_lexical) tensor<double>(p{})
             query(marqo__add_weights_lexical) tensor<double>(p{})
             query(marqo__mult_weights_tensor) tensor<double>(p{})
@@ -624,7 +624,7 @@ schema {{ index.schema_name }} {
         {%- endfor %}
         {%- for field in index.tensor_fields %}
         summary {{ field.chunk_field_name }} type array<string> {}
-        summary {{ field.embeddings_field_name }} type tensor<float>(p{}, x[{{ dimension }}]) {}
+        summary {{ field.embeddings_field_name }} type tensor<{{ index.vector_numeric_type.value }}>(p{}, x[{{ dimension }}]) {}
         {%- endfor %}
     }
 
