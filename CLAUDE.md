@@ -1,5 +1,7 @@
 # General Guidelines
 - All imports should be at the top of the file whenever possible.
+- We are deprecating `structured_vespa_index` so make all your changes directly to `semi_structured_vespa_index`
+  even if it supposedly inherits from `structured_vespa_index`.
 
 # Environment Setup
 

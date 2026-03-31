@@ -305,6 +305,55 @@ class TestTypeaheadIntegration(MarqoTestCase):
                 self.assertListEqual([q.query for q in sorted_queries[0:limit]],
                                      [s.suggestion for s in response.suggestions])
     
+    def test_get_suggestions_match_all_tokens_filters_unrelated_tokens(self):
+        """Test that matchAllTokens=True requires ALL tokens to match, filtering out partial matches.
+
+        With the default OR logic, "taylor s" returns results matching just "s" (e.g., "sport", "sad").
+        With matchAllTokens=True (AND logic), only results containing BOTH "taylor" AND "s*" are returned.
+        """
+        queries = [
+            TypeaheadAddQueryRequest(query="taylor swift", popularity=2.0),
+            TypeaheadAddQueryRequest(query="taylor", popularity=1.5),
+            TypeaheadAddQueryRequest(query="sport", popularity=1.8),
+            TypeaheadAddQueryRequest(query="sad", popularity=1.0),
+            TypeaheadAddQueryRequest(query="suspense", popularity=0.8),
+            TypeaheadAddQueryRequest(query="taylor series math", popularity=0.5),
+        ]
+        self._index_test_queries(queries)
+
+        # Default OR behavior: "taylor s" matches anything with "taylor" OR "s*"
+        request_or = TypeaheadRequest(q="taylor s")
+        response_or = self.config.typeahead.get_suggestions(self.test_index_name, request_or)
+        or_suggestions = [s.suggestion for s in response_or.suggestions]
+        # All 6 queries should be returned (OR matches any token)
+        self.assertCountEqual(
+            ["taylor swift", "taylor", "sport", "sad", "taylor series math", "suspense"],
+            or_suggestions
+        )
+
+        # matchAllTokens AND behavior: "taylor s" requires BOTH "taylor" AND "s*"
+        request_and = TypeaheadRequest(q="taylor s", match_all_tokens=True)
+        response_and = self.config.typeahead.get_suggestions(self.test_index_name, request_and)
+        and_suggestions = [s.suggestion for s in response_and.suggestions]
+        self.assertListEqual(
+            ["taylor swift", "taylor series math"],
+            and_suggestions
+        )
+
+    def test_get_suggestions_match_all_tokens_with_fuzzy(self):
+        """Test that matchAllTokens=True still allows fuzzy matching for typo tolerance."""
+        queries = [
+            TypeaheadAddQueryRequest(query="taylor swift", popularity=2.0),
+            TypeaheadAddQueryRequest(query="samsung galaxy", popularity=1.5),
+        ]
+        self._index_test_queries(queries)
+
+        # Typo in "taylor" -> "taylro", fuzzy should still match
+        request = TypeaheadRequest(q="taylro swi", match_all_tokens=True, fuzzy_edit_distance=2)
+        response = self.config.typeahead.get_suggestions(self.test_index_name, request)
+        suggestions = [s.suggestion for s in response.suggestions]
+        self.assertListEqual(["taylor swift"], suggestions)
+
     # D. Query Management Tests
     def test_get_queries_by_strings(self):
         """Retrieve specific queries by their query strings."""

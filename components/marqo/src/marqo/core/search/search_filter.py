@@ -159,6 +159,23 @@ class InTerm(Term):
         return f'{self.__class__.__name__}({repr(self.field)}, {repr(self.value_list)}, {repr(self.raw)})'
 
 
+class ContainsTerm(Term):
+    def __init__(self, field: str, value: str, raw: str):
+        super().__init__(field, raw)
+        self.value = value
+
+    def __eq__(self, other):
+        return (
+                type(self) == type(other) and
+                self.field == other.field and
+                self.value == other.value and
+                self.raw == other.raw
+        )
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({repr(self.field)}, {repr(self.value)}, {repr(self.raw)})'
+
+
 class And(Operator):
     def __init__(self, left: Node, right: Node, raw: str = 'AND'):
         super().__init__(left, right, raw)
@@ -228,10 +245,13 @@ class MarqoFilterStringParser:
 
     IN_TERM_DIVIDER = ' IN ('
 
+    CONTAINS_TERM_DIVIDER = ' CONTAINS '
+
     class _TermType(Enum):
         Equality = 1
         Range = 2
         In = 3
+        Contains = 4
 
     def _term_divider_is_IN(self, i: int, filter_string: str) -> bool:
         """
@@ -244,6 +264,14 @@ class MarqoFilterStringParser:
             self._error("Expected ( after ' IN '", filter_string, i)
 
         return candidate_substring == self.IN_TERM_DIVIDER
+
+    def _term_divider_is_CONTAINS(self, i: int, filter_string: str) -> bool:
+        """
+        Given 'i' and the full filter string, determine if 'i' is at the beginning of the CONTAINS term divider.
+        The keyword 'CONTAINS' is case-insensitive.
+        """
+        candidate_substring = filter_string[i:i + len(self.CONTAINS_TERM_DIVIDER)].upper()
+        return candidate_substring == self.CONTAINS_TERM_DIVIDER
 
     def _append_to_term_value(self, c: str):
         """
@@ -346,10 +374,11 @@ class MarqoFilterStringParser:
                         read_space_until = ')'
                     elif len(self._get_current_term_value()) == 0 and c == '[' and not read_space_until:  # start of term value
                         read_space_until = ']'
-                        if self._term_type != MarqoFilterStringParser._TermType.In:
-                            self._term_type = MarqoFilterStringParser._TermType.Range
+                        if self._term_type in (MarqoFilterStringParser._TermType.In,
+                                               MarqoFilterStringParser._TermType.Contains):
+                            self._error('[ and ] are only usable with the RANGE operator.', filter_string, i)
                         else:
-                            self._error('Unexpected [ after IN operator.', filter_string, i)
+                            self._term_type = MarqoFilterStringParser._TermType.Range
                     else:
                         self._append_to_term_value(c)
 
@@ -405,8 +434,19 @@ class MarqoFilterStringParser:
                 self._current_raw_token.append(c)
                 escape = True
             elif c == ' ':
+                # Found the ' CONTAINS ' operator.
+                if len(self._current_token) > 0 and self._term_divider_is_CONTAINS(i, filter_string):
+                    self._read_term_value = True
+                    self._term_type = MarqoFilterStringParser._TermType.Contains
+                    self._term_field = ''.join(self._current_token)
+                    self._current_token.append(self.CONTAINS_TERM_DIVIDER)
+                    self._current_raw_token.append(self.CONTAINS_TERM_DIVIDER)
+
+                    # Skip past ' CONTAINS ' (but not the last char, the loop increments i)
+                    i += len(self.CONTAINS_TERM_DIVIDER) - 1
+
                 # Found the ' IN ' operator. Look for a list starting with '(' on the next pass.
-                if self._term_divider_is_IN(i, filter_string):
+                elif self._term_divider_is_IN(i, filter_string):
                     self._read_term_value = True
                     self._term_type = MarqoFilterStringParser._TermType.In
                     self._term_value = [[]]
@@ -540,6 +580,8 @@ class MarqoFilterStringParser:
             elif term_type == self._TermType.In:
                 # For IN terms, term_value should already be a list, not a string
                 node = InTerm(term_field, term_value, raw_token)
+            elif term_type == self._TermType.Contains:
+                node = ContainsTerm(term_field, term_value, raw_token)
             else:
                 raise InternalError(f'Unexpected term type {term_type}')
 
