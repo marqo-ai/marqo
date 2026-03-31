@@ -960,11 +960,11 @@ class TestSearch(MarqoTestCase):
                             or_phrases=["term1", "term2"],
                             and_phrases=["term3", "term4"]
                         ),
-                        '(weakAnd(default contains "term1", default contains "term2")) AND '
-                        '(default contains "term3" AND default contains "term4")'
+                        'rank(default contains "term3" AND default contains "term4", '
+                        'weakAnd(default contains "term1", default contains "term2"))'
                         if isinstance(index, StructuredVespaIndex)
-                        else '((weakAnd(default contains "term1", default contains "term2")) '
-                             'AND (default contains "term3" AND default contains "term4"))'
+                        else '(rank(default contains "term3" AND default contains "term4", '
+                             'weakAnd(default contains "term1", default contains "term2")))'
                     ),
                 ]
 

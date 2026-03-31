@@ -114,3 +114,53 @@ class TestStructuredIndexBuildLexicalSearchQuery(MarqoTestCase):
                     test_marqo_query
                 )
                 self.assertEqual(generated_and_terms, expected_and_terms)
+
+    def test_lexical_search_term_or_and_phrases_uses_rank(self):
+        """When both or_phrases and and_phrases exist, YQL uses rank() so optional terms
+        only contribute to scoring, not recall."""
+        test_cases = [
+            (
+                ['opt1', 'opt2'], ['req1'], None,
+                'rank(default contains "req1", weakAnd(default contains "opt1", default contains "opt2"))',
+                "or+and, no searchable attrs"
+            ),
+            (
+                ['opt1'], ['req1', 'req2'], None,
+                'rank(default contains "req1" AND default contains "req2", weakAnd(default contains "opt1"))',
+                "1 or + 2 and, no searchable attrs"
+            ),
+            (
+                ['opt1', 'opt2'], ['req1'], ['lexical_field_1'],
+                'rank((marqo__lexical_lexical_field_1 contains "req1"), '
+                'weakAnd((marqo__lexical_lexical_field_1 contains "opt1"), '
+                '(marqo__lexical_lexical_field_1 contains "opt2")))',
+                "or+and with searchable attrs"
+            ),
+        ]
+        for or_phrases, and_phrases, attrs, expected, msg in test_cases:
+            with self.subTest(msg):
+                q = self._help_create_test_lexical_query_object(
+                    or_phrases=or_phrases,
+                    and_phrases=and_phrases,
+                    searchable_attributes=attrs,
+                )
+                result = self.structured_vespa_index._get_lexical_search_term(q)
+                self.assertEqual(result, expected)
+
+    def test_lexical_search_term_only_or_phrases_no_rank(self):
+        """When only or_phrases exist, return weakAnd without rank()."""
+        q = self._help_create_test_lexical_query_object(
+            or_phrases=['opt1', 'opt2'],
+            and_phrases=[],
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(q)
+        self.assertEqual(result, 'weakAnd(default contains "opt1", default contains "opt2")')
+
+    def test_lexical_search_term_only_and_phrases_no_rank(self):
+        """When only and_phrases exist, return AND terms without rank()."""
+        q = self._help_create_test_lexical_query_object(
+            or_phrases=[],
+            and_phrases=['req1', 'req2'],
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(q)
+        self.assertEqual(result, 'default contains "req1" AND default contains "req2"')

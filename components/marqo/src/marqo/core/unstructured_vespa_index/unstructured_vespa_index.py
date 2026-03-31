@@ -263,13 +263,10 @@ class UnstructuredVespaIndex(VespaIndex):
             and_terms = ' AND '.join([
                 f'default contains "{phrase}"' for phrase in marqo_query.and_phrases
             ])
-            if or_terms:
-                or_terms = f'({or_terms})'
-                and_terms = f' AND ({and_terms})'
         else:
             and_terms = ''
 
-        return f'{or_terms}{and_terms}'
+        return self._combine_lexical_or_and_terms(or_terms, and_terms)
 
     def _to_vespa_lexical_query(self, marqo_query: MarqoLexicalQuery) -> Dict[str, Any]:
         lexical_term = self._get_lexical_search_term(marqo_query)

@@ -301,6 +301,20 @@ class VespaIndex(ABC):
         return query.rerank_depth_tensor if query.rerank_depth_tensor else base_rerank_depth, additional_hits
 
     @staticmethod
+    def _combine_lexical_or_and_terms(or_terms: str, and_terms: str) -> str:
+        """Combine optional (OR) and required (AND) lexical terms using Vespa rank().
+
+        When both are present, rank() makes and_terms the recall set and or_terms
+        scoring-only, so optional terms never filter out documents.
+        """
+        if or_terms and and_terms:
+            return f'rank({and_terms}, {or_terms})'
+        elif and_terms:
+            return and_terms
+        else:
+            return or_terms
+
+    @staticmethod
     def escape(s: str) -> str:
         """
         Used for filter string construction.

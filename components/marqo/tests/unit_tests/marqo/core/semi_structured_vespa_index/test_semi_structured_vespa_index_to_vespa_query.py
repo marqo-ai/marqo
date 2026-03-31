@@ -200,7 +200,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     'language': 'en'
                 },
                 'expected_query': {
-                    'yql': 'select * from test_index where ((weakAnd(default contains "machine learning", default contains "artificial intelligence")) AND (default contains "deep"))',
+                    'yql': 'select * from test_index where (rank(default contains "deep", weakAnd(default contains "machine learning", default contains "artificial intelligence")))',
                     'model_restrict': 'test_index',
                     'hits': 20,
                     'offset': 5,
@@ -307,7 +307,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     'marqo__ranking.lexical.tensor': 'hybrid_bm25_then_embedding_similarity',
                     'marqo__ranking.tensor.lexical': 'hybrid_embedding_similarity_then_bm25',
                     'marqo__ranking.tensor.tensor': 'embedding_similarity',
-                    'marqo__yql.lexical': 'select * from test_index where ((weakAnd(default contains "neural networks", default contains "deep learning")) AND (default contains "transformer"))',
+                    'marqo__yql.lexical': 'select * from test_index where (rank(default contains "transformer", weakAnd(default contains "neural networks", default contains "deep learning")))',
                     'marqo__yql.tensor': 'select * from test_index where (({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))',
                     'model_restrict': 'test_index',
                     'offset': 10,
@@ -443,12 +443,11 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     "ranking.matching.weakand.allowDropAll": True,
                     "ranking.matching.filterThreshold": 0.4,
                     # Facets should still use the OR query structure
-                    'marqo__yql.facets': 'select * from test_index where ((default contains "neural networks" OR default contains "deep learning") '
-                                         'AND (default contains "transformer") OR '
+                    'marqo__yql.facets': 'select * from test_index where (rank(default contains "transformer", default contains "neural networks" OR default contains "deep learning") OR '
                                          '(({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) '
                                          'OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))) '
                                          'limit 0 | all(group(1.1) each(output(count())))',
-                    'marqo__yql.lexical': 'select * from test_index where (({targetHits:111}weakAnd(default contains "neural networks", default contains "deep learning")) AND (default contains "transformer"))',
+                    'marqo__yql.lexical': 'select * from test_index where (rank(default contains "transformer", {targetHits:111}weakAnd(default contains "neural networks", default contains "deep learning")))',
                     'marqo__yql.tensor': 'select * from test_index where (({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))',
                     'model_restrict': 'test_index',
                     'offset': 10,
@@ -1880,6 +1879,67 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             q, is_ranking_term=True, attributes_to_search=['tags']
         )
         self.assertEqual(result, "")
+
+    def test_get_lexical_search_term_or_and_phrases_uses_rank(self):
+        """When both or_phrases and and_phrases exist, YQL uses rank() so optional terms
+        only contribute to scoring, not recall."""
+        test_cases = [
+            {
+                'name': 'basic_or_and',
+                'or_phrases': ['machine learning', 'artificial intelligence'],
+                'and_phrases': ['deep'],
+                'expected': 'rank(default contains "deep", '
+                            'weakAnd(default contains "machine learning", default contains "artificial intelligence"))',
+            },
+            {
+                'name': 'multiple_and_phrases',
+                'or_phrases': ['optional'],
+                'and_phrases': ['required1', 'required2'],
+                'expected': 'rank(default contains "required1" AND default contains "required2", '
+                            'weakAnd(default contains "optional"))',
+            },
+        ]
+        for case in test_cases:
+            with self.subTest(case=case['name']):
+                q = MarqoLexicalQuery(
+                    index_name='test_index',
+                    limit=10,
+                    offset=0,
+                    or_phrases=case['or_phrases'],
+                    and_phrases=case['and_phrases'],
+                )
+                result = self.vespa_index._get_lexical_search_term(q)
+                self.assertEqual(result, case['expected'])
+
+    def test_get_lexical_search_term_only_or_phrases_no_rank(self):
+        """When only or_phrases exist (no and_phrases), return weakAnd without rank()."""
+        q = MarqoLexicalQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            or_phrases=['machine learning', 'artificial intelligence'],
+            and_phrases=[],
+        )
+        result = self.vespa_index._get_lexical_search_term(q)
+        self.assertEqual(
+            result,
+            'weakAnd(default contains "machine learning", default contains "artificial intelligence")'
+        )
+
+    def test_get_lexical_search_term_only_and_phrases_no_rank(self):
+        """When only and_phrases exist (no or_phrases), return AND terms without rank()."""
+        q = MarqoLexicalQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            or_phrases=[],
+            and_phrases=['deep', 'learning'],
+        )
+        result = self.vespa_index._get_lexical_search_term(q)
+        self.assertEqual(
+            result,
+            'default contains "deep" AND default contains "learning"'
+        )
 
     def test_hybrid_query_with_bm25_custom_score_includes_rank_in_yql(self):
         """With BM25 custom score modifiers, lexical and tensor YQL must wrap in rank() with extra BM25 term

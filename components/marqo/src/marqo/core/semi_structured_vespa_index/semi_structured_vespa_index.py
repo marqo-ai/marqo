@@ -266,12 +266,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 )
                 for phrase in marqo_query.and_phrases
             ])
-            if or_terms:
-                or_terms = f'({or_terms})'
-                and_terms = f' AND ({and_terms})'
         else:
             and_terms = ''
-        return f'{or_terms}{and_terms}'
+
+        return self._combine_lexical_or_and_terms(or_terms, and_terms)
 
     def _get_lexical_contains_term(
         self,
