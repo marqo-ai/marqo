@@ -21,6 +21,7 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
+from marqo.settings.settings import Settings
 from tests.integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
@@ -483,6 +484,22 @@ class TestSearch(MarqoTestCase):
 
         result_ids = {hit["_id"] for hit in res["hits"]}
         self.assertEqual({"in_test_1", "in_test_3"}, result_ids)
+
+    def test_filter_structured_index_in_exceeds_max_limit_raises_error(self):
+        """IN filter exceeding MARQO_MAX_IN_FILTER_IDS raises InvalidArgumentError on structured indexes."""
+        max_ids = 3
+        ids = [f'val_{i}' for i in range(max_ids + 1)]
+        filter_str = 'text_field_1 IN (' + ', '.join(ids) + ')'
+
+        with mock.patch("marqo.settings.settings._settings", Settings(marqo_max_in_filter_ids=max_ids)):
+            with self.assertRaises(base_exceptions.InvalidArgumentError) as cm:
+                tensor_search.search(
+                    config=self.config, index_name=self.structured_default_text_index.name,
+                    text="", filter=filter_str
+                )
+
+        self.assertIn("MARQO_MAX_IN_FILTER_IDS", str(cm.exception))
+        self.assertIn(str(max_ids), str(cm.exception))
 
     def test_filter_id(self):
         """
