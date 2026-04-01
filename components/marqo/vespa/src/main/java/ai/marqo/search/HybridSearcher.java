@@ -444,9 +444,19 @@ public class HybridSearcher extends Searcher {
      */
     @VisibleForTesting
     String injectMaxHitsIntoFacetsGrouping(String facetsYql, int maxHits, boolean verbose) {
-        // Find "| all(" or "| all( " — the separator between select clause and grouping.
+        if (facetsYql == null || facetsYql.isEmpty()) {
+            logIfVerbose("Empty or null facets YQL, skipping max injection", verbose);
+            return facetsYql == null ? "" : facetsYql;
+        }
+
+        if (maxHits < 1) {
+            throw new IllegalArgumentException("maxHits must be >= 1, got: " + maxHits);
+        }
+
+        // Find "| all(" — the separator between select clause and grouping.
         // We match on "| all(" rather than just "|" to be defensive against "|" appearing
         // in field names, search terms, or other parts of the YQL.
+        // Use lastIndexOf because the grouping clause is always at the end.
         int pipeAllIndex = facetsYql.lastIndexOf("| all(");
         if (pipeAllIndex == -1) {
             logIfVerbose(
@@ -458,16 +468,33 @@ public class HybridSearcher extends Searcher {
         String selectPart = facetsYql.substring(0, pipeAllIndex + 1); // includes the "|"
         String groupingPart = facetsYql.substring(pipeAllIndex + 1).trim(); // "all(..."
 
+        // Validate groupingPart has the expected structure: starts with "all(" and ends with ")"
+        if (!groupingPart.startsWith("all(") || !groupingPart.endsWith(")")) {
+            logIfVerbose(
+                    "Grouping part does not match expected 'all(...)' structure, "
+                            + "skipping max injection: "
+                            + groupingPart,
+                    verbose);
+            return facetsYql;
+        }
+
+        // Extract the inner content of all(...), handling variable whitespace after "all("
+        // e.g., "all(group(...)...)" or "all( max(100) all(group(...)...))"
+        String innerRaw =
+                groupingPart.substring(4, groupingPart.length() - 1); // between "all(" and ")"
+        String innerContent = innerRaw.trim();
+
+        if (innerContent.isEmpty()) {
+            logIfVerbose(
+                    "Empty grouping content in facets YQL, skipping max injection: " + facetsYql,
+                    verbose);
+            return facetsYql;
+        }
+
         // Wrap the existing grouping content with max(N) all(...).
         // Vespa requires all() or each() after max(), not group() directly.
         // E.g., all(group(...) each(...)) becomes all(max(N) all(group(...) each(...)))
         // If already nested (e.g., all( max(10) all(group(...)))), inject max(N) inside.
-        String innerContent;
-        if (groupingPart.startsWith("all( ")) {
-            innerContent = groupingPart.substring(5, groupingPart.length() - 1).trim();
-        } else {
-            innerContent = groupingPart.substring(4, groupingPart.length() - 1).trim();
-        }
         groupingPart = "all(max(" + maxHits + ") all(" + innerContent + "))";
 
         String result = selectPart + " " + groupingPart;
