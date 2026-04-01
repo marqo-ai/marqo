@@ -179,6 +179,9 @@ public class HybridSearcher extends Searcher {
                 readRelevanceCutoffParameter(query, relevanceCutoffMethod);
         Boolean relevanceCutoffAffectFacets =
                 query.properties().getBoolean("marqo__hybrid.relevanceCutoff.affectFacets", false);
+        Boolean relevanceCutoffOverrideSortCandidates =
+                query.properties()
+                        .getBoolean("marqo__hybrid.relevanceCutoff.overrideSortCandidates", false);
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
@@ -349,6 +352,11 @@ public class HybridSearcher extends Searcher {
         // Extract recency multiplier from match features after post-processing (only if recency is
         // enabled)
         processedHits = extractRecencyScore(processedHits, query, verbose);
+
+        // Override sortCandidates with relevantCandidates when requested
+        if (relevanceCutoffOverrideSortCandidates && relevantCandidates != null) {
+            sortCandidates = relevantCandidates;
+        }
 
         MarqoMetadataFields marqoMetadataFields =
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);

@@ -41,7 +41,9 @@ class RelevanceCutoffModel(StrictBaseModel):
     probe_depth: int = Field(1000, ge=1, alias="probeDepth")
     parameters: Union[RelativeMaxScoreParameters, MeanStdParameters, None] = None
     affect_facets: bool = Field(False, alias="affectFacets")
-    over_write_sort_candidates_by_relevant_candidates: bool = Field(False, alias="overWriteSortCandidatesByRelevantCandidates")
+    override_sort_candidates_with_relevant_candidates: bool = Field(
+        False, alias="overrideSortCandidatesWithRelevantCandidates"
+    )
 
     @root_validator(pre=False, skip_on_failure=True)
     def _validate_method_and_parameters(cls, values):

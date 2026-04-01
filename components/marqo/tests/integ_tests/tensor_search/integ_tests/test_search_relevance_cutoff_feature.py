@@ -1571,7 +1571,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
     when used together with sortBy.
 
     When affectFacets is enabled, facets and totalHits should only count documents that
-    pass the relevance cutoff. When overWriteSortCandidatesByRelevantCandidates is enabled,
+    pass the relevance cutoff. When overrideSortCandidatesWithRelevantCandidates is enabled,
     _sortCandidates should equal _relevantCandidates. When affectFacets is disabled,
     facets and totalHits should count all matching documents as usual.
     """
@@ -1706,13 +1706,13 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_hits, returned_hits)
 
     def test_overwrite_sort_candidates_aligns_sort_candidates_with_relevant_candidates(self):
-        """With overWriteSortCandidatesByRelevantCandidates, _sortCandidates equals _relevantCandidates."""
+        """With overrideSortCandidatesWithRelevantCandidates, _sortCandidates equals _relevantCandidates."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.2},
-                "overWriteSortCandidatesByRelevantCandidates": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
                 "affectFacets": True,
             },
             sort_by={"fields": [{"fieldName": "price"}]},
@@ -1732,13 +1732,13 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_hits, returned_hits)
 
     def test_overwrite_sort_candidates_aligns_sort_candidates_with_relevant_candidates_with_two_facets(self):
-        """With overWriteSortCandidatesByRelevantCandidates, _sortCandidates equals _relevantCandidates."""
+        """With overrideSortCandidatesWithRelevantCandidates, _sortCandidates equals _relevantCandidates."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.2},
-                "overWriteSortCandidatesByRelevantCandidates": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
                 "affectFacets": True,
             },
             sort_by={"fields": [{"fieldName": "price"}]},
@@ -1773,7 +1773,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.5},
                 "affectFacets": True,
-                "overWriteSortCandidatesByRelevantCandidates": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
             },
             sort_by={"fields": [{"fieldName": "price"}]},
             facets={"fields": {"color": {"type": "string"}}},
