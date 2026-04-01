@@ -28,14 +28,13 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
 
         @Test
         void shouldInsertMaxWhenNotPresent() {
-            // No max() in grouping — insert max(N) after "all("
-            // all(group(...) each(...)) -> all( max(5) group(...) each(...))
+            // No max() in grouping — wrap inner content with max(N) all(...)
+            // all(group(...) each(...)) -> all(max(5) all(group(...) each(...)))
             String input =
                     "select * from schema where (query) limit 0 | all(group(color)"
                             + " each(output(count())))";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
-            assertThat(result).contains("max(5)");
-            assertThat(result).contains("group(color)");
+            assertThat(result).endsWith("| all(max(5) all(group(color) each(output(count()))))");
         }
 
         @Test
@@ -135,7 +134,7 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
 
         @Test
         void shouldHandleRealWorldTotalHitsYqlFromVespaQuery() {
-            // totalHits YQL: no max() present, should insert max(5)
+            // totalHits YQL: no max() present, should wrap with max(5) all(...)
             String input =
                     "select * from marqo__facets_01rc_01match where ("
                             + "default contains \"universe\" OR default contains \"ocean\" OR "
@@ -146,8 +145,7 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
                             + "nearestNeighbor(marqo__embeddings_text, marqo__query_embedding))"
                             + ") limit 0 | all(group(1.1) each(output(count())))";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
-            assertThat(result).contains("max(5)");
-            assertThat(result).contains("group(1.1)");
+            assertThat(result).endsWith("| all(max(5) all(group(1.1) each(output(count()))))");
         }
     }
 

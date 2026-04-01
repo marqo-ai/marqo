@@ -520,8 +520,12 @@ public class HybridSearcher extends Searcher {
                 return facetsYql;
             }
         } else {
-            // No max(M) present — insert max(N) right after "all("
-            result = selectPart + " all( max(" + maxHits + ") " + groupingPart.substring(4);
+            // No max(M) present — wrap inner content with max(N) all(...)
+            // e.g., all(group(1.1) each(...)) -> all(max(N) all(group(1.1) each(...)))
+            // e.g., all( all(group(...) ...)) -> all(max(N) all(all(group(...) ...)))
+            // Note: for facets, inner content already starts with all(), so no extra nesting.
+            String innerContent = groupingPart.substring(4, groupingPart.length() - 1).trim();
+            result = selectPart + " all(max(" + maxHits + ") all(" + innerContent + "))";
             logIfVerbose(
                     String.format("Inserted max(%d) into facets grouping: %s", maxHits, result),
                     verbose);
