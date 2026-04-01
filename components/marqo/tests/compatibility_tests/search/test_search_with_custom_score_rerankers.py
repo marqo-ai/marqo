@@ -15,7 +15,7 @@ class TestSearchWithCustomScoreRerankers(BaseCompatibilityTestCase):
     unstructured_index_metadata = {
         "indexName": "test_search_api_unstructured_index_custom_score_rerankers",
         "type": "unstructured",
-        "model": "open_clip/ViT-B-16-SigLIP-512/webli"
+        "model": "open_clip/ViT-B-16-SigLIP/webli"
     }
 
     docs = [
