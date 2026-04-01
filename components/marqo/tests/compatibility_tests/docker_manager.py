@@ -222,7 +222,8 @@ class DockerManager:
                     "up",
                     "-d",
                     "--force-recreate",
-                    "--no-build" # To ignore any build instructions in the compose file
+                    "--no-build", # To ignore any build instructions in the compose file
+                    "--quiet-pull"
                 ],
                 check=True,
                 timeout=60
