@@ -1731,6 +1731,38 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_facets, result["facets"])
         self.assertEqual(expected_hits, returned_hits)
 
+    def test_overwrite_sort_candidates_aligns_sort_candidates_with_relevant_candidates_with_two_facets(self):
+        """With overWriteSortCandidatesByRelevantCandidates, _sortCandidates equals _relevantCandidates."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "overWriteSortCandidatesByRelevantCandidates": True,
+                "affectFacets": True,
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={
+                "fields": {
+                    "color": {"type": "string"},
+                    "brand": {"type": "string"},
+                },
+            },
+            track_total_hits=True,
+        )
+        self.assertEqual(5, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        self.assertEqual(5, result["_sortCandidates"])
+
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5"]
+        expected_facets = {
+            'color': {'blue': {'count': 3}, 'red': {'count': 2}},
+            'brand': {'External': {'count': 3}, 'Marqo': {'count': 2}}
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
+
     def test_stricter_cutoff_reduces_all_counts_consistently(self):
         """With a stricter relativeScoreFactor (0.5), fewer documents pass the cutoff.
         All counts (totalHits, relevantCandidates, sortCandidates, facets) reflect
