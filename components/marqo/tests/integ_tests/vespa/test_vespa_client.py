@@ -1,16 +1,18 @@
+from importlib import reload
+
 import asyncio
 import functools
-import json
-import os
-import time
-import unittest
-from unittest.mock import Mock, patch
-
 import httpcore
 import httpx
+import json
 import orjson
+import os
 import pytest
+import sys
+import time
+import unittest
 import vespa.application as pyvespa
+from unittest.mock import Mock, patch
 
 from marqo.tensor_search.api import generate_config
 from marqo.tensor_search.enums import EnvVars
@@ -912,3 +914,49 @@ class TestVespaClient(AsyncMarqoTestCase):
                     yql="select * from sources * where title contains 'Title 1';",
                     timeout=7000 # 7 seconds Vespa timeout, 8 seconds httpx timeout
                 )
+
+    def test_marqo_search_random_connection_close_rate_1(self):
+        """Test that query sends 'Connection: close' header based on the configured random close rate."""
+        documents = [
+            {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
+        ]
+        self.pyvespa_client.feed_iterable(documents, self.TEST_SCHEMA)
+
+        with self.help_mock_environment_variables_in_settings({"MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE": "1.0"}):
+            reload(sys.modules["marqo.vespa.vespa_client"])  # reload module to apply env var change
+            with patch.object(httpx.Client, "post", wraps=httpx.post) as mock_post:
+                self.client.query(
+                    yql="select * from sources * where title contains 'Title 1';",
+                    model_restrict=self.TEST_SCHEMA
+                )
+                headers = mock_post.call_args.kwargs.get("headers") or {}
+                self.assertEqual("close", headers.get("Connection"), )
+
+    def test_marqo_search_random_connection_close_rate_0(self):
+        with self.help_mock_environment_variables_in_settings({"MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE": "0.0"}):
+            reload(sys.modules["marqo.vespa.vespa_client"])
+            for _ in range(10):  # run multiple times to check that Connection: close is not sent
+                with patch.object(httpx.Client, "post", wraps=httpx.post) as mock_post:
+                    self.client.query(
+                        yql="select * from sources * where title contains 'Title 1';",
+                        model_restrict=self.TEST_SCHEMA
+                    )
+                    headers = mock_post.call_args.kwargs.get("headers")
+                    if headers:
+                        self.assertNotIn("Connection", headers)
+
+    def test_marqo_search_random_connection_close_rate_0_1(self):
+        with self.help_mock_environment_variables_in_settings({"MARQO_SEARCH_RANDOM_CONNECTION_CLOSE_RATE": "0.3"}):
+            reload(sys.modules["marqo.vespa.vespa_client"])
+            counter = 0
+            for seed in range(10):  # run multiple times to check that Connection: close is not sent
+                with patch.object(httpx.Client, "post", wraps=httpx.post) as mock_post:
+                    self.client.query(
+                        yql="select * from sources * where title contains 'Title 1';",
+                        model_restrict=self.TEST_SCHEMA, drop_connection_random_seed=seed
+                    )
+                    headers = mock_post.call_args.kwargs.get("headers")
+                    if headers and headers.get("Connection") == "close":
+                        counter += 1
+            self.assertEqual(4, counter)
+

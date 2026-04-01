@@ -622,6 +622,68 @@ class TestVespaClient(unittest.TestCase):
 
         mock_logger.warning.assert_not_called()
 
+    def test_query_sends_connection_close_header_when_should_drop(self):
+        """Test that query sends 'Connection: close' header when _should_drop_connection returns True."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
+
+        with patch.object(self.vespa_client, '_should_drop_connection', return_value=True), \
+             patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
+            self.vespa_client.query(yql="select * from sources * where test;")
+            headers = mock_post.call_args.kwargs["headers"]
+            self.assertEqual(headers, {"Connection": "close"})
+
+    def test_query_no_connection_close_header_when_should_not_drop(self):
+        """Test that query does not send 'Connection: close' header when _should_drop_connection returns False."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
+
+        with patch.object(self.vespa_client, '_should_drop_connection', return_value=False), \
+             patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
+            self.vespa_client.query(yql="select * from sources * where test;")
+            headers = mock_post.call_args.kwargs["headers"]
+            if headers:
+                self.assertNotIn("Connection", headers)
+
+    @patch('marqo.vespa.vespa_client.settings')
+    def test_query_no_connection_close_header_when_rate_is_zero(self, mock_settings):
+        """Test that query does not send 'Connection: close' header when rate is 0 (default)."""
+        mock_settings.marqo_search_random_connection_close_rate = 0
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
+
+        with patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
+            self.vespa_client.query(yql="select * from sources * where test;")
+            headers = mock_post.call_args.kwargs["headers"]
+            if headers:
+                self.assertNotIn("Connection", headers)
+
+    @patch('marqo.vespa.vespa_client.settings')
+    def test_query_connection_close_header_with_rate_1(self, mock_settings):
+        """Test that query always sends 'Connection: close' header when rate is 1.0."""
+        mock_settings.marqo_search_random_connection_close_rate = 1.0
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = '{"root": {"id": "test", "relevance": 1.0, "children": []}}'
+
+        with patch.object(httpx.Client, 'post', return_value=mock_response) as mock_post:
+            self.vespa_client.query(yql="select * from sources * where test;", drop_connection_random_seed=12)
+            headers = mock_post.call_args.kwargs["headers"]
+            self.assertEqual(headers, {"Connection": "close"})
+
+    @patch('marqo.vespa.vespa_client.settings')
+    def test_should_drop_connection_is_reproducible_with_same_seed(self, mock_settings):
+        """Test that _should_drop_connection returns the same result for the same seed."""
+        mock_settings.marqo_search_random_connection_close_rate = 0.5
+        result1 = self.vespa_client._should_drop_connection(seed=42)
+        result2 = self.vespa_client._should_drop_connection(seed=42)
+        self.assertEqual(result1, result2)
+
     @patch('marqo.vespa.vespa_client.logger')
     def test_wait_for_convergence_retries_on_httpx_timeout(self, mock_logger):
         """Test that httpx timeout exceptions are caught and retried."""

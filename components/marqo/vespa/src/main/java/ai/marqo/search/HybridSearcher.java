@@ -59,6 +59,10 @@ public class HybridSearcher extends Searcher {
             "marqo__custom_score_add_weights_global";
 
     private static String QUERY_INPUT_RECENCY_TIMESTAMP_KEY = "marqo__recency_timestamp_key";
+    private static String QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE =
+            "marqo__recency_should_apply_score";
+    private static String QUERY_INPUT_RECENCY_APPLY_TO_TENSOR = "marqo__recency_apply_to_tensor";
+    private static String QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL = "marqo__recency_apply_to_lexical";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private static String QUERY_RERANK_COUNT = "ranking.rerankCount";
@@ -1519,6 +1523,30 @@ public class HybridSearcher extends Searcher {
             logIfVerbose("Recency timestamp key tensor is null - not present in query", verbose);
         }
 
+        // Check applyToSubqueries flags and override recency if this subquery type shouldn't get it
+        boolean applyRecencyToTensor =
+                query.properties().getBoolean(QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, true);
+        boolean applyRecencyToLexical =
+                query.properties().getBoolean(QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, true);
+
+        boolean shouldDisableRecency = false;
+        if (retrievalMethod.equals(MARQO_SEARCH_METHOD_TENSOR) && !applyRecencyToTensor) {
+            shouldDisableRecency = true;
+        } else if (retrievalMethod.equals(MARQO_SEARCH_METHOD_LEXICAL) && !applyRecencyToLexical) {
+            shouldDisableRecency = true;
+        }
+
+        if (shouldDisableRecency) {
+            logIfVerbose(
+                    String.format(
+                            "Disabling recency for %s subquery based on applyToSubqueries",
+                            retrievalMethod),
+                    verbose);
+            queryNew.getRanking()
+                    .getFeatures()
+                    .put(addQueryWrapper(QUERY_INPUT_RECENCY_SHOULD_APPLY_SCORE), 0.0);
+        }
+
         // Set rank profile (using RANKING method)
         queryNew.getRanking().setProfile(rankProfileNew);
 
@@ -1954,6 +1982,8 @@ public class HybridSearcher extends Searcher {
     HitGroup applyGlobalScoreModifiers(HitGroup hits, Query query, boolean verbose) {
         FeatureData hitMatchFeatures;
         Double mult_modifier, add_modifier, original_score, modified_score, recencyScore;
+        boolean exposePreRerankScore =
+                query.properties().getBoolean("marqo__expose_pre_rerank_score", false);
         if (hits.size() == 0) {
             logIfVerbose("No hits to apply score modifiers to. Returning.", verbose);
             return hits;
@@ -2094,8 +2124,11 @@ public class HybridSearcher extends Searcher {
                     }
 
                     original_score = hit.getRelevance().getScore();
-                    // Expose pre-rerank score whenever we apply any global score modifiers
-                    hit.setField(MARQO_PRE_RERANK_SCORE, original_score);
+                    // Expose pre-rerank score only when explicitly requested, so old Marqo versions
+                    // that don't know this field can still parse results after a rollback.
+                    if (exposePreRerankScore) {
+                        hit.setField(MARQO_PRE_RERANK_SCORE, original_score);
+                    }
                     double baseScore = original_score * effectiveMult + effectiveAdd;
 
                     if (!applyRecency) {

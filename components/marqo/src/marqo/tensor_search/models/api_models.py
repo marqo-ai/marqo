@@ -229,6 +229,33 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
+    def validate_apply_to_subqueries_only_for_hybrid_rrf(cls, values):
+        """Validate that applyToSubqueries is only used with HYBRID search and RRF ranking."""
+        recency_parameters = values.get('recencyParameters')
+        if recency_parameters is None or recency_parameters.apply_to_subqueries is None:
+            return values
+
+        # Must be HYBRID search
+        search_method = values.get('searchMethod')
+        if search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(
+                f"'applyToSubqueries' can only be used with 'HYBRID' search. "
+                f"Search method is {search_method}."
+            )
+
+        # Must be Disjunction retrieval method (or default which is Disjunction)
+        hybrid_parameters = values.get('hybridParameters')
+        if hybrid_parameters is not None:
+            retrieval_method = hybrid_parameters.retrievalMethod
+            if retrieval_method is not None and retrieval_method != RetrievalMethod.Disjunction:
+                raise ValueError(
+                    f"'applyToSubqueries' can only be used with 'disjunction' retrieval method. "
+                    f"Retrieval method is '{retrieval_method}'."
+                )
+
+        return values
+
+    @root_validator(pre=False)
     def validate_facet_exclude_terms_in_filter(cls, values):
         """Validate that excluded facet fields appear in filter string.
 
@@ -464,12 +491,7 @@ class SearchQuery(BaseMarqoModel):
             )
         else:
             # If min_sort_candidates is provided, ensure it is at least as large as offset + limit
-            if sort_by.min_sort_candidates < (values.get('offset') + values.get('limit')):
-                raise ValueError(
-                    f" minSortCandidates must be at least as large as offset + limit. Received "
-                    f" minSortCandidates={sort_by.min_sort_candidates}, limit={values.get('limit')}, "
-                    f" offset={values.get('offset')} "
-                )
+            sort_by.min_sort_candidates = max(sort_by.min_sort_candidates, values.get('offset') + values.get('limit'))
         return values
 
     @root_validator(pre=False)

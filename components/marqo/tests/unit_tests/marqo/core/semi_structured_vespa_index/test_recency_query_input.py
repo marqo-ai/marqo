@@ -194,6 +194,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"created_at": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
                     # Grow parameters (disabled by default)
                     constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
@@ -221,6 +222,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"updated_at": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 1,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
                     # Grow parameters (disabled by default)
                     constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
@@ -248,6 +250,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"publish_date": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 2,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
                     # Grow parameters (disabled by default)
                     constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
@@ -275,6 +278,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"event_time": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 3,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.0,
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
                     # Grow parameters (disabled by default)
                     constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
@@ -303,6 +307,7 @@ class TestRecencyQueryInput(unittest.TestCase):
                     constants.QUERY_INPUT_RECENCY_TIMESTAMP_KEY: {"created_at": 1.0},
                     constants.QUERY_INPUT_RECENCY_DECAY_FUNCTION_TYPE: 0,
                     constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: 0.5,
+                    constants.QUERY_INPUT_RECENCY_CENTER_SECONDS: 0,
                     # Grow parameters (disabled by default)
                     constants.QUERY_INPUT_RECENCY_GROW_ENABLED: 0,
                     constants.QUERY_INPUT_RECENCY_GROW_FROM: 1.0,
@@ -640,6 +645,128 @@ class TestRecencyQueryInput(unittest.TestCase):
                         expected_value,
                         f"Key {key}: expected {expected_value}, got {result.get(key)}"
                     )
+
+
+    # ============= Center Parameter Tests =============
+
+    def test_center_default_zero(self):
+        """Test center defaults to 0 (sentinel for 'use now()') when None."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertEqual(
+            result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS],
+            0
+        )
+
+    def test_center_passed_correctly(self):
+        """Test center values are passed through correctly."""
+        center_values = [1709232000.0, 0, 1000000000, 9999999999.9]
+
+        for center in center_values:
+            with self.subTest(center=center):
+                params = RecencyParameters(
+                    recency_field="created_at",
+                    center=center
+                )
+                result = self.vespa_index._get_recency_query_input(params)
+
+                self.assertEqual(
+                    result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS],
+                    center
+                )
+
+    def test_center_in_all_query_constants(self):
+        """Test that center_seconds constant is present in output."""
+        params = RecencyParameters(recency_field="created_at")
+        result = self.vespa_index._get_recency_query_input(params)
+
+        self.assertIn(constants.QUERY_INPUT_RECENCY_CENTER_SECONDS, result)
+
+    # ============= ApplyToSubqueries Parameter Tests =============
+
+    def test_apply_to_subqueries_default(self):
+        """Test apply_to_subqueries default (None) sets both flags to True as top-level query properties."""
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+        )
+
+        query = self._create_hybrid_query_with_recency("all")
+        # Override to use default apply_to_subqueries (None)
+        query.recency_parameters = recency_params
+
+        with patch.object(self.vespa_index, '_get_base_vespa_hybrid_query', return_value={'query_features': {}}):
+            result = self.vespa_index._to_vespa_hybrid_query(query)
+
+        # Flags should be top-level query properties, not in query_features
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], True)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], True)
+        self.assertNotIn(constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR, result['query_features'])
+        self.assertNotIn(constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL, result['query_features'])
+
+    def test_apply_to_subqueries_tensor_only(self):
+        """Test apply_to_subqueries=['tensor'] sets only tensor flag to True as top-level query properties."""
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            apply_to_subqueries=["tensor"]
+        )
+
+        query = self._create_hybrid_query_with_recency("all")
+        query.recency_parameters = recency_params
+
+        with patch.object(self.vespa_index, '_get_base_vespa_hybrid_query', return_value={'query_features': {}}):
+            result = self.vespa_index._to_vespa_hybrid_query(query)
+
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], True)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], False)
+
+    def test_apply_to_subqueries_lexical_only(self):
+        """Test apply_to_subqueries=['lexical'] sets only lexical flag to True as top-level query properties."""
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            apply_to_subqueries=["lexical"]
+        )
+
+        query = self._create_hybrid_query_with_recency("all")
+        query.recency_parameters = recency_params
+
+        with patch.object(self.vespa_index, '_get_base_vespa_hybrid_query', return_value={'query_features': {}}):
+            result = self.vespa_index._to_vespa_hybrid_query(query)
+
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], False)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], True)
+
+    def test_apply_to_subqueries_empty_list(self):
+        """Test apply_to_subqueries=[] sets both flags to False as top-level query properties."""
+        recency_params = RecencyParameters(
+            recency_field="timestamp",
+            scale="7d",
+            offset="0d",
+            decay_function="exponential",
+            decay_to=0.5,
+            apply_to_subqueries=[]
+        )
+
+        query = self._create_hybrid_query_with_recency("all")
+        query.recency_parameters = recency_params
+
+        with patch.object(self.vespa_index, '_get_base_vespa_hybrid_query', return_value={'query_features': {}}):
+            result = self.vespa_index._to_vespa_hybrid_query(query)
+
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR], False)
+        self.assertEqual(result[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL], False)
 
 
 if __name__ == '__main__':

@@ -53,9 +53,6 @@ COPY marqo/pyproject.toml marqo/uv.lock ./
 # Install dependencies from lockfile
 RUN uv sync --no-dev
 
-# Install nltk data
-RUN uv run python -c "import nltk; nltk.download('punkt_tab')"
-
 COPY marqo/run_marqo.sh ./run_marqo.sh
 COPY marqo/src ./src
 

@@ -344,6 +344,22 @@ class HybridSearch:
                         f"created with Marqo {str(constants.MARQO_RECENCY_GROW_MINIMUM_VERSION)} or later. "
                         f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
                     )
+            # Check if center requires newer schema version
+            if recency_parameters.center is not None:
+                if not marqo_index.index_supports_recency_center_and_subqueries:
+                    raise core_exceptions.UnsupportedFeatureError(
+                        f"Recency center parameter (center) is only supported for unstructured indexes "
+                        f"created with Marqo {str(constants.MARQO_RECENCY_CENTER_AND_SUBQUERIES_MINIMUM_VERSION)} or later. "
+                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                    )
+            # Check if applyToSubqueries requires newer schema version
+            if recency_parameters.apply_to_subqueries is not None:
+                if not marqo_index.index_supports_recency_center_and_subqueries:
+                    raise core_exceptions.UnsupportedFeatureError(
+                        f"Recency applyToSubqueries parameter (applyToSubqueries) is only supported for unstructured indexes "
+                        f"created with Marqo {str(constants.MARQO_RECENCY_CENTER_AND_SUBQUERIES_MINIMUM_VERSION)} or later. "
+                        f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version}."
+                    )
 
         if hybrid_parameters.secondPhaseModifier:
             if not isinstance(marqo_index, SemiStructuredMarqoIndex):

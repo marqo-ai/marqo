@@ -23,6 +23,7 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.core.utils.duration_parser import parse_duration_to_seconds
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.settings.settings import get_settings
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.recency_parameters import RecencyParameters, ApplyInRankingPhase, DecayFunction
@@ -638,6 +639,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if marqo_query.global_rerank_depth_start is not None:
             query["marqo__hybrid.rerankDepthStartGlobal"] = marqo_query.global_rerank_depth_start
 
+        if (hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]
+                or hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)):
+            query["marqo__expose_pre_rerank_score"] = True
+
         # Tell the custom searcher what type of custom score reranking will be done
         if applicable_custom_score_keys:
             has_bm25 = bool(self._get_fields_to_bm25_rerank_by(applicable_custom_score_keys))
@@ -683,6 +688,14 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query['marqo__recency_enabled'] = True
             query['marqo__recency_apply_in_global_ranking_phase'] = marqo_query.recency_parameters.apply_in_ranking_phase != ApplyInRankingPhase.EXCLUDE_GLOBAL
 
+            # Set apply_to_subqueries flags as top-level query properties (not ranking features)
+            # so Java can read them via query.properties().getBoolean()
+            apply_to = marqo_query.recency_parameters.apply_to_subqueries
+            if apply_to is None:
+                apply_to = ["tensor", "lexical"]
+            query[constants.QUERY_INPUT_RECENCY_APPLY_TO_TENSOR] = "tensor" in apply_to
+            query[constants.QUERY_INPUT_RECENCY_APPLY_TO_LEXICAL] = "lexical" in apply_to
+
         # add lexical specific hybrid parameters
         if marqo_query.hybrid_parameters.secondPhaseModifier:
             if marqo_query.collapse:
@@ -717,6 +730,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # Default to 0.0 for multiplicative mode (None means multiplicative)
             constants.QUERY_INPUT_RECENCY_ADD_TO_SCORE_WEIGHT: recency_params.add_to_score_weight if recency_params.add_to_score_weight is not None else 0.0
         }
+
+        # Center timestamp: 0 means "use now()", positive value means fixed reference point
+        result[constants.QUERY_INPUT_RECENCY_CENTER_SECONDS] = recency_params.center if recency_params.center is not None else 0
 
         # grow params, the recency_params validation ensures all or nothing for these params
         if recency_params.grow_from is not None:
@@ -978,53 +994,53 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             filter_parts = []
 
             # Escape special characters in field name and value
-            node.field = self.escape(node.field)
-            node.value = self.escape(node.value)
+            escaped_field = self.escape(node.field)
+            escaped_value = self.escape(node.value)
 
             # Filter on `_id`
-            if node.field == MARQO_DOC_ID:
-                return f'({VESPA_FIELD_ID} contains "{node.value}")'
+            if escaped_field == MARQO_DOC_ID:
+                return f'({VESPA_FIELD_ID} contains "{escaped_value}")'
 
-            if self.get_marqo_index().is_collapse_field(node.field):
+            if self.get_marqo_index().is_collapse_field(escaped_field):
                 # collapse field is indexed as attribute, can be used directly in a filter term
-                return f'({node.field} contains "{node.value}")'
+                return f'({escaped_field} contains "{escaped_value}")'
 
             # Bool Filter
-            if node.value.lower() in self._FILTER_STRING_BOOL_VALUES:
-                filter_value = int(True if node.value.lower() == "true" else False)
+            if escaped_value.lower() in self._FILTER_STRING_BOOL_VALUES:
+                filter_value = int(True if escaped_value.lower() == "true" else False)
                 bool_filter_string = (f'({BOOL_FIELDS} contains '
-                                      f'sameElement(key contains "{node.field}", value = {filter_value}))')
+                                      f'sameElement(key contains "{escaped_field}", value = {filter_value}))')
                 filter_parts.append(bool_filter_string)
 
             # Short String Filter
             short_string_filter_string = (f'({SHORT_STRINGS_FIELDS} '
-                                          f'contains sameElement(key contains "{node.field}", '
-                                          f'value contains "{node.value}"))')
+                                          f'contains sameElement(key contains "{escaped_field}", '
+                                          f'value contains "{escaped_value}"))')
             filter_parts.append(short_string_filter_string)
 
             # String Array Filter
             if self.index_supports_partial_updates:
-                if node.field in self.get_marqo_index().name_to_string_array_field_map:
-                    string_array_field_name = f'{STRING_ARRAY}_{node.field}'
+                if escaped_field in self.get_marqo_index().name_to_string_array_field_map:
+                    string_array_field_name = f'{STRING_ARRAY}_{escaped_field}'
                     string_array_filter_string = (f'({string_array_field_name} contains '
-                                                  f'"{node.value}")')
+                                                  f'"{escaped_value}")')
                     filter_parts.append(string_array_filter_string)
             else:
                 string_array_filter_string = (f'({STRING_ARRAY} contains '
-                                              f'"{node.field}::{node.value}")')
+                                              f'"{escaped_field}::{escaped_value}")')
                 filter_parts.append(string_array_filter_string)
 
             # Numeric Filter
             numeric_filter_string = ""
             try:
-                numeric_value = int(node.value)
+                numeric_value = int(escaped_value)
                 numeric_filter_string = (
-                    f'({INT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value})) '
-                    f'OR ({FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))')
+                    f'({INT_FIELDS} contains sameElement(key contains "{escaped_field}", value = {numeric_value})) '
+                    f'OR ({FLOAT_FIELDS} contains sameElement(key contains "{escaped_field}", value = {numeric_value}))')
             except ValueError:
                 try:
-                    numeric_value = float(node.value)
-                    numeric_filter_string = f'({FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))'
+                    numeric_value = float(escaped_value)
+                    numeric_filter_string = f'({FLOAT_FIELDS} contains sameElement(key contains "{escaped_field}", value = {numeric_value}))'
                 except ValueError:
                     pass
 
@@ -1037,7 +1053,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
             # Escape special characters in field name
-            node.field = self.escape(node.field)
+            escaped_field = self.escape(node.field)
 
             lower = f'value >= {node.lower}' if node.lower is not None else ""
             higher = f'value <= {node.upper}' if node.upper is not None else ""
@@ -1046,12 +1062,45 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 raise InternalError('RangeTerm has no lower or upper bound')
 
             float_field_string = (f'({FLOAT_FIELDS} contains '
-                                  f'sameElement(key contains "{node.field}", {bound}))')
+                                  f'sameElement(key contains "{escaped_field}", {bound}))')
 
             int_field_string = (f'({INT_FIELDS} contains '
-                                f'sameElement(key contains "{node.field}", {bound}))')
+                                f'sameElement(key contains "{escaped_field}", {bound}))')
 
             return f'({float_field_string} OR {int_field_string})'
+
+        def generate_in_filter_string(node: search_filter.InTerm) -> str:
+            if node.field != MARQO_DOC_ID:
+                raise InvalidArgumentError(
+                    "The 'IN' filter keyword is only supported for the '_id' field "
+                    "on semi-structured indexes."
+                )
+
+            max_in_filter_ids = get_settings().marqo_max_in_filter_ids
+            if len(node.value_list) > max_in_filter_ids:
+                raise InvalidArgumentError(
+                    f"The IN filter contains {len(node.value_list)} values, which exceeds the maximum "
+                    f"of {max_in_filter_ids} (MARQO_MAX_IN_FILTER_IDS)."
+                )
+
+            escaped_values = ', '.join(
+                f'"{self.escape(v)}"' for v in node.value_list
+            )
+            return f'{VESPA_FIELD_ID} in ({escaped_values})'
+
+        def generate_contains_filter_string(node: search_filter.ContainsTerm) -> str:
+            escaped_field = self.escape(node.field)
+            escaped_value = self.escape(node.value)
+            marqo_index = self.get_marqo_index()
+            # field_map only contains lexical fields for semi-structured indexes
+            if escaped_field not in marqo_index.field_map:
+                raise InvalidArgumentError(
+                    f"CONTAINS filter field '{escaped_field}' is not found in index '{marqo_index.name}'. "
+                    f"Available lexical fields: {', '.join(sorted(marqo_index.lexically_searchable_fields_names))}"
+                )
+            field = marqo_index.field_map[escaped_field]
+            lexical_field_name = field.lexical_field_name
+            return f'({lexical_field_name} contains "{escaped_value}")'
 
         def tree_to_filter_string(node: search_filter.Node) -> Optional[str]:
             # Skip any terms with excluded fields first - check at node level
@@ -1098,7 +1147,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 elif isinstance(node, search_filter.RangeTerm):
                     return generate_range_filter_string(node)
                 elif isinstance(node, search_filter.InTerm):
-                    raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
+                    return generate_in_filter_string(node)
+                elif isinstance(node, search_filter.ContainsTerm):
+                    return generate_contains_filter_string(node)
 
             raise InternalError(f'Unknown node type {type(node)}')
 

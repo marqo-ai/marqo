@@ -740,6 +740,16 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
             lambda: self.parsed_schema_template_version() >= constants.MARQO_RECENCY_GROW_MINIMUM_VERSION)
 
     @property
+    def index_supports_recency_center_and_subqueries(self) -> bool:
+        """
+        Check if the index schema supports recency center and applyToSubqueries parameters.
+        These parameters were added in version 2.25.1.
+        """
+        return self._cache_or_get(
+            'index_supports_recency_center_and_subqueries',
+            lambda: self.parsed_schema_template_version() >= constants.MARQO_RECENCY_CENTER_AND_SUBQUERIES_MINIMUM_VERSION)
+
+    @property
     def index_supports_second_phase_lexical_score_modifiers(self) -> bool:
         """
         Check if the index schema supports second phase lexical score modifiers.

@@ -321,63 +321,64 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
     def test_get_suggestions_short_tokens_exact_matching(self, mock_normalize):
         """Test get_suggestions uses exact prefix matching for short tokens."""
         mock_normalize.return_value = "ai ml"  # Both tokens are short (< 3 chars)
-        
+
         self.mock_vespa_client.query.return_value = self.empty_vespa_response
-        
+
         request = TypeaheadRequest(q="ai ml", min_fuzzy_match_length=3)
-        
+
         with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
             result = self.typeahead.get_suggestions("test_index", request)
-        
-        # Verify vespa query was called
-        self.mock_vespa_client.query.assert_called_once()
+
         call_kwargs = self.mock_vespa_client.query.call_args[1]
-        
-        # Check YQL contains exact prefix matching
-        yql = call_kwargs['yql']
-        self.assertIn('query_words contains ({prefix:true}"ai")', yql)
-        self.assertIn('query_words contains ({prefix:true}"ml")', yql)
-        self.assertNotIn('fuzzy', yql)
+        self.assertEqual(
+            'SELECT query, metadata FROM test_schema WHERE rank('
+            'query_words contains ({prefix:true}"ai") OR '
+            'query_words contains ({prefix:true}"ml"), '
+            'query_index contains "ai" OR query_index contains "ml")',
+            call_kwargs['yql']
+        )
 
     @patch('marqo.core.typeahead.typeahead.normalize_text')
     def test_get_suggestions_long_tokens_fuzzy_matching(self, mock_normalize):
         """Test get_suggestions uses fuzzy matching for long tokens."""
         mock_normalize.return_value = "machine learning"  # Both tokens are long (>= 3 chars)
-        
+
         self.mock_vespa_client.query.return_value = self.empty_vespa_response
-        
+
         request = TypeaheadRequest(q="machine learning", fuzzy_edit_distance=2, min_fuzzy_match_length=3)
-        
+
         with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.03]):
             result = self.typeahead.get_suggestions("test_index", request)
-        
-        # Verify vespa query was called
+
         call_kwargs = self.mock_vespa_client.query.call_args[1]
-        yql = call_kwargs['yql']
-        
-        # Check YQL contains fuzzy matching
-        self.assertIn('query_words contains ({maxEditDistance:2, prefix:true}fuzzy("machine"))', yql)
-        self.assertIn('query_words contains ({maxEditDistance:2, prefix:true}fuzzy("learning"))', yql)
+        self.assertEqual(
+            'SELECT query, metadata FROM test_schema WHERE rank('
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("machine")) OR '
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("learning")), '
+            'query_index contains "machine" OR query_index contains "learning")',
+            call_kwargs['yql']
+        )
 
     @patch('marqo.core.typeahead.typeahead.normalize_text')
     def test_get_suggestions_mixed_token_lengths(self, mock_normalize):
         """Test get_suggestions handles mix of short and long tokens."""
         mock_normalize.return_value = "ai machine"  # One short, one long token
-        
+
         self.mock_vespa_client.query.return_value = self.empty_vespa_response
-        
+
         request = TypeaheadRequest(q="ai machine", fuzzy_edit_distance=1, min_fuzzy_match_length=3)
-        
+
         with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.04]):
             result = self.typeahead.get_suggestions("test_index", request)
-        
+
         call_kwargs = self.mock_vespa_client.query.call_args[1]
-        yql = call_kwargs['yql']
-        
-        # Short token should use exact matching
-        self.assertIn('query_words contains ({prefix:true}"ai")', yql)
-        # Long token should use fuzzy matching
-        self.assertIn('query_words contains ({maxEditDistance:1, prefix:true}fuzzy("machine"))', yql)
+        self.assertEqual(
+            'SELECT query, metadata FROM test_schema WHERE rank('
+            'query_words contains ({prefix:true}"ai") OR '
+            'query_words contains ({maxEditDistance:1, prefix:true}fuzzy("machine")), '
+            'query_index contains "ai" OR query_index contains "machine")',
+            call_kwargs['yql']
+        )
 
     @patch('marqo.core.typeahead.typeahead.normalize_text')
     def test_get_suggestions_with_popularity_weight(self, mock_normalize):
@@ -468,29 +469,29 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         """Test get_suggestions constructs correct Vespa query parameters."""
         # Override the schema name for this specific test
         self.mock_marqo_index.typeahead_schema_name = "custom_schema"
-        
+
         mock_normalize.return_value = "machine learning"
-        
+
         self.mock_vespa_client.query.return_value = self.empty_vespa_response
-        
+
         request = TypeaheadRequest(q="machine learning", limit=15)
-        
+
         with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.01]):
             result = self.typeahead.get_suggestions("test_index", request)
-        
-        # Verify query parameters
+
+        expected_yql = (
+            'SELECT query, metadata FROM custom_schema WHERE rank('
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("machine")) OR '
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("learning")), '
+            'query_index contains "machine" OR query_index contains "learning")'
+        )
+
         self.mock_vespa_client.query.assert_called_once_with(
             schema="custom_schema",
-            yql=unittest.mock.ANY,  # We'll check this separately
+            yql=expected_yql,
             hits=15,
             ranking="suggestions-rank-profile"
         )
-        
-        # Check YQL structure
-        call_kwargs = self.mock_vespa_client.query.call_args[1]
-        yql = call_kwargs['yql']
-        self.assertIn("SELECT query, metadata FROM custom_schema WHERE rank(", yql)
-        self.assertIn("query_index contains", yql)
 
     @patch('marqo.core.typeahead.typeahead.normalize_text')
     def test_get_suggestions_processing_time_calculation(self, mock_normalize):
@@ -507,6 +508,91 @@ class TestTypeaheadGetSuggestions(unittest.TestCase):
         
         # Should convert to milliseconds and round: 123.4ms -> 123ms
         self.assertEqual(result.processing_time_ms, 123)
+
+
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_match_all_tokens_uses_and_logic(self, mock_normalize):
+        """Test get_suggestions uses AND between retrieval terms when matchAllTokens=True."""
+        mock_normalize.return_value = "taylor s"
+
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="taylor s", match_all_tokens=True)
+
+        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
+            self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        self.assertEqual(
+            'SELECT query, metadata FROM test_schema WHERE rank('
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("taylor")) AND '
+            'query_words contains ({prefix:true}"s"), '
+            'query_index contains "taylor" OR query_index contains "s")',
+            call_kwargs['yql']
+        )
+
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_match_all_tokens_keeps_fuzzy(self, mock_normalize):
+        """Test get_suggestions still uses fuzzy matching for long tokens in matchAllTokens mode."""
+        mock_normalize.return_value = "machine learning"
+
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="machine learning", match_all_tokens=True, fuzzy_edit_distance=2,
+                                   min_fuzzy_match_length=3)
+
+        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
+            self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        self.assertEqual(
+            'SELECT query, metadata FROM test_schema WHERE rank('
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("machine")) AND '
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("learning")), '
+            'query_index contains "machine" OR query_index contains "learning")',
+            call_kwargs['yql']
+        )
+
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_match_all_tokens_single_token(self, mock_normalize):
+        """Test get_suggestions matchAllTokens mode works with a single token."""
+        mock_normalize.return_value = "taylor"
+
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="taylor", match_all_tokens=True)
+
+        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
+            self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        self.assertEqual(
+            'SELECT query, metadata FROM test_schema WHERE rank('
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("taylor")), '
+            'query_index contains "taylor")',
+            call_kwargs['yql']
+        )
+
+    @patch('marqo.core.typeahead.typeahead.normalize_text')
+    def test_get_suggestions_default_uses_or_logic(self, mock_normalize):
+        """Test get_suggestions uses OR between retrieval terms by default (backward compat)."""
+        mock_normalize.return_value = "taylor s"
+
+        self.mock_vespa_client.query.return_value = self.empty_vespa_response
+
+        request = TypeaheadRequest(q="taylor s")
+
+        with patch('marqo.core.typeahead.typeahead.timer', side_effect=[0.0, 0.05]):
+            self.typeahead.get_suggestions("test_index", request)
+
+        call_kwargs = self.mock_vespa_client.query.call_args[1]
+        self.assertEqual(
+            'SELECT query, metadata FROM test_schema WHERE rank('
+            'query_words contains ({maxEditDistance:2, prefix:true}fuzzy("taylor")) OR '
+            'query_words contains ({prefix:true}"s"), '
+            'query_index contains "taylor" OR query_index contains "s")',
+            call_kwargs['yql']
+        )
 
 
 class TestTypeaheadDeleteQueries(unittest.TestCase):

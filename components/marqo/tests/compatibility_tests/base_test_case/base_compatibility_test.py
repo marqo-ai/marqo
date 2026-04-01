@@ -100,5 +100,8 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
                     )
                     expected_hit.pop(field)
                     actual_hit.pop(field)
-            self.assertEqual(expected_hit, actual_hit,
-                             f"Hit results do not match. Expected: {expected_hit}, Got: {actual_hit}")
+            for field, value in expected_hit.items():
+                self.assertEqual(
+                    value, actual_hit.get(field),
+                    f"Field '{field}' does not match. Expected: {expected_hit}, Got: {actual_hit}"
+                )

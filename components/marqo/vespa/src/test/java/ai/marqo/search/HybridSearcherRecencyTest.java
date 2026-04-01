@@ -14,9 +14,13 @@ import com.yahoo.search.result.HitGroup;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Unit tests for recency scoring functionality in HybridSearcher.
@@ -612,6 +616,121 @@ class HybridSearcherRecencyTest {
             RankFeatures features = subQuery.getRanking().getFeatures();
             assertThat(features.getDouble("query(created_at)")).hasValue(1.0);
             assertThat(features.getDouble("query(updated_at)")).hasValue(0.5);
+        }
+
+        static Stream<Arguments> applyToSubqueriesCases() {
+            return Stream.of(
+                    // tensor disabled when apply_to_tensor=false
+                    Arguments.of(
+                            "tensor",
+                            "embedding_similarity",
+                            "marqo__tensor_text_field_1",
+                            false,
+                            true,
+                            true),
+                    // lexical disabled when apply_to_lexical=false
+                    Arguments.of(
+                            "lexical", "bm25", "marqo__lexical_text_field_1", true, false, true),
+                    // tensor NOT disabled when apply_to_tensor=true
+                    Arguments.of(
+                            "tensor",
+                            "embedding_similarity",
+                            "marqo__tensor_text_field_1",
+                            true,
+                            false,
+                            false),
+                    // lexical NOT disabled when apply_to_lexical=true
+                    Arguments.of(
+                            "lexical", "bm25", "marqo__lexical_text_field_1", false, true, false),
+                    // defaults (not set) — recency enabled
+                    Arguments.of(
+                            "tensor",
+                            "embedding_similarity",
+                            "marqo__tensor_text_field_1",
+                            null,
+                            null,
+                            false));
+        }
+
+        @ParameterizedTest
+        @MethodSource("applyToSubqueriesCases")
+        void shouldRespectApplyToSubqueryFlags(
+                String subqueryType,
+                String rankProfile,
+                String fieldKey,
+                Boolean applyToTensor,
+                Boolean applyToLexical,
+                boolean expectDisabled) {
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__yql." + subqueryType, subqueryType + " yql");
+            query.properties()
+                    .set("marqo__ranking." + subqueryType + "." + subqueryType, rankProfile);
+            if (applyToTensor != null) {
+                query.properties().set("marqo__recency_apply_to_tensor", applyToTensor);
+            }
+            if (applyToLexical != null) {
+                query.properties().set("marqo__recency_apply_to_lexical", applyToLexical);
+            }
+
+            TensorType tensorType = new TensorType.Builder().mapped("p").build();
+            Tensor recencyTensor =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("created_at"), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__recency_timestamp_key)", recencyTensor);
+
+            Tensor fieldsToRank =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels(fieldKey), 1.0)
+                            .build();
+            query.getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_" + subqueryType + ")", fieldsToRank);
+
+            Query subQuery =
+                    hybridSearcher.createSubQuery(query, subqueryType, subqueryType, false);
+
+            RankFeatures features = subQuery.getRanking().getFeatures();
+            if (expectDisabled) {
+                assertThat(features.getDouble("query(marqo__recency_should_apply_score)"))
+                        .hasValue(0.0);
+            } else {
+                assertThat(features.getDouble("query(marqo__recency_should_apply_score)"))
+                        .isEmpty();
+            }
+        }
+    }
+
+    @Nested
+    class PreRerankScoreExposureTests {
+        @Test
+        void shouldNotSetPreRerankScoreWhenPropertyIsFalse() {
+            // Default: marqo__expose_pre_rerank_score is not set → false
+            Query query = new Query("search/?query=test");
+            HitGroup hits = new HitGroup();
+            hits.add(createHitWithScoreModifiers("index:test/0/doc1", 1.0, 2.0, 0.5, null));
+
+            hybridSearcher.applyGlobalScoreModifiers(hits, query, false);
+
+            assertThat(hits.get(0).getField("marqo__pre_rerank_score")).isNull();
+        }
+
+        @Test
+        void shouldSetPreRerankScoreWhenPropertyIsTrue() {
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__expose_pre_rerank_score", true);
+            double originalRelevance = 1.0;
+            HitGroup hits = new HitGroup();
+            hits.add(
+                    createHitWithScoreModifiers(
+                            "index:test/0/doc1", originalRelevance, 2.0, 0.5, null));
+
+            hybridSearcher.applyGlobalScoreModifiers(hits, query, false);
+
+            assertThat(hits.get(0).getField("marqo__pre_rerank_score"))
+                    .isEqualTo(originalRelevance);
         }
     }
 }

@@ -13,7 +13,7 @@ on:
         type: string
         default: 'mainline'
       push_to:
-        description: 'image destination. Options: "OS-ECR", "AMI-ECR"'
+        description: 'image destination. Options: "OS-ECR", "STAGING-ECR"'
         required: true
         type: string
         default: OS-ECR
@@ -36,13 +36,13 @@ on:
         # By image_identifier, we refer to the
         # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).      image_identifier:
         description: "The api_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/api@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.api_image_identifier }}
+        value: ${{ jobs.expose-outputs.outputs.api_image_identifier }}
       inference_orchestrator_image_identifier:
         description: "The inference_orchestrator_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/inference-orchestrator@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.inference_orchestrator_image_identifier }}
+        value: ${{ jobs.expose-outputs.outputs.inference_orchestrator_image_identifier }}
       model_management_image_identifier:
         description: "The model_management_image_identifier (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai-dev/model-management@sha256:1234567890abcdef)"
-        value: ${{ jobs.Docker-Build.outputs.model_management_image_identifier }}
+        value: ${{ jobs.expose-outputs.outputs.model_management_image_identifier }}
 
   workflow_dispatch: #for manual triggers
     inputs:
@@ -52,12 +52,12 @@ on:
         type: string
         default: 'mainline'
       push_to:
-        description: 'image destination. Options: "OS-ECR", "AMI-ECR"'
+        description: 'image destination. Options: "OS-ECR", "STAGING-ECR"'
         required: true
         type: choice
         options:
           - OS-ECR
-          - AMI-ECR
+          - STAGING-ECR
         default: OS-ECR
       image_namespace:
         description: 'The prefix of the image repository, by default "marqoai-dev". We will push 3 images: {prefix}/api, {prefix}/inference-orchestrator, {prefix}/model-management'
@@ -86,12 +86,8 @@ jobs:
   Docker-Build:
     name: Build docker image
     runs-on: "runs-on=${{ github.run_id }}/family=m6i.xlarge/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
-    outputs:
-      api_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.api_image_identifier }}
-      inference_orchestrator_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.inference_orchestrator_image_identifier }}
-      model_management_image_identifier: ${{ steps.set-image-identifier-in-output.outputs.model_management_image_identifier}}
     environment:
-      name: ${{ (inputs.image_namespace || github.event.inputs.image_namespace) == 'marqoai' && 'production' || 'non-prod' }}
+      name: ${{ (inputs.push_to || github.event.inputs.push_to) == 'OS-ECR' && 'os' || 'staging' }}
 
     steps:
       - name: Set input variables
@@ -114,33 +110,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to OS-ECR
-        uses: docker/login-action@v2
-        if: env.PUSH_TO == 'OS-ECR'
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@master
         with:
-          registry: 424082663841.dkr.ecr.us-east-1.amazonaws.com
-          username: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
+          role-session-name: build-push-marqo-image
+          aws-region: us-east-1
 
-      - name: Login to AMI-ECR
-        uses: docker/login-action@v2
-        if: env.PUSH_TO == 'AMI-ECR'
-        with:
-          registry: 975050213659.dkr.ecr.us-east-1.amazonaws.com
-          username: ${{ secrets.AMI_ECR_PUSHER_AWS_ACCESS_KEY_ID }}
-          password: ${{ secrets.AMI_ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set registry and image repo
+      - name: Set registry
         id: prepare
         run: |
-          if [[ "${{ env.PUSH_TO }}" == "OS-ECR" ]]; then
-            echo "registry=424082663841.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
-          elif [[ "${{ env.PUSH_TO }}" == "AMI-ECR" ]]; then
-            echo "registry=975050213659.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
-          else
-            echo "Error: Unknown PUSH_TO value '${{ env.PUSH_TO }}'. Must be 'OS-ECR' or 'AMI-ECR'." >&2
-            exit 1
-          fi
+          echo "registry=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_OUTPUT
 
       - name: Build and push api image
         id: build-and-push-api
@@ -166,15 +150,48 @@ jobs:
         id: build-and-push-model-management
         uses: docker/build-push-action@v6
         with:
-          context: ./components/model_management
+          context: ./components
+          file: ./components/model_management/Dockerfile
           push: true
           platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management:${{ env.IMAGE_TAG }}
 
-      - name: Output image_identifier
-        # By image_identifier, we refer to the complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef)
-        id: set-image-identifier-in-output
+      - name: Write image identifiers to file
+        # Write identifiers to a file and upload as artifact to avoid GitHub Actions
+        # suppressing outputs from jobs that use an environment in reusable workflows.
         run: |
-          echo "api_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api@${{ steps.build-and-push-api.outputs.digest }}" >> $GITHUB_OUTPUT
-          echo "inference_orchestrator_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator@${{ steps.build-and-push-inference-orchestrator.outputs.digest }}" >> $GITHUB_OUTPUT
-          echo "model_management_image_identifier=${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management@${{ steps.build-and-push-model-management.outputs.digest }}" >> $GITHUB_OUTPUT
+          mkdir -p /tmp/image-identifiers
+          echo "${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/api@${{ steps.build-and-push-api.outputs.digest }}" > /tmp/image-identifiers/api_image_identifier.txt
+          echo "${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/inference-orchestrator@${{ steps.build-and-push-inference-orchestrator.outputs.digest }}" > /tmp/image-identifiers/inference_orchestrator_image_identifier.txt
+          echo "${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_NAMESPACE }}/model-management@${{ steps.build-and-push-model-management.outputs.digest }}" > /tmp/image-identifiers/model_management_image_identifier.txt
+
+      - name: Upload image identifiers
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-identifiers
+          path: /tmp/image-identifiers/
+
+  # This job reads image identifiers from artifacts instead of job outputs.
+  # GitHub Actions suppresses outputs from jobs that use an environment in reusable workflows,
+  # so we use artifacts to pass the values through without secret masking.
+  expose-outputs:
+    name: Expose image identifiers
+    needs: Docker-Build
+    runs-on: ubuntu-latest
+    outputs:
+      api_image_identifier: ${{ steps.read.outputs.api_image_identifier }}
+      inference_orchestrator_image_identifier: ${{ steps.read.outputs.inference_orchestrator_image_identifier }}
+      model_management_image_identifier: ${{ steps.read.outputs.model_management_image_identifier }}
+    steps:
+      - name: Download image identifiers
+        uses: actions/download-artifact@v4
+        with:
+          name: image-identifiers
+          path: /tmp/image-identifiers/
+
+      - name: Read and export identifiers
+        id: read
+        run: |
+          echo "api_image_identifier=$(cat /tmp/image-identifiers/api_image_identifier.txt)" >> $GITHUB_OUTPUT
+          echo "inference_orchestrator_image_identifier=$(cat /tmp/image-identifiers/inference_orchestrator_image_identifier.txt)" >> $GITHUB_OUTPUT
+          echo "model_management_image_identifier=$(cat /tmp/image-identifiers/model_management_image_identifier.txt)" >> $GITHUB_OUTPUT

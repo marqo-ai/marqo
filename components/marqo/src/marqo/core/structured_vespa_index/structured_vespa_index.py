@@ -11,6 +11,7 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
+from marqo.settings.settings import get_settings
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 
@@ -622,6 +623,10 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.global_rerank_depth_start is not None:
             query["marqo__hybrid.rerankDepthStartGlobal"] = marqo_query.global_rerank_depth_start
 
+        if (hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]
+                or hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)):
+            query["marqo__expose_pre_rerank_score"] = True
+
         return query
 
     def _get_tensor_fields_to_search(
@@ -833,8 +838,16 @@ class StructuredVespaIndex(VespaIndex):
                     else:
                         raise InternalError('RangeTerm has no lower or upper bound')
                 elif isinstance(node, search_filter.InTerm):
+                    max_in_filter_ids = get_settings().marqo_max_in_filter_ids
+                    if len(node.value_list) > max_in_filter_ids:
+                        raise InvalidArgumentError(
+                            f"The IN filter contains {len(node.value_list)} values, which exceeds the maximum "
+                            f"of {max_in_filter_ids} (MARQO_MAX_IN_FILTER_IDS)."
+                        )
                     return (f'{marqo_field_name} in '
                             f'{_convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type)}')
+                elif isinstance(node, search_filter.ContainsTerm):
+                    raise InvalidArgumentError("The 'CONTAINS' filter keyword is not yet supported for structured indexes")
 
             raise InternalError(f'Unknown node type {type(node)}')
 
