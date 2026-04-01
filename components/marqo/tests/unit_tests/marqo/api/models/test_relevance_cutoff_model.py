@@ -2,6 +2,7 @@ from unittest import TestCase
 
 from pydantic.v1 import ValidationError
 
+from marqo.core.models.hybrid_parameters import LexicalOperand
 from marqo.tensor_search.models.relevance_cutoff_model import (
     RelevanceCutoffMethod,
     RelativeMaxScoreParameters,
@@ -130,3 +131,26 @@ class TestRelevanceCutoffModel(TestCase):
         
         self.assertIn("relevanceCutoff can only be provided for 'HYBRID' search", str(cm.exception))
         self.assertIn("LEXICAL", str(cm.exception))
+
+    def test_lexical_operand_valid_values(self):
+        """Test that valid lexicalOperand values are accepted."""
+        for operand in ['or', 'and', 'weakAnd']:
+            with self.subTest(operand=operand):
+                m = RelevanceCutoffModel(
+                    method=RelevanceCutoffMethod.GapDetection,
+                    lexicalOperand=operand
+                )
+                self.assertEqual(m.lexical_operand, operand)
+
+    def test_lexical_operand_none_by_default(self):
+        """Test that lexicalOperand defaults to None."""
+        m = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
+        self.assertIsNone(m.lexical_operand)
+
+    def test_lexical_operand_invalid_value(self):
+        """Test that invalid lexicalOperand values are rejected."""
+        with self.assertRaises(ValidationError):
+            RelevanceCutoffModel(
+                method=RelevanceCutoffMethod.GapDetection,
+                lexicalOperand="invalid"
+            )
