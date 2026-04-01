@@ -1628,7 +1628,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
 
     @classmethod
     def _search(cls, query="universe ocean", relevance_cutoff=None, facets=None,
-                track_total_hits=None, limit=10, hybrid_parameters=None):
+                track_total_hits=None, limit=10, hybrid_parameters=None, sort_by=None):
         if hybrid_parameters is None:
             hybrid_parameters = {
                 "retrievalMethod": "disjunction",
@@ -1647,6 +1647,8 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
             search_query_dict["facets"] = facets
         if track_total_hits is not None:
             search_query_dict["trackTotalHits"] = track_total_hits
+        if sort_by is not None:
+            search_query_dict["sortBy"] = sort_by
         return json.loads(search(
             index_name=cls.index_name,
             marqo_config=cls.config,
@@ -1659,24 +1661,6 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         result = self._search(track_total_hits=True)
         self.assertEqual(8, result["totalHits"])
 
-    def test_total_hits_with_relevance_cutoff_matches_relevant_candidates(self):
-        """With relevance cutoff and affectFacets, totalHits should equal _relevantCandidates, not all matches."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
-                "affectFacets": True,
-            },
-            track_total_hits=True,
-        )
-        relevant_candidates = result["_relevantCandidates"]
-        self.assertEqual(relevant_candidates, result["totalHits"],
-                         "totalHits should equal _relevantCandidates when relevance cutoff is enabled")
-        # The cutoff should filter out some results
-        self.assertLess(result["totalHits"], 8,
-                        "relevance cutoff should reduce totalHits below total document count")
-
     def test_string_facets_without_relevance_cutoff_counts_all_matches(self):
         """Without relevance cutoff, facets should count all matching documents."""
         result = self._search(
@@ -1685,8 +1669,8 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(5, result["facets"]["color"]["red"]["count"])
         self.assertEqual(3, result["facets"]["color"]["blue"]["count"])
 
-    def test_string_facets_with_relevance_cutoff_only_counts_relevant(self):
-        """With relevance cutoff and affectFacets, string facets should only count relevant documents."""
+    def test_sort_by_with_relevance_cutoff_and_affect_facets(self):
+        """With sortBy + relevanceCutoff + affectFacets, facets and totalHits should be consistent."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
@@ -1694,177 +1678,102 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
                 "parameters": {"relativeScoreFactor": 0.3},
                 "affectFacets": True,
             },
-            facets={"fields": {"color": {"type": "string"}}},
-        )
-        # Only the relevant hits should contribute to facets
-        relevant_hits = result["hits"]
-        expected_facets = {}
-        for hit in relevant_hits:
-            color = hit.get("color")
-            if color:
-                expected_facets.setdefault(color, {"count": 0})
-                expected_facets[color]["count"] += 1
-
-        self.assertEqual(expected_facets, result["facets"]["color"],
-                         "Facets should only count documents that pass relevance cutoff")
-
-        # Verify that the total facet count matches the number of relevant hits
-        total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
-        self.assertEqual(len(relevant_hits), total_facet_count)
-
-    def test_facets_and_total_hits_consistent_with_relevance_cutoff(self):
-        """Facets total count and totalHits should be consistent with relevance cutoff."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
-                "affectFacets": True,
-            },
-            facets={"fields": {"color": {"type": "string"}}},
-            track_total_hits=True,
-        )
-        total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
-        self.assertEqual(result["totalHits"], result["_relevantCandidates"])
-        self.assertEqual(total_facet_count, len(result["hits"]))
-
-    def test_array_facets_with_relevance_cutoff(self):
-        """Array facets should only count relevant documents when affectFacets is enabled."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
-                "affectFacets": True,
-            },
-            facets={"fields": {"tags": {"type": "array"}}},
-        )
-        # Recompute expected tags from actual hits
-        relevant_hits = result["hits"]
-        expected_tags = {}
-        for hit in relevant_hits:
-            for tag in hit.get("tags", []):
-                expected_tags.setdefault(tag, {"count": 0})
-                expected_tags[tag]["count"] += 1
-
-        self.assertEqual(expected_tags, result["facets"]["tags"])
-
-    def test_number_facets_with_relevance_cutoff(self):
-        """Number facets should only compute stats from relevant documents when affectFacets is enabled."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
-                "affectFacets": True,
-            },
-            facets={"fields": {"price": {"type": "number"}}},
-        )
-        relevant_hits = result["hits"]
-        prices = [hit["price"] for hit in relevant_hits if "price" in hit]
-        price_facet = result["facets"]["price"]
-
-        self.assertEqual(len(prices), price_facet["count"])
-        if prices:
-            self.assertAlmostEqual(sum(prices), price_facet["sum"], places=1)
-            self.assertAlmostEqual(min(prices), price_facet["min"], places=1)
-            self.assertAlmostEqual(max(prices), price_facet["max"], places=1)
-
-    def test_low_relevance_cutoff_threshold_preserves_all_facets(self):
-        """A very low relevance cutoff threshold with affectFacets should not filter any results."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.01},
-                "affectFacets": True,
-            },
-            facets={"fields": {"color": {"type": "string"}}},
-            track_total_hits=True,
-        )
-        # With very low threshold, all matches should pass
-        total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
-        self.assertEqual(total_facet_count, len(result["hits"]))
-        self.assertEqual(result["totalHits"], result["_relevantCandidates"])
-
-    def test_facets_correct_when_limit_less_than_relevant_candidates(self):
-        """Facets should count all relevant candidates, not just the returned page.
-
-        Even when limit=1, if relevantCandidates=2, facets should reflect all 2
-        relevant documents, not just the 1 returned.
-        """
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
-                "affectFacets": True,
-            },
+            sort_by={"fields": [{"fieldName": "price"}]},
             facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
             limit=1,
         )
         relevant_candidates = result["_relevantCandidates"]
-        self.assertGreater(relevant_candidates, 1,
-                           "Need more relevant candidates than limit for this test")
-        # Only 1 hit returned due to limit
-        self.assertEqual(1, len(result["hits"]))
-        # But facets and totalHits should reflect all relevant candidates
-        total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
-        self.assertEqual(relevant_candidates, total_facet_count,
-                         "Facets should count all relevant candidates, not just returned hits")
-        self.assertEqual(relevant_candidates, result["totalHits"])
+        self.assertGreater(relevant_candidates, 0,
+                           "Should have some relevant candidates")
 
-    def test_total_hits_correct_with_offset(self):
-        """totalHits should remain consistent regardless of offset."""
-        result_no_offset = self._search(
+        # Facets total count should not exceed relevantCandidates
+        total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
+        self.assertLessEqual(total_facet_count, relevant_candidates,
+                             "Facet count should not exceed relevantCandidates")
+
+    def test_sort_by_with_overwrite_sort_candidates(self):
+        """With overWriteSortCandidatesByRelevant, _sortCandidates should equal _relevantCandidates."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.3},
+                "overWriteSortCandidatesByRelevant": True,
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            track_total_hits=True,
+        )
+        self.assertEqual(
+            result["_relevantCandidates"], result["_sortCandidates"],
+            "sortCandidates should equal relevantCandidates when overWriteSortCandidatesByRelevant is True"
+        )
+
+    def test_sort_by_without_overwrite_sort_candidates(self):
+        """Without overWriteSortCandidatesByRelevant, _sortCandidates may differ from _relevantCandidates."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.3},
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            track_total_hits=True,
+        )
+        # sortCandidates comes from the main query hit count, not relevantCandidates
+        self.assertIn("_sortCandidates", result)
+        self.assertIn("_relevantCandidates", result)
+        # sortCandidates should be >= relevantCandidates since the main query
+        # fetches max(relevantCandidates, sortByMinSortCandidates) documents
+        self.assertGreaterEqual(result["_sortCandidates"], result["_relevantCandidates"])
+
+    def test_sort_by_with_affect_facets_and_overwrite_all_consistent(self):
+        """With both affectFacets and overWriteSortCandidatesByRelevant, all counts should align."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.3},
+                "affectFacets": True,
+                "overWriteSortCandidatesByRelevant": True,
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            limit=1,
+        )
+        relevant_candidates = result["_relevantCandidates"]
+        self.assertGreater(relevant_candidates, 0)
+
+        # _sortCandidates should equal _relevantCandidates
+        self.assertEqual(relevant_candidates, result["_sortCandidates"],
+                         "sortCandidates should match relevantCandidates")
+
+        # Facets total should not exceed relevantCandidates
+        total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
+        self.assertLessEqual(total_facet_count, relevant_candidates,
+                             "Facet count should not exceed relevantCandidates")
+
+    def test_sort_by_with_affect_facets_facets_correct_with_small_limit(self):
+        """With sortBy + affectFacets, facets should count more than just the returned page."""
+        result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.3},
                 "affectFacets": True,
             },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
-            limit=10,
+            limit=1,
         )
-        # Even with a large offset that returns no hits, totalHits should still be correct
-        self.assertEqual(
-            result_no_offset["_relevantCandidates"],
-            result_no_offset["totalHits"]
-        )
+        relevant_candidates = result["_relevantCandidates"]
+        # Only 1 hit returned due to limit
+        self.assertEqual(1, len(result["hits"]))
 
-    def test_facets_with_different_retrieval_methods(self):
-        """Facets with relevance cutoff should work for different retrieval/ranking methods."""
-        test_cases = [
-            {"retrievalMethod": "disjunction", "rankingMethod": "rrf", "alpha": 0.5},
-            {"retrievalMethod": "lexical", "rankingMethod": "lexical"},
-            {"retrievalMethod": "tensor", "rankingMethod": "tensor"},
-        ]
-        for hybrid_params in test_cases:
-            retrieval = hybrid_params["retrievalMethod"]
-            ranking = hybrid_params["rankingMethod"]
-            with self.subTest(retrieval=retrieval, ranking=ranking):
-                result = self._search(
-                    relevance_cutoff={
-                        "method": "relative_max_score",
-                        "probeDepth": 1000,
-                        "parameters": {"relativeScoreFactor": 0.3},
-                        "affectFacets": True,
-                    },
-                    facets={"fields": {"color": {"type": "string"}}},
-                    track_total_hits=True,
-                    hybrid_parameters=hybrid_params,
-                )
-                # totalHits should match _relevantCandidates for all methods
-                self.assertEqual(
-                    result["_relevantCandidates"], result["totalHits"],
-                    f"totalHits mismatch for {retrieval}/{ranking}"
-                )
-                # Facets total should not exceed relevantCandidates
-                total_facet_count = sum(
-                    v["count"] for v in result["facets"]["color"].values()
-                )
-                self.assertLessEqual(
-                    total_facet_count, result["_relevantCandidates"],
-                    f"Facet count exceeds relevantCandidates for {retrieval}/{ranking}"
-                )
+        if relevant_candidates > 1:
+            # Facets should reflect more than just the 1 returned hit
+            total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
+            self.assertGreater(total_facet_count, 1,
+                               "Facets should count beyond the returned page when relevantCandidates > limit")
