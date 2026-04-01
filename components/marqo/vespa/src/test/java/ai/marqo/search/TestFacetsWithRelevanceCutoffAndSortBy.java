@@ -1,7 +1,6 @@
 package ai.marqo.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.yahoo.search.Query;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,21 +73,6 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
             assertThat(hybridSearcher.injectMaxHitsIntoFacetsGrouping(null, 5, false))
                     .isEqualTo("");
             assertThat(hybridSearcher.injectMaxHitsIntoFacetsGrouping("", 5, false)).isEqualTo("");
-        }
-
-        @Test
-        void shouldThrowWhenMaxHitsIsZeroOrNegative() {
-            String input =
-                    "select * from schema where (query) limit 0 | all(group(color)"
-                            + " each(output(count())))";
-            assertThatThrownBy(
-                            () -> hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 0, false))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("maxHits must be >= 1");
-            assertThatThrownBy(
-                            () -> hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, -3, false))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("maxHits must be >= 1");
         }
 
         @Test

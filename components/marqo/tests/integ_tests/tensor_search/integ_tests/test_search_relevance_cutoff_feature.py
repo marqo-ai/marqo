@@ -1863,7 +1863,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_facets, result["facets"])
         self.assertEqual(expected_hits, returned_hits)
 
-    def test_search_with_quoted_model_and_main_query_or_relevance_cutoff(self):
+    def test_search_operand_and_main_query_or_relevance_cutoff(self):
         """and for main query, or in relevance cutoff query"""
         result = self._search(
             relevance_cutoff={
@@ -1897,7 +1897,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
             self.assertIn("_tensor_score", hit)
             self.assertNotIn("_lexical_score", hit) # You shouldn't see any retrievals from lexical
 
-    def test_search_with_quoted_model_weakAnd_main_or_relevance_cutoff(self):
+    def test_search_operand_weakAnd_main_or_relevance_cutoff(self):
         """weakAnd for main query, or in relevance cutoff query"""
         result = self._search(
             relevance_cutoff={
@@ -1931,7 +1931,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         for hit in result["hits"][1:]:
             self.assertIn("_lexical_score", hit)
 
-    def test_search_with_quoted_model_or_main_and_relevance_cutoff(self):
+    def test_search_operand_or_main_and_relevance_cutoff(self):
         """or for main query, and in relevance cutoff query"""
         result = self._search(
             relevance_cutoff={
@@ -1954,7 +1954,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
 
         self.assertEqual(0, len(result["hits"]))
 
-    def test_search_with_quoted_model_none_main_and_relevance_cutoff(self):
+    def test_search_operand_none_main_and_relevance_cutoff(self):
         """None for main query, and in relevance cutoff query"""
         result = self._search(
             relevance_cutoff={
@@ -1977,7 +1977,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
 
         self.assertEqual(0, len(result["hits"]))
 
-    def test_search_with_quoted_model_none_main_or_relevance_cutoff(self):
+    def test_search_operand_none_main_or_relevance_cutoff(self):
         """None for main query, or in relevance cutoff query"""
         result = self._search(
             relevance_cutoff={
@@ -2006,7 +2006,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_facets, result["facets"])
         self.assertEqual(expected_hits, returned_hits)
 
-    def test_search_with_quoted_model_none_main_weakAnd_relevance_cutoff(self):
+    def test_search_operand_none_main_weakAnd_relevance_cutoff(self):
         """None for main query, weakAnd in relevance cutoff query"""
         result = self._search(
             relevance_cutoff={

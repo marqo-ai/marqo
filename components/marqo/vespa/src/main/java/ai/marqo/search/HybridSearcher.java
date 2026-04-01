@@ -472,8 +472,6 @@ public class HybridSearcher extends Searcher {
             logIfVerbose("Empty or null facets YQL, skipping max injection", verbose);
             return facetsYql == null ? "" : facetsYql;
         }
-        // TODO Early return if maxHits is 0 when relevantCandidates is 0, the facets query should
-        // not be sent
 
         // Find "| all(" — the separator between select clause and grouping.
         // We match on "| all(" rather than just "|" to be defensive against "|" appearing
