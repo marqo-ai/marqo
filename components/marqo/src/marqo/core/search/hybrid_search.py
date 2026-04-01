@@ -592,6 +592,9 @@ class HybridSearch:
             gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
             gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
 
+        if responses.trace is not None:
+            gathered_results['trace'] = responses.trace
+
         return gathered_results
 
     def _max_value_check_for_total_hits(self, gathered_results: Dict) -> Dict:
