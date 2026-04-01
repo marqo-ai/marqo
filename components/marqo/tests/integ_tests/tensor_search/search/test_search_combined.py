@@ -1020,13 +1020,8 @@ class TestSearch(MarqoTestCase):
                     self.assertEqual(result, expected_result)
 
     def test_lexical_search_optional_terms_do_not_filter_results(self):
-        """Test that unquoted (optional) terms in a lexical query do not prevent results
-        from being returned. Optional terms should only contribute to scoring via rank(),
+        """Unquoted (optional) terms in a lexical query should only contribute to scoring,
         not filter the recall set.
-
-        Regression test for a bug where optional terms were ANDed with required terms,
-        causing queries with a required term and optional punctuation like '-' to return
-        no results because '-' is stripped by Vespa's tokenizer during indexing.
         """
         docs_list = [
             {"_id": "doc1", "text_field_1": "Quick brown fox jumps over the lazy dog"},

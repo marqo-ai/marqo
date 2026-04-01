@@ -13,16 +13,8 @@ from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestLexicalSearchOptionalTerms(MarqoTestCase):
-    """Integration test verifying that unquoted (optional) terms in lexical queries
-    do not filter the recall set.
-
-    Regression test for a bug where or_phrases were ANDed with and_phrases in YQL,
-    making optional terms mandatory. Punctuation-only tokens like '-' are stripped
-    by Vespa's tokenizer during indexing, so requiring them to match returned zero
-    results.
-
-    The fix uses Vespa's rank() operator so that required (quoted) terms define the
-    recall set and optional (unquoted) terms only contribute to scoring.
+    """Verifies that unquoted (optional) terms in lexical queries do not filter the recall set.
+    Only quoted (required) terms define recall; optional terms contribute to scoring only.
     """
 
     @classmethod
@@ -122,12 +114,8 @@ class TestLexicalSearchOptionalTerms(MarqoTestCase):
 
 
 class TestLexicalOptionalTermsWithHybridAndScoreModifiers(MarqoTestCase):
-    """Verify that the rank() fix for optional/required terms interacts correctly
-    with other features that also use rank(): custom score rerankers, and
-    hybrid search with opposite retrieval/ranking methods.
-
-    Vespa flattens nested rank() (e.g. rank(a, rank(b, c)) -> rank(a, b, c)),
-    so these should work, but we need integration coverage.
+    """Verifies that optional/required lexical terms work correctly with custom score
+    rerankers and hybrid search with opposite retrieval/ranking methods.
     """
 
     @classmethod
@@ -208,10 +196,8 @@ class TestLexicalOptionalTermsWithHybridAndScoreModifiers(MarqoTestCase):
             result_count=10
         )
         result_ids = self._result_ids(res)
-        # Lexical retrieval: recall is defined by the required term "Quick"
         self.assertIn('doc1', result_ids)
         self.assertIn('doc2', result_ids)
-        # doc3 does not contain "Quick", should not be retrieved
         self.assertNotIn('doc3', result_ids)
 
     def test_tensor_retrieval_lexical_ranking_with_required_and_optional_terms(self):
@@ -229,7 +215,5 @@ class TestLexicalOptionalTermsWithHybridAndScoreModifiers(MarqoTestCase):
             result_count=10
         )
         result_ids = self._result_ids(res)
-        # Tensor retrieval: recall is semantic, so more docs may appear
         self.assertGreater(len(result_ids), 0)
-        # doc1 should be ranked high (matches both tensor similarity and lexical "Quick" + "fox")
         self.assertIn('doc1', result_ids)
