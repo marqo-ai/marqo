@@ -771,7 +771,9 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
             "marqo__hybrid.relevanceCutoff.method",
             "marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor",
             "marqo__hybrid.relevanceCutoff.parameters.stdDevFactor",
-            "marqo__hybrid.relevanceCutoff.probeDepth"
+            "marqo__hybrid.relevanceCutoff.probeDepth",
+            "marqo__hybrid.relevanceCutoff.affectFacets",
+            "marqo__hybrid.relevanceCutoff.overrideSortCandidates"
         ]:
             self.assertNotIn(key, r)
 
@@ -791,6 +793,10 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
                                r["marqo__hybrid.relevanceCutoff.parameters.relativeScoreFactor"])
         # default probeDepth is 1000
         self.assertEqual(1000, r["marqo__hybrid.relevanceCutoff.probeDepth"])
+        # default affectFacets is False
+        self.assertEqual(False, r["marqo__hybrid.relevanceCutoff.affectFacets"])
+        # default overrideSortCandidates is False
+        self.assertEqual(False, r["marqo__hybrid.relevanceCutoff.overrideSortCandidates"])
         # no stdDevFactor for this method
         self.assertNotIn("marqo__hybrid.relevanceCutoff.parameters.stdDevFactor", r)
 

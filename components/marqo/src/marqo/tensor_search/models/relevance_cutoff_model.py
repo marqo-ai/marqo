@@ -31,6 +31,8 @@ class RelevanceCutoffModel(StrictBaseModel):
             If the method is RelativeMaxScore, you must provide 'relativeScoreFactor' as a parameter.
             If the method is MeanStd, you must provide 'stdDevFactor' as a parameter.
             Check Vespa Custom Searcher for more details.
+        affect_facets (bool): When True, facets and totalHits will only count documents that pass the
+            relevance cutoff. Defaults to False.
     """
     class Config(StrictBaseModel.Config):
         use_enum_values = True
@@ -38,6 +40,10 @@ class RelevanceCutoffModel(StrictBaseModel):
     method: RelevanceCutoffMethod
     probe_depth: int = Field(1000, ge=1, alias="probeDepth")
     parameters: Union[RelativeMaxScoreParameters, MeanStdParameters, None] = None
+    affect_facets: bool = Field(False, alias="affectFacets")
+    override_sort_candidates_with_relevant_candidates: bool = Field(
+        False, alias="overrideSortCandidatesWithRelevantCandidates"
+    )
 
     @root_validator(pre=False, skip_on_failure=True)
     def _validate_method_and_parameters(cls, values):

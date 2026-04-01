@@ -413,6 +413,7 @@ class TestHybridSearch(TestCase):
             f"but got {result['totalHits']}"
         )
 
+
 class TestRecencyValidation(TestCase):
     """Tests for recency scoring validation in HybridSearch."""
 
