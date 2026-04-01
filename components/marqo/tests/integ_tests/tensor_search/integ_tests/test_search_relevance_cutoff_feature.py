@@ -1581,28 +1581,29 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         super().setUpClass()
         cls.index_request = cls.unstructured_marqo_index_request(
             name="rc_facets_totalhits_index",
-            model=Model(name="hf/all-MiniLM-L6-v2")
+            model=Model(name="hf/all-MiniLM-L6-v2"),
+            collapse_fields=[CollapseField(name="parentId")],
         )
         cls.create_indexes([cls.index_request])
         cls.index_name = cls.index_request.name
 
         cls.test_docs = [
             {"_id": "doc1", "text": "The quick brown fox jumps over the lazy dog.",
-             "color": "red", "price": 9.99, "tags": ["animal", "nature"], "brand": "Marqo"},
+             "color": "red", "price": 9.99, "tags": ["animal", "nature"], "brand": "Marqo", "parentId": "p1"},
             {"_id": "doc2", "text": "Artificial intelligence is transforming the modern world.",
-             "color": "red", "price": 24.50, "tags": ["technology", "science"], "brand": "External"},
+             "color": "red", "price": 24.50, "tags": ["technology", "science"], "brand": "External", "parentId": "p1"},
             {"_id": "doc3", "text": "The sun sets beautifully over the mountain horizon.",
-             "color": "red", "price": 4.75, "tags": ["nature", "travel"], "brand": "Marqo"},
+             "color": "red", "price": 4.75, "tags": ["nature", "travel"], "brand": "Marqo", "parentId": "p1"},
             {"_id": "doc4", "text": "Learning a new language opens many doors in life.",
-             "color": "red", "price": 49.99, "tags": ["education", "lifestyle"], "brand": "External"},
+             "color": "red", "price": 49.99, "tags": ["education", "lifestyle"], "brand": "External", "parentId": "p1"},
             {"_id": "doc5", "text": "Fresh coffee in the morning is the best way to start the day.",
-             "color": "red", "price": 12.00, "tags": ["food", "lifestyle"], "brand": "Marqo"},
+             "color": "red", "price": 12.00, "tags": ["food", "lifestyle"], "brand": "Marqo", "parentId": "p2"},
             {"_id": "doc6", "text": "The ocean is home to millions of undiscovered species.",
-             "color": "blue", "price": 7.30, "tags": ["nature", "science"], "brand": "External"},
+             "color": "blue", "price": 7.30, "tags": ["nature", "science"], "brand": "External", "parentId": "p2"},
             {"_id": "doc7", "text": "Reading books regularly improves focus and vocabulary.",
-             "color": "blue", "price": 33.80, "tags": ["education", "lifestyle"], "brand": "Marqo"},
+             "color": "blue", "price": 33.80, "tags": ["education", "lifestyle"], "brand": "Marqo", "parentId": "p2"},
             {"_id": "doc8", "text": "Space exploration has uncovered fascinating mysteries of the universe.",
-             "color": "blue", "price": 18.45, "tags": ["technology", "science"], "brand": "External"},
+             "color": "blue", "price": 18.45, "tags": ["technology", "science"], "brand": "External", "parentId": "p2"},
         ]
 
         cls.add_documents(
@@ -1619,7 +1620,8 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
 
     @classmethod
     def _search(cls, query="universe ocean intelligence world vocabulary millions day", relevance_cutoff=None,
-                facets=None, track_total_hits=None, limit=10, hybrid_parameters=None, sort_by=None):
+                facets=None, track_total_hits=None, limit=10, hybrid_parameters=None, sort_by=None, offset=0,
+                collapse_fields=None,):
         if hybrid_parameters is None:
             hybrid_parameters = {
                 "retrievalMethod": "disjunction",
@@ -1631,6 +1633,8 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
             "searchMethod": SearchMethod.HYBRID,
             "hybridParameters": hybrid_parameters,
             "limit": limit,
+            "offset": offset,
+            "collapseFields": collapse_fields,
         }
         if relevance_cutoff is not None:
             search_query_dict["relevanceCutoff"] = relevance_cutoff
@@ -1723,7 +1727,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(5, result["_relevantCandidates"])
         self.assertEqual(5, result["_sortCandidates"])
 
-        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5"]
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc6"]
         expected_facets = {
             "color": {"blue": {"count": 3}, "red": {"count": 2}},
         }
@@ -1754,7 +1758,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(5, result["_relevantCandidates"])
         self.assertEqual(5, result["_sortCandidates"])
 
-        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5"]
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc6"]
         expected_facets = {
             'color': {'blue': {'count': 3}, 'red': {'count': 2}},
             'brand': {'External': {'count': 3}, 'Marqo': {'count': 2}}
@@ -1783,9 +1787,75 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(3, result["_relevantCandidates"])
         self.assertEqual(3, result["_sortCandidates"])
 
-        expected_hits = ["doc7", "doc2", "doc8"]
+        expected_hits = ["doc2", "doc8", "doc6"]
         expected_facets = {
             "color": {"blue": {"count": 2}, "red": {"count": 1}},
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
+
+    def test_cutoff_and_sort_by_and_facets_pagination(self):
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "overrideSortCandidatesWithRelevantCandidates": True,
+                "affectFacets": True,
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={
+                "fields": {
+                    "color": {"type": "string"},
+                    "brand": {"type": "string"},
+                },
+            },
+            limit=3,
+            offset=3,
+            track_total_hits=True,
+        )
+        self.assertEqual(5, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        self.assertEqual(5, result["_sortCandidates"])
+
+        expected_hits = ["doc8", "doc6"] # You should only see 2 results here
+        expected_facets = {
+            'color': {'blue': {'count': 3}, 'red': {'count': 2}},
+            'brand': {'External': {'count': 3}, 'Marqo': {'count': 2}}
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
+
+    def test_cutoff_and_sort_by_and_facets_collapse_field(self):
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "overrideSortCandidatesWithRelevantCandidates": True,
+                "affectFacets": True,
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={
+                "fields": {
+                    "color": {"type": "string"},
+                    "brand": {"type": "string"},
+                },
+            },
+            limit=10,
+            track_total_hits=True,
+            collapse_fields=[{"name": "parentId"}],
+        )
+        self.assertEqual(2, result["totalHits"])
+        self.assertEqual(2, result["_relevantCandidates"])
+        self.assertEqual(2, result["_sortCandidates"])
+
+        expected_hits = ["doc2", "doc6"]  # You should only see 2 results here
+        expected_facets = {
+            'color': {'blue': {'count':1}, 'red': {'count': 1}},
+            'brand': {'External': {'count': 2}}
         }
         returned_hits = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(expected_facets, result["facets"])
