@@ -698,5 +698,64 @@ class RelevanceCutoffTest {
                                     .getDouble("query(marqo__recency_should_apply_score)"))
                     .hasValue(0.0);
         }
+
+        @Test
+        void shouldUseLexicalProbeYqlWhenAvailable() {
+            Query originalQuery = new Query("search/?query=test&hits=60&offset=0");
+            Integer probeDepth = 2000;
+
+            // Set up main lexical YQL (with weakAnd)
+            originalQuery
+                    .properties()
+                    .set("marqo__yql.lexical", "select * from schema where weakAnd(default contains \"hello\", default contains \"world\")");
+            // Set up probe YQL (always OR-based)
+            originalQuery
+                    .properties()
+                    .set("marqo__yql.lexicalProbe", "select * from schema where default contains \"hello\" OR default contains \"world\"");
+            originalQuery
+                    .properties()
+                    .set("marqo__ranking.lexical.lexical", "lexical_rank_profile");
+
+            // Set up the required tensor for fields to rank
+            originalQuery
+                    .getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_lexical)", Tensor.from("tensor(p{}):{}"));
+
+            Query probeQuery =
+                    hybridSearcher.createProbeLexialQuery(originalQuery, probeDepth, false);
+
+            // Verify that the probe query uses the OR-based probe YQL
+            String probeYql = probeQuery.properties().getString("yql");
+            assertThat(probeYql).contains("OR");
+            assertThat(probeYql).doesNotContain("weakAnd");
+        }
+
+        @Test
+        void shouldFallBackToLexicalYqlWhenProbeYqlNotAvailable() {
+            Query originalQuery = new Query("search/?query=test&hits=60&offset=0");
+            Integer probeDepth = 2000;
+
+            // Set up only main lexical YQL (no probe YQL)
+            originalQuery
+                    .properties()
+                    .set("marqo__yql.lexical", "select * from schema where weakAnd(default contains \"hello\")");
+            originalQuery
+                    .properties()
+                    .set("marqo__ranking.lexical.lexical", "lexical_rank_profile");
+
+            // Set up the required tensor for fields to rank
+            originalQuery
+                    .getRanking()
+                    .getFeatures()
+                    .put("query(marqo__fields_to_rank_lexical)", Tensor.from("tensor(p{}):{}"));
+
+            Query probeQuery =
+                    hybridSearcher.createProbeLexialQuery(originalQuery, probeDepth, false);
+
+            // Verify that the probe query falls back to the main lexical YQL
+            String probeYql = probeQuery.properties().getString("yql");
+            assertThat(probeYql).contains("weakAnd");
+        }
     }
 }

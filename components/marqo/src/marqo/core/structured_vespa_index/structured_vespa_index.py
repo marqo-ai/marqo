@@ -572,6 +572,10 @@ class StructuredVespaIndex(VespaIndex):
         tensor_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
         lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
 
+        # Generate probe query YQL (always OR-based) for relevance cutoff
+        probe_lexical_term = self._get_lexical_search_term(marqo_query, force_or=True) if fields_to_search_lexical else "False"
+        probe_lexical_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({probe_lexical_term}){filter_term}'
+
         query = {
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
@@ -595,6 +599,7 @@ class StructuredVespaIndex(VespaIndex):
                     marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical
             ) else tensor_yql,
             'marqo__yql.lexical': lexical_yql,
+            'marqo__yql.lexicalProbe': probe_lexical_yql,
 
             'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
             'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
@@ -844,16 +849,19 @@ class StructuredVespaIndex(VespaIndex):
         else:
             return '*'
 
-    def _generate_or_terms(self, marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery], is_facets_term=False) \
-            -> str:
-        """Generate the OR/weakAnd terms for the lexical search term.
+    def _generate_or_terms(self, marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery], is_facets_term=False,
+                           force_or=False) -> str:
+        """Generate the OR/weakAnd/AND terms for the lexical search term.
         Logic flows:
         1. If no or_phrases, return empty string
         2. If is facets term, always use OR
-        3. If rerank depth lexical is set, use weakAnd with targetHits (newly added in 2.24.11),
-        4. If score modifiers exist, use OR
-        5. Default: use weakAnd
+        3. If lexical_operand is explicitly set, use it (OR, AND, or weakAnd)
+        4. If rerank depth lexical is set, use weakAnd with targetHits (newly added in 2.24.11),
+        5. If score modifiers exist, use OR
+        6. Default: use weakAnd
         """
+        from marqo.core.models.hybrid_parameters import LexicalOperand
+
         if not marqo_query.or_phrases:
             return ''
 
@@ -875,6 +883,24 @@ class StructuredVespaIndex(VespaIndex):
         if is_facets_term:
             return ' OR '.join(terms)
 
+        # Probe queries always use OR
+        if force_or:
+            return ' OR '.join(terms)
+
+        # If lexical_operand is explicitly set, use it
+        lexical_operand = marqo_query.lexical_operand
+        if lexical_operand is not None:
+            if lexical_operand == LexicalOperand.OR:
+                return ' OR '.join(terms)
+            elif lexical_operand == LexicalOperand.AND:
+                return ' AND '.join(terms)
+            elif lexical_operand == LexicalOperand.WEAK_AND:
+                if rerank_depth_lexical is not None:
+                    if rerank_depth_lexical <= 0:  # pragma: no cover
+                        raise InternalError('RerankDepthLexical is less than or equal to 0 in _get_lexical_search_term')
+                    return f'{{targetHits:{rerank_depth_lexical}}}weakAnd({", ".join(terms)})'
+                return f'weakAnd({", ".join(terms)})'
+
         # Has rerank depth: weakAnd with targetHits
         if rerank_depth_lexical is not None:
             if rerank_depth_lexical <= 0:  # pragma: no cover
@@ -888,24 +914,29 @@ class StructuredVespaIndex(VespaIndex):
         # Default: plain weakAnd
         return f'weakAnd({", ".join(terms)})'
 
-    def _get_lexical_search_term(self, marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery], is_facets_term=False) \
-            -> str:
+    def _get_lexical_search_term(self, marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery], is_facets_term=False,
+                                force_or=False) -> str:
         # Empty query and wildcard
         if not marqo_query.or_phrases and not marqo_query.and_phrases:
             return 'false'
         if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
             return 'true'
 
-        or_terms = self._generate_or_terms(marqo_query, is_facets_term=is_facets_term)
+        or_terms = self._generate_or_terms(marqo_query, is_facets_term=is_facets_term, force_or=force_or)
 
         # Required tokens
         if marqo_query.and_phrases:
-            and_terms = ' AND '.join([
+            and_phrase_terms = [
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.and_phrases
-            ])
+            ]
+            if force_or:
+                # Probe query: join and_phrases with OR for maximum recall
+                and_terms = ' OR '.join(and_phrase_terms)
+            else:
+                and_terms = ' AND '.join(and_phrase_terms)
             if or_terms:
                 or_terms = f'({or_terms})'
-                and_terms = f' AND ({and_terms})'
+                and_terms = f' {"OR" if force_or else "AND"} ({and_terms})'
         else:
             and_terms = ''
 

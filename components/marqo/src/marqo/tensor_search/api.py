@@ -474,6 +474,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 facets=search_query.facets,
                 track_total_hits=search_query.trackTotalHits,
                 language=search_query.language,
+                lexical_operand=search_query.lexicalOperand,
                 relevance_cutoff=search_query.relevance_cutoff,
                 sort_by=search_query.sort_by,
                 interpolation_method=search_query.interpolationMethod,

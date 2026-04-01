@@ -7,6 +7,12 @@ from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
 
+class LexicalOperand(str, Enum):
+    OR = 'OR'
+    AND = 'AND'
+    WEAK_AND = 'weakAnd'
+
+
 class RetrievalMethod(str, Enum):
     Disjunction = 'disjunction'
     Tensor = 'tensor'

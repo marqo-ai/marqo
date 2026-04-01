@@ -340,6 +340,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            facets: Optional[FacetsParameters] = None,
            track_total_hits: Optional[bool] = None,
            language: Optional[str] = None,
+           lexical_operand=None,
            relevance_cutoff: Optional[RelevanceCutoffModel] = None,
            sort_by: Optional[SortByModel] = None,
            interpolation_method: Optional[InterpolationMethod] = None,
@@ -513,7 +514,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
                 hybrid_parameters=hybrid_parameters, facets=facets, track_total_hits=track_total_hits,
-                language=language,
+                language=language, lexical_operand=lexical_operand,
                 relevance_cutoff=relevance_cutoff, sort_by=sort_by,
                 interpolation_method=interpolation_method,
                 collapse=collapse,
@@ -532,7 +533,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             config=config, marqo_index=marqo_index, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
-            score_modifiers=score_modifiers, language=language
+            score_modifiers=score_modifiers, language=language, lexical_operand=lexical_operand
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -559,7 +560,8 @@ def _lexical_search(
         config: Config, marqo_index: MarqoIndex, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
-        score_modifiers: Optional[ScoreModifierLists] = None, language: Optional[str] = None):
+        score_modifiers: Optional[ScoreModifierLists] = None, language: Optional[str] = None,
+        lexical_operand=None):
     """
 
     Args:
@@ -603,7 +605,8 @@ def _lexical_search(
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
         score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers else None,
-        language=language
+        language=language,
+        lexical_operand=lexical_operand
     )
 
     vespa_index = vespa_index_factory(marqo_index)

@@ -11,7 +11,7 @@ from pydantic.v1 import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod, LexicalOperand
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search import validation
@@ -68,6 +68,7 @@ class SearchQuery(BaseMarqoModel):
     facets: Optional[FacetsParameters] = None
     trackTotalHits: Optional[bool] = None
     language: Optional[str] = None
+    lexicalOperand: Optional[LexicalOperand] = None
     sort_by: Optional[SortByModel] = Field(default=None, alias="sortBy")
     relevance_cutoff: Optional[RelevanceCutoffModel] = Field(default=None, alias="relevanceCutoff")
     interpolationMethod: Optional[InterpolationMethod] = None
@@ -363,6 +364,20 @@ class SearchQuery(BaseMarqoModel):
                 raise ValueError(
                     "language parameter is not supported for TENSOR search method. "
                     "Language specification only applies to lexical and hybrid search."
+                )
+        return values
+
+    @root_validator(pre=False)
+    def validate_lexical_operand_only_for_lexical_hybrid(cls, values):
+        """Validate that lexicalOperand is only provided for lexical/hybrid search"""
+        lexical_operand = values.get('lexicalOperand')
+        search_method = values.get('searchMethod')
+
+        if lexical_operand is not None:
+            if search_method == SearchMethod.TENSOR:
+                raise ValueError(
+                    "lexicalOperand is not supported for TENSOR search method. "
+                    "It only applies to lexical and hybrid search."
                 )
         return values
 

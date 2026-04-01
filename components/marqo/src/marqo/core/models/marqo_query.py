@@ -8,7 +8,7 @@ from marqo.base_model import StrictBaseModel
 from marqo.core.models.facets_parameters import FacetsParameters
 from marqo.core.models.score_modifier import ScoreModifier
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
-from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
+from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters, LexicalOperand
 from marqo.tensor_search.models.sort_by_model import SortByModel
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
@@ -59,6 +59,7 @@ class MarqoLexicalQuery(MarqoQuery):
     or_phrases: List[str]
     and_phrases: List[str]
     language: Optional[str] = None
+    lexical_operand: Optional[LexicalOperand] = None
 
     # Both lists can be empty only if it's a MarqoHybridQuery and it's
     # retrieval_method & ranking_method are "TENSOR" (i.e. it's a pure tensor search)

@@ -49,6 +49,7 @@ class HybridSearchInternalParameters(StrictBaseModel):
     facets: Optional[FacetsParameters] = None
     track_total_hits: Optional[bool] = None
     language: Optional[str] = None
+    lexical_operand: Optional[Any] = None
     relevance_cutoff: Optional[RelevanceCutoffModel] = None
     sort_by: Optional[SortByModel] = None
     interpolation_method: Optional[InterpolationMethod] = None
@@ -81,6 +82,7 @@ class CollapseSearch:
             facets: Optional[FacetsParameters] = None,
             track_total_hits: Optional[bool] = None,
             language: Optional[str] = None,
+            lexical_operand=None,
             relevance_cutoff: Optional[RelevanceCutoffModel] = None,
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
@@ -123,6 +125,7 @@ class CollapseSearch:
             facets=facets,
             track_total_hits=track_total_hits,
             language=language,
+            lexical_operand=lexical_operand,
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
             interpolation_method=interpolation_method,

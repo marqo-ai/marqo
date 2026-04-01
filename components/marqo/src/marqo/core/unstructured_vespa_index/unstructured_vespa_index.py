@@ -249,14 +249,22 @@ class UnstructuredVespaIndex(VespaIndex):
 
         # Optional tokens
         # TODO: add searchable attributes. This will affect the lexical "contains" term.
-        if marqo_query.or_phrases and score_modifiers:
-            or_terms = ' OR '.join([
-                f'default contains "{phrase}"' for phrase in marqo_query.or_phrases
-            ])
-        elif marqo_query.or_phrases and not score_modifiers:
-            or_terms = 'weakAnd(%s)' % ', '.join([
-                f'default contains "{phrase}"' for phrase in marqo_query.or_phrases
-            ])
+        from marqo.core.models.hybrid_parameters import LexicalOperand
+        lexical_operand = marqo_query.lexical_operand
+
+        if marqo_query.or_phrases:
+            terms = [f'default contains "{phrase}"' for phrase in marqo_query.or_phrases]
+            if lexical_operand is not None:
+                if lexical_operand == LexicalOperand.OR:
+                    or_terms = ' OR '.join(terms)
+                elif lexical_operand == LexicalOperand.AND:
+                    or_terms = ' AND '.join(terms)
+                else:  # weakAnd
+                    or_terms = 'weakAnd(%s)' % ', '.join(terms)
+            elif score_modifiers:
+                or_terms = ' OR '.join(terms)
+            else:
+                or_terms = 'weakAnd(%s)' % ', '.join(terms)
         else:
             or_terms = ''
 

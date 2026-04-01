@@ -12,6 +12,7 @@ from tests.unit_tests.marqo_test import MarqoTestCase
 from marqo.core.models.marqo_index import *
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.models.marqo_query import MarqoLexicalQuery
+from marqo.core.models.hybrid_parameters import LexicalOperand
 
 
 
@@ -114,3 +115,80 @@ class TestStructuredIndexBuildLexicalSearchQuery(MarqoTestCase):
                     test_marqo_query
                 )
                 self.assertEqual(generated_and_terms, expected_and_terms)
+
+    def test_lexical_operand_or(self):
+        """Test that lexicalOperand=OR forces OR for or_phrases."""
+        query = MarqoLexicalQuery(
+            index_name='index1', limit=10, offset=0,
+            or_phrases=["hello", "world"], and_phrases=[],
+            lexical_operand=LexicalOperand.OR
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(query)
+        self.assertEqual(result, 'default contains "hello" OR default contains "world"')
+
+    def test_lexical_operand_and(self):
+        """Test that lexicalOperand=AND forces AND for or_phrases."""
+        query = MarqoLexicalQuery(
+            index_name='index1', limit=10, offset=0,
+            or_phrases=["hello", "world"], and_phrases=[],
+            lexical_operand=LexicalOperand.AND
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(query)
+        self.assertEqual(result, 'default contains "hello" AND default contains "world"')
+
+    def test_lexical_operand_weak_and(self):
+        """Test that lexicalOperand=weakAnd forces weakAnd for or_phrases."""
+        query = MarqoLexicalQuery(
+            index_name='index1', limit=10, offset=0,
+            or_phrases=["hello", "world"], and_phrases=[],
+            lexical_operand=LexicalOperand.WEAK_AND
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(query)
+        self.assertEqual(result, 'weakAnd(default contains "hello", default contains "world")')
+
+    def test_lexical_operand_none_defaults_to_weak_and(self):
+        """Test that lexicalOperand=None keeps default behavior (weakAnd)."""
+        query = MarqoLexicalQuery(
+            index_name='index1', limit=10, offset=0,
+            or_phrases=["hello", "world"], and_phrases=[]
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(query)
+        self.assertEqual(result, 'weakAnd(default contains "hello", default contains "world")')
+
+    def test_lexical_operand_with_and_phrases(self):
+        """Test that lexicalOperand=OR with and_phrases keeps and_phrases as AND."""
+        query = MarqoLexicalQuery(
+            index_name='index1', limit=10, offset=0,
+            or_phrases=["hello", "world"], and_phrases=["required"],
+            lexical_operand=LexicalOperand.OR
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(query)
+        self.assertEqual(
+            result,
+            '(default contains "hello" OR default contains "world") AND (default contains "required")'
+        )
+
+    def test_force_or_probe_query(self):
+        """Test that force_or=True generates OR-based probe query."""
+        query = MarqoLexicalQuery(
+            index_name='index1', limit=10, offset=0,
+            or_phrases=["hello", "world"], and_phrases=["required"],
+            lexical_operand=LexicalOperand.AND  # Should be overridden by force_or
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(query, force_or=True)
+        self.assertEqual(
+            result,
+            '(default contains "hello" OR default contains "world") OR (default contains "required")'
+        )
+
+    def test_force_or_with_only_and_phrases(self):
+        """Test that force_or=True with only and_phrases generates OR."""
+        query = MarqoLexicalQuery(
+            index_name='index1', limit=10, offset=0,
+            or_phrases=[], and_phrases=["term1", "term2"]
+        )
+        result = self.structured_vespa_index._get_lexical_search_term(query, force_or=True)
+        self.assertEqual(
+            result,
+            'default contains "term1" OR default contains "term2"'
+        )
