@@ -81,7 +81,9 @@ class HybridSearch:
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
             collapse: Optional[CollapseModel] = None,
-            recency_parameters: Optional[RecencyParameters] = None
+            recency_parameters: Optional[RecencyParameters] = None,
+            query_tag: Optional[str] = None,
+            extra_params: dict = {}
     ):
         if should_use_collapse_search(collapse=collapse, main_query_sort_by=sort_by):
             # Deliberately use a late import to avoid circular imports
@@ -115,7 +117,9 @@ class HybridSearch:
                 sort_by=sort_by,
                 interpolation_method=interpolation_method,
                 collapse=collapse,
-                recency_parameters=recency_parameters
+                recency_parameters=recency_parameters,
+                query_tag=query_tag,
+                extra_params=extra_params
             ).search()
         else:
             return self.execute_search(
@@ -147,7 +151,9 @@ class HybridSearch:
                 sort_by=sort_by,
                 interpolation_method=interpolation_method,
                 collapse=collapse,
-                recency_parameters=recency_parameters
+                recency_parameters=recency_parameters,
+                query_tag=query_tag,
+                extra_params=extra_params
             )
 
     def execute_search(
@@ -169,6 +175,8 @@ class HybridSearch:
             interpolation_method: Optional[InterpolationMethod] = None,
             collapse: Optional[CollapseModel] = None,
             recency_parameters: Optional[RecencyParameters] = None,
+            query_tag: Optional[str] = None,
+            extra_params: dict = {},
             telemetry_prefix: Optional[str] = None,
     ) -> Dict:
         """
@@ -507,7 +515,9 @@ class HybridSearch:
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
             collapse=collapse,
-            recency_parameters=recency_parameters
+            recency_parameters=recency_parameters,
+            query_tag=query_tag,
+            extra_params=extra_params
         )
 
         vespa_index = vespa_index_factory(marqo_index)

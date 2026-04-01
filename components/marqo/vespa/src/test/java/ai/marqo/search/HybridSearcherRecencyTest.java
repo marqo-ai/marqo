@@ -525,7 +525,8 @@ class HybridSearcherRecencyTest {
                     .getFeatures()
                     .put("query(marqo__fields_to_rank_lexical)", fieldsToRank);
 
-            Query subQuery = hybridSearcher.createSubQuery(query, "lexical", "lexical", false);
+            Query subQuery =
+                    hybridSearcher.createSubQuery(query, "lexical", "lexical", false, "test");
 
             // Verify recency tensor was extracted and added to rank features
             RankFeatures features = subQuery.getRanking().getFeatures();
@@ -551,7 +552,8 @@ class HybridSearcherRecencyTest {
                     .put("query(marqo__fields_to_rank_lexical)", fieldsToRank);
 
             // Should not crash
-            Query subQuery = hybridSearcher.createSubQuery(query, "lexical", "lexical", false);
+            Query subQuery =
+                    hybridSearcher.createSubQuery(query, "lexical", "lexical", false, "test");
 
             assertThat(subQuery).isNotNull();
         }
@@ -578,7 +580,8 @@ class HybridSearcherRecencyTest {
                     .getFeatures()
                     .put("query(marqo__fields_to_rank_lexical)", fieldsToRank);
 
-            Query subQuery = hybridSearcher.createSubQuery(query, "lexical", "lexical", false);
+            Query subQuery =
+                    hybridSearcher.createSubQuery(query, "lexical", "lexical", false, "test");
 
             // Should handle gracefully
             assertThat(subQuery).isNotNull();
@@ -610,7 +613,8 @@ class HybridSearcherRecencyTest {
                     .getFeatures()
                     .put("query(marqo__fields_to_rank_lexical)", fieldsToRank);
 
-            Query subQuery = hybridSearcher.createSubQuery(query, "lexical", "lexical", false);
+            Query subQuery =
+                    hybridSearcher.createSubQuery(query, "lexical", "lexical", false, "test");
 
             // Verify both cells were added
             RankFeatures features = subQuery.getRanking().getFeatures();
@@ -690,7 +694,7 @@ class HybridSearcherRecencyTest {
                     .put("query(marqo__fields_to_rank_" + subqueryType + ")", fieldsToRank);
 
             Query subQuery =
-                    hybridSearcher.createSubQuery(query, subqueryType, subqueryType, false);
+                    hybridSearcher.createSubQuery(query, subqueryType, subqueryType, false, "test");
 
             RankFeatures features = subQuery.getRanking().getFeatures();
             if (expectDisabled) {

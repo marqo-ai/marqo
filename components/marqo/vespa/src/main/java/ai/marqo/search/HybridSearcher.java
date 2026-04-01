@@ -12,16 +12,19 @@ import com.google.common.annotations.VisibleForTesting;
 import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
+import com.yahoo.container.logging.AccessLogEntry;
 import com.yahoo.data.JsonProducer;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
+import com.yahoo.search.result.Coverage;
 import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.FeatureData;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.AsyncExecution;
 import com.yahoo.search.searchchain.Execution;
+import com.yahoo.search.statistics.ElapsedTime;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.Tensor.Cell;
 import com.yahoo.tensor.TensorAddress;
@@ -108,6 +111,30 @@ public class HybridSearcher extends Searcher {
                 throw new RuntimeException(e);
             }
         }
+
+        public void addToAccessLogEntry(AccessLogEntry entry) {
+            if (sortCandidates != null) {
+                entry.addKeyValue("c_sort", String.valueOf(sortCandidates));
+            }
+            if (probeCandidates != null) {
+                entry.addKeyValue("c_probe", String.valueOf(probeCandidates));
+            }
+            if (relevantCandidates != null) {
+                entry.addKeyValue("c_rel", String.valueOf(relevantCandidates));
+            }
+        }
+    }
+
+    private record SubQueryStats(
+            String queryId, long totalHits, int hits, Coverage coverage, ElapsedTime elapsedTime) {}
+
+    private SubQueryStats statsFromResult(String queryId, Result result) {
+        return new SubQueryStats(
+                queryId,
+                result.getTotalHitCount(),
+                result.hits().size(),
+                result.getCoverage(false),
+                result.getElapsedTime());
     }
 
     /**
@@ -284,6 +311,8 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException("Query limit cannot be null.");
         }
 
+        List<SubQueryStats> subQueryStatsList = new ArrayList<>();
+
         List<Future<Result>> futureFacets =
                 getFacetsFutureList(query, execution, verbose, collapse);
 
@@ -296,6 +325,7 @@ public class HybridSearcher extends Searcher {
             Query probeLexicalQuery =
                     createProbeLexialQuery(query, relevanceCutoffProbeDepth, verbose);
             Result probeLexicalResult = execution.search(probeLexicalQuery);
+            subQueryStatsList.add(statsFromResult("p", probeLexicalResult));
             probeCandidates = probeLexicalResult.hits().size();
             relevantCandidates =
                     detectCutoffCount(
@@ -326,10 +356,15 @@ public class HybridSearcher extends Searcher {
                             query,
                             MARQO_SEARCH_METHOD_LEXICAL,
                             MARQO_SEARCH_METHOD_LEXICAL,
-                            verbose);
+                            verbose,
+                            "lexical");
             Query queryTensor =
                     createSubQuery(
-                            query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+                            query,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            verbose,
+                            "tensor");
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -346,6 +381,9 @@ public class HybridSearcher extends Searcher {
                                 + ". "
                                 + e.toString());
             }
+
+            subQueryStatsList.add(statsFromResult("l", resultLexical));
+            subQueryStatsList.add(statsFromResult("t", resultTensor));
 
             // Collect errors from lexical and tensor results.
             HitGroup combinedErrors =
@@ -379,8 +417,10 @@ public class HybridSearcher extends Searcher {
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
             if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
                 Query combinedQuery =
-                        createSubQuery(query, retrievalMethod, rankingMethod, verbose);
+                        createSubQuery(
+                                query, retrievalMethod, rankingMethod, verbose, retrievalMethod);
                 Result result = execution.search(combinedQuery);
+                subQueryStatsList.add(statsFromResult(retrievalMethod, result));
                 hitsForPostProcessing = result.hits();
                 logIfVerbose("Unprocessed results: ", verbose);
                 logHitGroup(hitsForPostProcessing, verbose);
@@ -425,7 +465,7 @@ public class HybridSearcher extends Searcher {
         }
 
         if (!futureFacets.isEmpty()) {
-            attachFacetsResult(futureFacets, timeout, processedHits, verbose);
+            attachFacetsResult(futureFacets, timeout, processedHits, subQueryStatsList, verbose);
         }
 
         // Extract recency multiplier from match features after post-processing (only if recency is
@@ -436,13 +476,18 @@ public class HybridSearcher extends Searcher {
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
 
         processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
-        return new Result(query, processedHits);
+
+        String tag = query.properties().getString("marqo__query_tag", "");
+        Result finalResult = new Result(query, processedHits);
+        populateAccessLogHitCounts(query, finalResult, tag, subQueryStatsList, marqoMetadataFields);
+        return finalResult;
     }
 
     private void attachFacetsResult(
             List<Future<Result>> futureFacets,
             Integer timeout,
             HitGroup processedHits,
+            List<SubQueryStats> subQueryStatsList,
             boolean verbose) {
         try {
             long startTime = System.currentTimeMillis();
@@ -462,6 +507,7 @@ public class HybridSearcher extends Searcher {
                     // Add facets as children to the processed hits
                     processedHits.addAll(facetsResult.hits().asList());
                     facetCounter++;
+                    subQueryStatsList.add(statsFromResult("f" + facetCounter, facetsResult));
                 }
             }
             long facetsTime = System.currentTimeMillis() - startTime;
@@ -477,6 +523,71 @@ public class HybridSearcher extends Searcher {
                             + ". "
                             + e.toString());
         }
+    }
+
+    private void logCoverage(Coverage coverage, String queryId, AccessLogEntry entry) {
+        if (coverage == null) {
+            return;
+        }
+        entry.addKeyValue(queryId + "_cov_docs", String.valueOf(coverage.getDocs()));
+        entry.addKeyValue(queryId + "_cov_pct", String.valueOf(coverage.getResultPercentage()));
+        if (coverage.isDegraded()) {
+            int degradation =
+                    com.yahoo.container.logging.Coverage.toDegradation(
+                            coverage.isDegradedByMatchPhase(),
+                            coverage.isDegradedByTimeout(),
+                            coverage.isDegradedByAdapativeTimeout());
+            entry.addKeyValue(queryId + "_cov_deg_reasons", String.valueOf(degradation));
+        }
+    }
+
+    private void populateAccessLogHitCounts(
+            Query query,
+            Result result,
+            String tag,
+            List<SubQueryStats> subQueryStatsList,
+            MarqoMetadataFields marqoMetadataFields) {
+        var httpRequest = query.getHttpRequest();
+        if (httpRequest == null) return;
+
+        httpRequest
+                .getAccessLogEntry()
+                .ifPresent(
+                        entry -> {
+                            // query metadata
+                            entry.addKeyValue("tag", tag);
+                            entry.addKeyValue("limit", String.valueOf(query.getHits()));
+                            entry.addKeyValue("offset", String.valueOf(query.getOffset()));
+
+                            // result
+                            entry.addKeyValue("a_hits", String.valueOf(result.getHitCount()));
+                            entry.addKeyValue("a_total", String.valueOf(result.getTotalHitCount()));
+                            logCoverage(result.getCoverage(false), "a", entry);
+
+                            marqoMetadataFields.addToAccessLogEntry(entry);
+
+                            subQueryStatsList.forEach(
+                                    (stats) -> {
+                                        entry.addKeyValue(
+                                                stats.queryId + "_hits",
+                                                String.valueOf(stats.hits()));
+                                        entry.addKeyValue(
+                                                stats.queryId + "_total",
+                                                String.valueOf(stats.totalHits()));
+
+                                        logCoverage(stats.coverage(), stats.queryId, entry);
+
+                                        ElapsedTime elapsedTime = stats.elapsedTime();
+                                        if (elapsedTime != null) {
+                                            entry.addKeyValue(
+                                                    stats.queryId + "_t_search",
+                                                    String.valueOf(elapsedTime.searchTime()));
+                                            entry.addKeyValue(
+                                                    stats.queryId + "_t_fill",
+                                                    String.valueOf(elapsedTime.fillTime()));
+                                        }
+                                    });
+                        });
     }
 
     @VisibleForTesting
@@ -498,7 +609,8 @@ public class HybridSearcher extends Searcher {
                                 MARQO_SEARCH_METHOD_LEXICAL,
                                 MARQO_SEARCH_METHOD_LEXICAL,
                                 verbose,
-                                facetsYql);
+                                facetsYql,
+                                "facets");
                 if (collapse) {
                     // Carrying collapsefield parameter to facets query will cause extra count since
                     // CollapseFieldSearch does extra searches
@@ -1217,7 +1329,8 @@ public class HybridSearcher extends Searcher {
                         MARQO_SEARCH_METHOD_LEXICAL,
                         MARQO_SEARCH_METHOD_LEXICAL,
                         verbose,
-                        probeLexicalYql);
+                        probeLexicalYql,
+                        "probe");
 
         // Overwrite the lexical score modifiers in the probe query
         probeLexicalQuery
@@ -1395,9 +1508,13 @@ public class HybridSearcher extends Searcher {
     }
 
     public Query createSubQuery(
-            Query query, String retrievalMethod, String rankingMethod, boolean verbose) {
+            Query query,
+            String retrievalMethod,
+            String rankingMethod,
+            boolean verbose,
+            String queryId) {
         // Default exactQuery to an empty string (or any default value you prefer)
-        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "");
+        return createSubQuery(query, retrievalMethod, rankingMethod, verbose, "", queryId);
     }
 
     /**
@@ -1413,13 +1530,15 @@ public class HybridSearcher extends Searcher {
      * @param rankingMethod The ranking method to use for the sub-query
      * @param verbose Whether to log detailed information about the created sub-query.
      * @param exactQuery An YQL string to use instead of the retrieval method's YQL.
+     * @param queryId An identifier for this sub-query, used for tracing and access log.
      */
     Query createSubQuery(
             Query query,
             String retrievalMethod,
             String rankingMethod,
             boolean verbose,
-            String exactQuery) {
+            String exactQuery,
+            String queryId) {
         logIfVerbose(
                 String.format(
                         "Creating subquery with retrieval: %s, ranking: %s",
@@ -1527,6 +1646,8 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(queryNew.getRanking().getFeatures().toString(), verbose);
         logIfVerbose(
                 String.format("Rank Profile: %s", queryNew.getRanking().getProfile()), verbose);
+
+        queryNew.trace(String.format("starting subquery: %s", queryId), 2);
 
         return queryNew;
     }

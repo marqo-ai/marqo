@@ -620,7 +620,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose,
 
+            'marqo__query_tag': marqo_query.query_tag,
         }
+
+        query.update(marqo_query.extra_params)
 
         query = {k: v for k, v in query.items() if v is not None}
 

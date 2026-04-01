@@ -77,6 +77,8 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     relevance_cutoff: Optional[RelevanceCutoffModel] = None
     sort_by: Optional[SortByModel] = None
     collapse: Optional[CollapseModel] = None
+    query_tag: Optional[str] = None
+    extra_params: dict = {}
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):

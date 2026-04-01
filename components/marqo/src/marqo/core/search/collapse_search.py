@@ -54,6 +54,8 @@ class HybridSearchInternalParameters(StrictBaseModel):
     interpolation_method: Optional[InterpolationMethod] = None
     collapse: Optional[CollapseModel] = None
     recency_parameters: Optional[RecencyParameters] = None
+    query_tag: Optional[str] = None
+    extra_params: dict = {}
 
 
 class CollapseSearch:
@@ -85,7 +87,9 @@ class CollapseSearch:
             sort_by: Optional[SortByModel] = None,
             interpolation_method: Optional[InterpolationMethod] = None,
             collapse: Optional[CollapseModel] = None,
-            recency_parameters: Optional[RecencyParameters] = None
+            recency_parameters: Optional[RecencyParameters] = None,
+            query_tag: Optional[str] = None,
+            extra_params: dict = {}
     ):
         modified_attributes_to_retrieve = deepcopy(attributes_to_retrieve)
 
@@ -127,7 +131,9 @@ class CollapseSearch:
             sort_by=sort_by,
             interpolation_method=interpolation_method,
             collapse=collapse,
-            recency_parameters=recency_parameters
+            recency_parameters=recency_parameters,
+            query_tag=query_tag,
+            extra_params=extra_params
         )
 
     def search(self):
