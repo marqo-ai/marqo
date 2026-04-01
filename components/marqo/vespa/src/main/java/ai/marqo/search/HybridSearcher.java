@@ -242,8 +242,6 @@ public class HybridSearcher extends Searcher {
                         Boolean.TRUE.equals(relevanceCutoffAffectFacets),
                         verbose);
 
-        // Launch facets AFTER updateQueryHitsOffsetsAndTargetHits so the facets subqueries
-        // inherit the adjusted targetHits and max(N) grouping.
         List<Future<Result>> futureFacets =
                 getFacetsFutureList(query, execution, verbose, collapse);
 
@@ -608,9 +606,15 @@ public class HybridSearcher extends Searcher {
             String[] queries = facetsYql.split(delimiter);
             for (int i = 0; i < queries.length; i++) {
                 if (!queries[i].isEmpty()) {
-                    if (currentTensorTargetHits != null) {
-                        queries[i] = overwriteTargetHitsIfPresent(queries[i], newTensorTargetHits);
+                    if (currentTensorTargetHits != null
+                            && !Objects.equals(currentTensorTargetHits, newTensorTargetHits)) {
+                        int efSearch = currentTensorTargetHits + currentExploreAdditionalHits;
+                        String tensorFacetYQLUpdated =
+                                overwriteTargetHitsAndExploreAdditionalHits(
+                                        queries[i], newTensorTargetHits, efSearch);
+                        queries[i] = tensorFacetYQLUpdated;
                     }
+
                     queries[i] = injectMaxHitsIntoFacetsGrouping(queries[i], newHits, verbose);
                 }
             }
