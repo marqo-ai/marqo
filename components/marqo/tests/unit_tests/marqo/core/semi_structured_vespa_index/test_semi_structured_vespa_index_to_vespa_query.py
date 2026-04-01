@@ -2077,6 +2077,36 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         vespa_query = vespa_index.to_vespa_query(marqo_query)
         self.assertEqual(vespa_query["marqo__custom_score_closeness_distance_metric"], "dotproduct")
 
+    def test_expose_pre_rerank_score_set_when_global_score_modifiers_present(self):
+        """marqo__expose_pre_rerank_score is True when global (non-custom) score modifiers are used."""
+        marqo_query = self._hybrid_query(
+            score_modifiers=[
+                ScoreModifier(field='popularity', weight=1.0, type=ScoreModifierType.Add),
+            ],
+        )
+        vespa_query = self.vespa_index._get_base_vespa_hybrid_query(marqo_query)
+        self.assertTrue(vespa_query.get('marqo__expose_pre_rerank_score'))
+
+    def test_expose_pre_rerank_score_set_when_custom_score_rerank_modifiers_present(self):
+        """marqo__expose_pre_rerank_score is True when custom score rerank modifiers are used."""
+        marqo_query = self._hybrid_query(
+            score_modifiers=[
+                ScoreModifier(
+                    field=f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum',
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index._get_base_vespa_hybrid_query(marqo_query)
+        self.assertTrue(vespa_query.get('marqo__expose_pre_rerank_score'))
+
+    def test_expose_pre_rerank_score_absent_when_no_score_modifiers(self):
+        """marqo__expose_pre_rerank_score is not set when no score modifiers are used."""
+        marqo_query = self._hybrid_query()
+        vespa_query = self.vespa_index._get_base_vespa_hybrid_query(marqo_query)
+        self.assertNotIn('marqo__expose_pre_rerank_score', vespa_query)
+
 
 class TestAppendCustomScoreRerankTerms(unittest.TestCase):
     """Unit tests for _append_custom_score_rerank_terms."""
