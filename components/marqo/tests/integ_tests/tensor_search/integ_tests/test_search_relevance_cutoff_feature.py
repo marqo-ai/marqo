@@ -12,7 +12,8 @@ from marqo.tensor_search.enums import SearchMethod
 from tests.integ_tests.marqo_test import MarqoTestCase
 
 
-@pytest.mark.skip_for_multinode("Multi-nodes will return different lexical results so we can not assert on the results.")
+@pytest.mark.skip_for_multinode(
+    "Multi-nodes will return different lexical results so we can not assert on the results.")
 class TestSearchRelevanceCutoffFeature(MarqoTestCase):
 
     @classmethod
@@ -34,9 +35,9 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             ],
             tensor_fields=["content"]
         )
-        
+
         cls.create_indexes([unstructured_index_request, structured_index_request])
-        
+
         cls.unstructured_index_name = unstructured_index_request.name
         cls.structured_marqo_index_name = structured_index_request.name
 
@@ -176,7 +177,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         cls.PROBE_CANDIDATES = 25  # Expected number of probe candidates for relevance cutoff tests
 
     def setUp(self):
-        pass # To override the parent class setup method that deletes the documents after each test.
+        pass  # To override the parent class setup method that deletes the documents after each test.
 
     @classmethod
     def _search_helper(
@@ -335,7 +336,6 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         self.assertEqual(25, result["_probeCandidates"])
         self.assertEqual(10, result["_relevantCandidates"])
 
-
     def test_relevance_cutoff_mean_std_dev(self):
         """Test that mean_std_dev cutoff works as expected."""
         result = self._search_helper(
@@ -461,7 +461,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             },
             limit=10
         )
-        
+
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(10, result["_relevantCandidates"])
         self.assertEqual(25, result["_probeCandidates"])
@@ -473,7 +473,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             "method": "relative_max_score",
             "parameters": {"relativeScoreFactor": 0.7}
         }
-        
+
         # Test with different minSortCandidates values
         for min_sort in [5, 15, 25]:
             result = self._search_helper(
@@ -490,7 +490,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                 f"Sort candidates should at least greater than or equal "
                 f"to minSortCandidates: {min_sort}"
             )
-            
+
             # When minSortCandidates is high, it should override relevance filtering
             if min_sort >= 25:
                 # Should include low-relevance docs due to high minSortCandidates
@@ -500,10 +500,10 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
     def test_sort_with_relevance_cutoff_different_thresholds_effectiveness(self):
         """Test how different relevance cutoff thresholds affect sort results."""
         sort_params = {"fields": [{"field_name": "sort_value", "order": "desc"}]}
-        
+
         results = {}
         thresholds = [0.3, 0.5, 0.7, 0.9]
-        
+
         for threshold in thresholds:
             result = self._search_helper(
                 sort_by=sort_params,
@@ -514,15 +514,15 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                 limit=10
             )
             results[threshold] = result
-        
+
         # Higher thresholds should result in fewer relevance candidates
         prev_candidates = 30
         for threshold in thresholds:
             current_candidates = results[threshold]["_relevantCandidates"]
             self.assertLessEqual(current_candidates, prev_candidates,
-                               f"Threshold {threshold} should have <= candidates than previous")
+                                 f"Threshold {threshold} should have <= candidates than previous")
             prev_candidates = current_candidates
-        
+
         # Most restrictive threshold should exclude low-relevance docs
         restrictive_ids = [hit["_id"] for hit in results[0.9]["hits"]]
         self.assertTrue(
@@ -578,7 +578,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             },
             limit=15
         )
-        
+
         ids = [hit["_id"] for hit in result["hits"]]
 
         self.assertEqual(16, result["_relevantCandidates"])
@@ -598,12 +598,12 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             },
             limit=10
         )
-        
+
         # Sort candidates should be >= relevance candidates because sorting candidates includes the results from
         # tensor search.
         self.assertGreaterEqual(result["_sortCandidates"], result["_relevantCandidates"],
-                           "Sort candidates should not exceed relevance candidates")
-        
+                                "Sort candidates should not exceed relevance candidates")
+
         # Both should be <= total available documents (25 probe candidates)
         self.assertLessEqual(result["_relevantCandidates"], 25)
         self.assertLessEqual(result["_sortCandidates"], 25)
@@ -639,11 +639,11 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         )
         self.assertEqual(len(result_small["hits"]), 3, "Should respect limit")
         self.assertIn("_relevantCandidates", result_small)
-        
+
         # Test with offset
         result_offset = self._search_helper(
             relevance_cutoff={
-                "method": "relative_max_score", 
+                "method": "relative_max_score",
                 "parameters": {"relativeScoreFactor": 0.4},
             },
             limit=5,
@@ -661,7 +661,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             }
         )
         self.assertEqual(3, result_max["_relevantCandidates"], "Factor 1.0 should be very restrictive")
-        
+
         # Test with factor = 0.0 (least restrictive)
         result_min = self._search_helper(
             relevance_cutoff={
@@ -678,12 +678,12 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                 "method": "gap_detection",
             }
         )
-        
+
         # Verify basic structure
         self.assertIn("hits", result)
         self.assertIn("_relevantCandidates", result)
         self.assertIn("_probeCandidates", result)
-        
+
         # Verify each hit has required fields
         for hit in result["hits"]:
             self.assertIn("_id", hit, "Each hit should have _id")
@@ -695,16 +695,16 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
     def test_relevance_cutoff_baseline_without_cutoff(self):
         """Test baseline search without relevance cutoff returns expected results."""
         result = self._search_helper()
-        
+
         # Should not have cutoff metadata
         self.assertNotIn("_relevantCandidates", result, "Should not have cutoff metadata")
         self.assertNotIn("_probeCandidates", result, "Should not have probe metadata")
-        
+
         # Should return all high relevance documents in top 10
         result_ids = set(hit["_id"] for hit in result["hits"])
         high_relevance_ids = set([f"h{i}" for i in range(1, 11)])
-        self.assertEqual(result_ids, high_relevance_ids, 
-                        "Should return all high relevance documents without cutoff")
+        self.assertEqual(result_ids, high_relevance_ids,
+                         "Should return all high relevance documents without cutoff")
 
     def test_relevance_cutoff_consistency_across_calls(self):
         """Test that identical relevance cutoff calls return consistent results."""
@@ -712,16 +712,16 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             "method": "relative_max_score",
             "parameters": {"relativeScoreFactor": 0.6},
         }
-        
+
         result1 = self._search_helper(relevance_cutoff=cutoff_params)
         result2 = self._search_helper(relevance_cutoff=cutoff_params)
-        
+
         # Results should be consistent
         self.assertEqual(result1["_relevantCandidates"], result2["_relevantCandidates"],
-                        "Relevance candidates should be consistent across calls")
+                         "Relevance candidates should be consistent across calls")
         self.assertEqual(len(result1["hits"]), len(result2["hits"]),
-                        "Number of hits should be consistent across calls")
-        
+                         "Number of hits should be consistent across calls")
+
         # Order should be consistent
         ids1 = [hit["_id"] for hit in result1["hits"]]
         ids2 = [hit["_id"] for hit in result2["hits"]]
@@ -731,7 +731,7 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         """Test mean_std_dev method with comprehensive range of stdDevFactor values."""
         # Test negative, zero, and positive factors
         factors = [-2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
-        
+
         previous_candidates = 30
         for factor in factors:
             result = self._search_helper(
@@ -740,63 +740,63 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                     "parameters": {"stdDevFactor": factor}
                 }
             )
-            
+
             current_candidates = result["_relevantCandidates"]
-            
+
             # Higher factors should generally result in fewer or equal candidates
             self.assertLessEqual(current_candidates, previous_candidates,
-                               f"Factor {factor} should have <= candidates than previous factor")
-            
+                                 f"Factor {factor} should have <= candidates than previous factor")
+
             # All results should be valid
             self.assertGreaterEqual(current_candidates, 0, "Should have non-negative candidates")
             self.assertLessEqual(current_candidates, 25, "Should not exceed probe candidates")
-            
+
             previous_candidates = current_candidates
 
     def test_mean_std_dev_with_different_sort_orders(self):
         """Test mean_std_dev behavior with ascending vs descending sort."""
-        
+
         base_cutoff = {
             "method": "mean_std_dev",
             "parameters": {"stdDevFactor": 1.0}
         }
-        
+
         # Test with descending sort
         desc_result = self._search_helper(
             sort_by={"fields": [{"field_name": "sort_value", "order": "desc"}]},
             relevance_cutoff=base_cutoff,
             limit=8
         )
-        
+
         # Test with ascending sort
         asc_result = self._search_helper(
             sort_by={"fields": [{"field_name": "sort_value", "order": "asc"}]},
             relevance_cutoff=base_cutoff,
             limit=8
         )
-        
+
         # Both should apply same relevance filtering
         self.assertEqual(desc_result["_relevantCandidates"], asc_result["_relevantCandidates"],
-                        "Sort order should not affect relevance filtering")
-        
+                         "Sort order should not affect relevance filtering")
+
         # Should maintain appropriate sort orders
         desc_values = [hit["sort_value"] for hit in desc_result["hits"]]
         asc_values = [hit["sort_value"] for hit in asc_result["hits"]]
-        
+
         self.assertEqual(desc_values, sorted(desc_values, reverse=True), "Desc should be descending")
         self.assertEqual(asc_values, sorted(asc_values), "Asc should be ascending")
 
     def test_mean_std_dev_with_min_sort_candidates_interaction(self):
         """Test how mean_std_dev interacts with minSortCandidates in production."""
-        
+
         # Test different combinations of filtering vs minSortCandidates
         test_cases = [
             {"stdDevFactor": 0.5, "minSortCandidates": 10},
-            {"stdDevFactor": 1.0, "minSortCandidates": 15}, 
+            {"stdDevFactor": 1.0, "minSortCandidates": 15},
             {"stdDevFactor": 1.5, "minSortCandidates": 20},
             {"stdDevFactor": 2.0, "minSortCandidates": 25}  # Override scenario
         ]
-        
+
         for case in test_cases:
             result = self._search_helper(
                 sort_by={
@@ -809,11 +809,11 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                 },
                 limit=10
             )
-            
+
             # Sort candidates should meet minimum requirement
             self.assertGreaterEqual(result["_sortCandidates"], case["minSortCandidates"],
-                                  f"Case {case}: Sort candidates should meet minimum")
-            
+                                    f"Case {case}: Sort candidates should meet minimum")
+
             # When minSortCandidates is very high, it overrides filtering
             if case["minSortCandidates"] >= 25:
                 ids = [hit["_id"] for hit in result["hits"]]
@@ -822,12 +822,12 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
 
     def test_mean_std_dev_consistency_across_multiple_calls(self):
         """Test that mean_std_dev produces consistent results across calls."""
-        
+
         cutoff_params = {
             "method": "mean_std_dev",
             "parameters": {"stdDevFactor": 1.0}
         }
-        
+
         # Multiple calls with same parameters
         results = []
         for _ in range(3):
@@ -837,12 +837,12 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                 limit=8
             )
             results.append(result)
-        
+
         # All calls should produce identical results
         for i in range(1, len(results)):
             self.assertEqual(results[0]["_relevantCandidates"], results[i]["_relevantCandidates"],
-                           f"Call {i} should have same relevance candidates as call 0")
-            
+                             f"Call {i} should have same relevance candidates as call 0")
+
             ids_0 = [hit["_id"] for hit in results[0]["hits"]]
             ids_i = [hit["_id"] for hit in results[i]["hits"]]
             self.assertEqual(ids_0, ids_i, f"Call {i} should have same result order as call 0")
@@ -888,7 +888,6 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         page_2_sort_candidates = page_2_results["_sortCandidates"]
         self.assertEqual(11, page_2_sort_candidates)
 
-
         page_3_results = self._search_helper(
             sort_by={
                 "fields": [{"field_name": "sort_value", "order": "desc"}]
@@ -898,13 +897,12 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
                 "parameters": {"stdDevFactor": 0.5}
             },
             limit=4,
-            offset= 8
+            offset=8
         )
 
         self.assertEqual(11, page_3_results["_sortCandidates"])
         self.assertEqual(10, page_3_results["_relevantCandidates"])
         self.assertEqual(3, len(page_3_results["hits"]))
-
 
         # We should see a consistent sort value order in both pages
         page_1_sort_values = [hit["sort_value"] for hit in page_1_results["hits"]]
@@ -1358,12 +1356,12 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
             add_docs_params=AddDocsParams(
                 docs=documents,
                 index_name=cls.index_name,
-                mappings = {
+                mappings={
                     "multimodal_combination": {
                         "type": "multimodal_combination",
                         "weights": {
                             "title": 0.99,
-                            "image_url": 0.1 # Give it a low weight as it just a dummy image URL
+                            "image_url": 0.1  # Give it a low weight as it just a dummy image URL
                         }
                     },
 
@@ -1373,7 +1371,7 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         )
 
     def setUp(self):
-        pass # Override to avoid running the parent class setup that clears the index
+        pass  # Override to avoid running the parent class setup that clears the index
 
     @classmethod
     def _search_helper(
@@ -1568,19 +1566,22 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
             filter="filter_field_1:us"
         )
 
-
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(6, result["_relevantCandidates"])
         self.assertEqual(6, result["_probeCandidates"])
         self.assertEqual(['13', '20', '10', '17', '1', '14'], ids)
 
 
-@pytest.mark.skip_for_multinode("Multi-nodes will return different lexical results so we can not assert on the results.")
+@pytest.mark.skip_for_multinode(
+    "Multi-nodes will return different lexical results so we can not assert on the results.")
 class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
-    """Tests that facets and trackTotalHits reflect relevance cutoff filtering.
+    """Tests that facets, totalHits, and sortCandidates correctly reflect relevance cutoff
+    when used together with sortBy.
 
-    When relevance cutoff is enabled, facets and totalHits should only count results
-    that pass the relevance cutoff, not all matching documents.
+    When affectFacets is enabled, facets and totalHits should only count documents that
+    pass the relevance cutoff. When overWriteSortCandidatesByRelevantCandidates is enabled,
+    _sortCandidates should equal _relevantCandidates. When affectFacets is disabled,
+    facets and totalHits should count all matching documents as usual.
     """
 
     @classmethod
@@ -1593,25 +1594,23 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         cls.create_indexes([cls.index_request])
         cls.index_name = cls.index_request.name
 
-        # Documents designed so that searching "universe ocean" with relevance cutoff
-        # will only return the highly relevant docs (doc6, doc8) which are both "blue".
         cls.test_docs = [
             {"_id": "doc1", "text": "The quick brown fox jumps over the lazy dog.",
-             "color": "red", "price": 9.99, "tags": ["animal", "nature"]},
+             "color": "red", "price": 9.99, "tags": ["animal", "nature"], "brand": "Marqo"},
             {"_id": "doc2", "text": "Artificial intelligence is transforming the modern world.",
-             "color": "red", "price": 24.50, "tags": ["technology", "science"]},
+             "color": "red", "price": 24.50, "tags": ["technology", "science"], "brand": "External"},
             {"_id": "doc3", "text": "The sun sets beautifully over the mountain horizon.",
-             "color": "red", "price": 4.75, "tags": ["nature", "travel"]},
+             "color": "red", "price": 4.75, "tags": ["nature", "travel"], "brand": "Marqo"},
             {"_id": "doc4", "text": "Learning a new language opens many doors in life.",
-             "color": "red", "price": 49.99, "tags": ["education", "lifestyle"]},
+             "color": "red", "price": 49.99, "tags": ["education", "lifestyle"], "brand": "External"},
             {"_id": "doc5", "text": "Fresh coffee in the morning is the best way to start the day.",
-             "color": "red", "price": 12.00, "tags": ["food", "lifestyle"]},
+             "color": "red", "price": 12.00, "tags": ["food", "lifestyle"], "brand": "Marqo"},
             {"_id": "doc6", "text": "The ocean is home to millions of undiscovered species.",
-             "color": "blue", "price": 7.30, "tags": ["nature", "science"]},
+             "color": "blue", "price": 7.30, "tags": ["nature", "science"], "brand": "External"},
             {"_id": "doc7", "text": "Reading books regularly improves focus and vocabulary.",
-             "color": "blue", "price": 33.80, "tags": ["education", "lifestyle"]},
+             "color": "blue", "price": 33.80, "tags": ["education", "lifestyle"], "brand": "Marqo"},
             {"_id": "doc8", "text": "Space exploration has uncovered fascinating mysteries of the universe.",
-             "color": "blue", "price": 18.45, "tags": ["technology", "science"]},
+             "color": "blue", "price": 18.45, "tags": ["technology", "science"], "brand": "External"},
         ]
 
         cls.add_documents(
@@ -1627,8 +1626,8 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         pass  # Override parent to preserve documents between tests
 
     @classmethod
-    def _search(cls, query="universe ocean", relevance_cutoff=None, facets=None,
-                track_total_hits=None, limit=10, hybrid_parameters=None, sort_by=None):
+    def _search(cls, query="universe ocean intelligence world vocabulary millions day", relevance_cutoff=None,
+                facets=None, track_total_hits=None, limit=10, hybrid_parameters=None, sort_by=None):
         if hybrid_parameters is None:
             hybrid_parameters = {
                 "retrievalMethod": "disjunction",
@@ -1656,12 +1655,12 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
             search_query_dict=search_query_dict
         ).body.decode('utf-8'))
 
-    def test_total_hits_without_relevance_cutoff_counts_all_matches(self):
+    def test_baseline_total_hits_counts_all_matches(self):
         """Without relevance cutoff, totalHits should count all matching documents."""
         result = self._search(track_total_hits=True)
         self.assertEqual(8, result["totalHits"])
 
-    def test_string_facets_without_relevance_cutoff_counts_all_matches(self):
+    def test_baseline_facets_count_all_matches(self):
         """Without relevance cutoff, facets should count all matching documents."""
         result = self._search(
             facets={"fields": {"color": {"type": "string"}}},
@@ -1669,111 +1668,101 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(5, result["facets"]["color"]["red"]["count"])
         self.assertEqual(3, result["facets"]["color"]["blue"]["count"])
 
-    def test_sort_by_with_relevance_cutoff_and_affect_facets(self):
-        """With sortBy + relevanceCutoff + affectFacets, facets and totalHits should be consistent."""
+    def test_affect_facets_false_facets_and_total_hits_count_all_matches(self):
+        """With affectFacets=False, facets and totalHits count all matches, not just relevant ones."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
+                "parameters": {"relativeScoreFactor": 0.1},
+                "affectFacets": False
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+        )
+        self.assertEqual(8, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        expected_facets = {
+            "color": {"blue": {"count": 3}, "red": {"count": 5}},
+        }
+        self.assertEqual(expected_facets, result["facets"])
+
+    def test_affect_facets_true_facets_and_total_hits_reflect_relevant_candidates(self):
+        """With sortBy + affectFacets=True, facets and totalHits only count relevant documents."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
                 "affectFacets": True,
             },
             sort_by={"fields": [{"fieldName": "price"}]},
             facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
-            limit=1,
         )
-        relevant_candidates = result["_relevantCandidates"]
-        self.assertGreater(relevant_candidates, 0,
-                           "Should have some relevant candidates")
+        self.assertEqual(5, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        self.assertEqual(6, result["_sortCandidates"])
 
-        # Facets total count should not exceed relevantCandidates
-        total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
-        self.assertLessEqual(total_facet_count, relevant_candidates,
-                             "Facet count should not exceed relevantCandidates")
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5"]
+        expected_facets = {
+            "color": {"blue": {"count": 3}, "red": {"count": 2}},
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
 
-    def test_sort_by_with_overwrite_sort_candidates(self):
-        """With overWriteSortCandidatesByRelevant, _sortCandidates should equal _relevantCandidates."""
+    def test_overwrite_sort_candidates_aligns_sort_candidates_with_relevant_candidates(self):
+        """With overWriteSortCandidatesByRelevantCandidates, _sortCandidates equals _relevantCandidates."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
-                "overWriteSortCandidatesByRelevant": True,
-            },
-            sort_by={"fields": [{"fieldName": "price"}]},
-            track_total_hits=True,
-        )
-        self.assertEqual(
-            result["_relevantCandidates"], result["_sortCandidates"],
-            "sortCandidates should equal relevantCandidates when overWriteSortCandidatesByRelevant is True"
-        )
-
-    def test_sort_by_without_overwrite_sort_candidates(self):
-        """Without overWriteSortCandidatesByRelevant, _sortCandidates may differ from _relevantCandidates."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
-            },
-            sort_by={"fields": [{"fieldName": "price"}]},
-            track_total_hits=True,
-        )
-        # sortCandidates comes from the main query hit count, not relevantCandidates
-        self.assertIn("_sortCandidates", result)
-        self.assertIn("_relevantCandidates", result)
-        # sortCandidates should be >= relevantCandidates since the main query
-        # fetches max(relevantCandidates, sortByMinSortCandidates) documents
-        self.assertGreaterEqual(result["_sortCandidates"], result["_relevantCandidates"])
-
-    def test_sort_by_with_affect_facets_and_overwrite_all_consistent(self):
-        """With both affectFacets and overWriteSortCandidatesByRelevant, all counts should align."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
-                "affectFacets": True,
-                "overWriteSortCandidatesByRelevant": True,
-            },
-            sort_by={"fields": [{"fieldName": "price"}]},
-            facets={"fields": {"color": {"type": "string"}}},
-            track_total_hits=True,
-            limit=1,
-        )
-        relevant_candidates = result["_relevantCandidates"]
-        self.assertGreater(relevant_candidates, 0)
-
-        # _sortCandidates should equal _relevantCandidates
-        self.assertEqual(relevant_candidates, result["_sortCandidates"],
-                         "sortCandidates should match relevantCandidates")
-
-        # Facets total should not exceed relevantCandidates
-        total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
-        self.assertLessEqual(total_facet_count, relevant_candidates,
-                             "Facet count should not exceed relevantCandidates")
-
-    def test_sort_by_with_affect_facets_facets_correct_with_small_limit(self):
-        """With sortBy + affectFacets, facets should count more than just the returned page."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.3},
+                "parameters": {"relativeScoreFactor": 0.2},
+                "overWriteSortCandidatesByRelevantCandidates": True,
                 "affectFacets": True,
             },
             sort_by={"fields": [{"fieldName": "price"}]},
             facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
-            limit=1,
         )
-        relevant_candidates = result["_relevantCandidates"]
-        # Only 1 hit returned due to limit
-        self.assertEqual(1, len(result["hits"]))
+        self.assertEqual(5, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        self.assertEqual(5, result["_sortCandidates"])
 
-        if relevant_candidates > 1:
-            # Facets should reflect more than just the 1 returned hit
-            total_facet_count = sum(v["count"] for v in result["facets"]["color"].values())
-            self.assertGreater(total_facet_count, 1,
-                               "Facets should count beyond the returned page when relevantCandidates > limit")
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5"]
+        expected_facets = {
+            "color": {"blue": {"count": 3}, "red": {"count": 2}},
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
+
+    def test_stricter_cutoff_reduces_all_counts_consistently(self):
+        """With a stricter relativeScoreFactor (0.5), fewer documents pass the cutoff.
+        All counts (totalHits, relevantCandidates, sortCandidates, facets) reflect
+        the reduced set consistently."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.5},
+                "affectFacets": True,
+                "overWriteSortCandidatesByRelevantCandidates": True,
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+        )
+        self.assertEqual(3, result["totalHits"])
+        self.assertEqual(3, result["_relevantCandidates"])
+        self.assertEqual(3, result["_sortCandidates"])
+
+        expected_hits = ["doc7", "doc2", "doc8"]
+        expected_facets = {
+            "color": {"blue": {"count": 2}, "red": {"count": 1}},
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
