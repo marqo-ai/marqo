@@ -1580,7 +1580,6 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.index_request = cls.unstructured_marqo_index_request(
-            name="rc_facets_totalhits_index",
             model=Model(name="hf/all-MiniLM-L6-v2"),
             collapse_fields=[CollapseField(name="parentId")],
         )
@@ -1619,15 +1618,18 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         pass  # Override parent to preserve documents between tests
 
     @classmethod
+
     def _search(cls, query="universe ocean intelligence world vocabulary millions day", relevance_cutoff=None,
-                facets=None, track_total_hits=None, limit=10, hybrid_parameters=None, sort_by=None, offset=0,
-                collapse_fields=None,):
+                facets=None, track_total_hits=None, limit=10, hybrid_parameters=None, sort_by=None, offset=0, alpha=0.5,
+                collapse_fields=None, lexical_operand=None):
         if hybrid_parameters is None:
             hybrid_parameters = {
                 "retrievalMethod": "disjunction",
                 "rankingMethod": "rrf",
-                "alpha": 0.5,
+                "alpha": alpha,
             }
+        if lexical_operand is not None:
+            hybrid_parameters["lexicalOperand"] = lexical_operand
         search_query_dict = {
             "q": query,
             "searchMethod": SearchMethod.HYBRID,
@@ -1860,3 +1862,187 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         returned_hits = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(expected_facets, result["facets"])
         self.assertEqual(expected_hits, returned_hits)
+
+    def test_search_operand_and_main_query_or_relevance_cutoff(self):
+        """and for main query, or in relevance cutoff query"""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "affectFacets": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
+                "lexicalOperand": "or"
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            alpha=0.2,
+            lexical_operand="and"
+        )
+
+        self.assertEqual(5, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        self.assertEqual(5, result["_sortCandidates"])
+
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc6"]
+        expected_facets = {
+            'color': {'blue': {'count': 3}, 'red': {'count': 2}},
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
+
+        for hit in result["hits"]:
+            self.assertIn("_tensor_score", hit)
+            self.assertNotIn("_lexical_score", hit) # You shouldn't see any retrievals from lexical
+
+    def test_search_operand_weakAnd_main_or_relevance_cutoff(self):
+        """weakAnd for main query, or in relevance cutoff query"""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "affectFacets": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
+                "lexicalOperand": "or"
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            lexical_operand="or"
+        )
+
+        self.assertEqual(5, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        self.assertEqual(5, result["_sortCandidates"])
+
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc6"]
+        expected_facets = {
+            'color': {'blue': {'count': 3}, 'red': {'count': 2}},
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
+
+        # "doc4" is purely retrieved by tensor, others have tensor and lexical scores
+        self.assertNotIn("_lexical_score", result["hits"][0])
+        for hit in result["hits"][1:]:
+            self.assertIn("_lexical_score", hit)
+
+    def test_search_operand_or_main_and_relevance_cutoff(self):
+        """or for main query, and in relevance cutoff query"""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "affectFacets": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
+                "lexicalOperand": "and"
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            lexical_operand="or"
+        )
+
+        self.assertEqual(0, result["totalHits"])
+        self.assertEqual(0, result["_relevantCandidates"])
+        self.assertEqual(0, result["_sortCandidates"])
+
+        self.assertEqual(0, len(result["hits"]))
+
+    def test_search_operand_none_main_and_relevance_cutoff(self):
+        """None for main query, and in relevance cutoff query"""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "affectFacets": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
+                "lexicalOperand": "and"
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            lexical_operand=None # use default
+        )
+
+        self.assertEqual(0, result["totalHits"])
+        self.assertEqual(0, result["_relevantCandidates"])
+        self.assertEqual(0, result["_sortCandidates"])
+
+        self.assertEqual(0, len(result["hits"]))
+
+    def test_search_operand_none_main_or_relevance_cutoff(self):
+        """None for main query, or in relevance cutoff query"""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "affectFacets": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
+                "lexicalOperand": "or"
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            lexical_operand=None # use default
+        )
+
+        self.assertEqual(5, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        self.assertEqual(5, result["_sortCandidates"])
+
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc6"]
+        expected_facets = {
+            'color': {'blue': {'count': 3}, 'red': {'count': 2}},
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
+
+    def test_search_operand_none_main_weakAnd_relevance_cutoff(self):
+        """None for main query, weakAnd in relevance cutoff query"""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "affectFacets": True,
+                "overrideSortCandidatesWithRelevantCandidates": True,
+                "lexicalOperand": "weakAnd"
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            lexical_operand=None # use default
+        )
+
+        self.assertEqual(5, result["totalHits"])
+        self.assertEqual(5, result["_relevantCandidates"])
+        self.assertEqual(5, result["_sortCandidates"])
+
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc6"]
+        expected_facets = {
+            'color': {'blue': {'count': 3}, 'red': {'count': 2}},
+        }
+        returned_hits = [hit["_id"] for hit in result["hits"]]
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(expected_hits, returned_hits)
+
+    def test_search_operand_works_with_quoted_queries(self):
+        """Ensure quoted queries still work"""
+        result = self._search(
+            query = '\"void\" \"test\"',
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            lexical_operand=None # use default
+        )
+        for hit in result["hits"]:
+            self.assertNotIn("_lexical_score", hit)
+            self.assertIn("_tensor_score", hit)

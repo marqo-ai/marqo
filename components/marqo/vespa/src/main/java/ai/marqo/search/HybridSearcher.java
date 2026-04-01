@@ -473,10 +473,6 @@ public class HybridSearcher extends Searcher {
             return facetsYql == null ? "" : facetsYql;
         }
 
-        if (maxHits < 1) {
-            throw new IllegalArgumentException("maxHits must be >= 1, got: " + maxHits);
-        }
-
         // Find "| all(" — the separator between select clause and grouping.
         // We match on "| all(" rather than just "|" to be defensive against "|" appearing
         // in field names, search terms, or other parts of the YQL.
@@ -1266,9 +1262,25 @@ public class HybridSearcher extends Searcher {
      * @return A new Query object configured for probe lexical search.
      */
     Query createProbeLexialQuery(Query query, Integer probeDepth, boolean verbose) {
-        Query probeLexicalQuery =
-                createSubQuery(
-                        query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+        // Use dedicated probe lexical YQL when set; else fall back to main lexical.
+        String probeLexicalYql = query.properties().getString("marqo__yql.lexical.probe", null);
+        Query probeLexicalQuery;
+        if (probeLexicalYql != null && !probeLexicalYql.isEmpty()) {
+            probeLexicalQuery =
+                    createSubQuery(
+                            query,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            verbose,
+                            probeLexicalYql);
+        } else {
+            probeLexicalQuery =
+                    createSubQuery(
+                            query,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            verbose);
+        }
 
         // Overwrite the lexical score modifiers in the probe query
         probeLexicalQuery
