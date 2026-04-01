@@ -328,6 +328,17 @@ public class HybridSearcher extends Searcher {
         HitGroup processedHits;
         Integer sortCandidates = null;
         if (sortByFields != null) {
+            // When overrideSortCandidates is set, trim hits to only relevant candidates
+            // before sorting, so that non-relevant documents are excluded from sort results.
+            if (relevanceCutoffOverrideSortCandidates
+                    && relevantCandidates != null
+                    && relevantCandidates < hitsForPostProcessing.size()) {
+                List<Hit> trimmed =
+                        new ArrayList<>(
+                                hitsForPostProcessing.asList().subList(0, relevantCandidates));
+                hitsForPostProcessing = new HitGroup();
+                trimmed.forEach(hitsForPostProcessing::add);
+            }
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
                     postProcessBySort(
