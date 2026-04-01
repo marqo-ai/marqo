@@ -875,6 +875,11 @@ class StructuredVespaIndex(VespaIndex):
         if is_facets_term:
             return ' OR '.join(terms)
 
+        # Explicit lexicalOperand overrides automatic logic
+        lexical_operand = getattr(marqo_query, 'lexical_operand', None)
+        if lexical_operand is not None:
+            return self._apply_lexical_operand(lexical_operand, terms, rerank_depth_lexical)
+
         # Has rerank depth: weakAnd with targetHits
         if rerank_depth_lexical is not None:
             if rerank_depth_lexical <= 0:  # pragma: no cover
@@ -887,6 +892,20 @@ class StructuredVespaIndex(VespaIndex):
 
         # Default: plain weakAnd
         return f'weakAnd({", ".join(terms)})'
+
+    @staticmethod
+    def _apply_lexical_operand(lexical_operand: str, terms: list, rerank_depth_lexical: Optional[int] = None) -> str:
+        """Apply an explicit lexical operand to combine terms."""
+        if lexical_operand == 'or':
+            return ' OR '.join(terms)
+        elif lexical_operand == 'and':
+            return ' AND '.join(terms)
+        elif lexical_operand == 'weakAnd':
+            if rerank_depth_lexical is not None:
+                return f'{{targetHits:{rerank_depth_lexical}}}weakAnd({", ".join(terms)})'
+            return f'weakAnd({", ".join(terms)})'
+        else:
+            raise InternalError(f'Unknown lexical operand: {lexical_operand}')
 
     def _get_lexical_search_term(self, marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery], is_facets_term=False) \
             -> str:

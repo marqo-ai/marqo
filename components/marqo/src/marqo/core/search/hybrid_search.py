@@ -493,7 +493,8 @@ class HybridSearch:
             relevance_cutoff=relevance_cutoff,
             sort_by=sort_by,
             collapse=collapse,
-            recency_parameters=recency_parameters
+            recency_parameters=recency_parameters,
+            lexical_operand=hybrid_parameters.lexicalOperand
         )
 
         vespa_index = vespa_index_factory(marqo_index)

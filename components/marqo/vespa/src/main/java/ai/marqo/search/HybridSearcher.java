@@ -1237,9 +1237,17 @@ public class HybridSearcher extends Searcher {
      * @return A new Query object configured for probe lexical search.
      */
     Query createProbeLexialQuery(Query query, Integer probeDepth, boolean verbose) {
-        Query probeLexicalQuery =
-                createSubQuery(
-                        query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+        // Use dedicated probe lexical YQL when set; else fall back to main lexical.
+        String probeLexicalYql = query.properties().getString("marqo__yql.lexical.probe", null);
+        Query probeLexicalQuery;
+        if (probeLexicalYql != null && !probeLexicalYql.isEmpty()) {
+            probeLexicalQuery = createSubQuery(
+                    query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose,
+                    probeLexicalYql);
+        } else {
+            probeLexicalQuery = createSubQuery(
+                    query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+        }
 
         // Overwrite the lexical score modifiers in the probe query
         probeLexicalQuery

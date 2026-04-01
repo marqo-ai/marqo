@@ -1,8 +1,10 @@
 from enum import Enum
+from typing import Optional, Union
+
 from pydantic.v1 import root_validator, Field
-from typing import Union
 
 from marqo.base_model import StrictBaseModel
+from marqo.core.models.hybrid_parameters import LexicalOperand
 
 
 class RelevanceCutoffMethod(str, Enum):
@@ -42,6 +44,7 @@ class RelevanceCutoffModel(StrictBaseModel):
     parameters: Union[RelativeMaxScoreParameters, MeanStdParameters, None] = None
     affect_facets: bool = Field(False, alias="affectFacets")
     over_write_sort_candidates_by_relevant_candidates: bool = Field(False, alias="overWriteSortCandidatesByRelevantCandidates")
+    lexical_operand: Optional[LexicalOperand] = Field(None, alias="lexicalOperand")
 
     @root_validator(pre=False, skip_on_failure=True)
     def _validate_method_and_parameters(cls, values):
