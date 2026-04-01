@@ -942,48 +942,58 @@ class TestInjectMaxHitsIntoFacetsGrouping(TestCase):
     """
 
     def test_max_injected_into_simple_grouping(self):
-        """Verify the expected YQL format after max(N) injection."""
+        """Verify the expected YQL format after max(N) injection wraps with all()."""
         original = "select * from schema where (query) limit 0 | all(group(color) each(output(count())))"
-        # After injection with relevantCandidates=5:
-        expected = "select * from schema where (query) limit 0 | all(max(5) group(color) each(output(count())))"
-        # Simulate the injection logic
+        expected = "select * from schema where (query) limit 0 | all(max(5) all(group(color) each(output(count()))))"
         result = self._inject_max(original, 5)
         self.assertEqual(expected, result)
 
     def test_max_injected_into_total_hits_grouping(self):
         original = "select * from schema where (query) limit 0 | all(group(1.1) each(output(count())))"
-        expected = "select * from schema where (query) limit 0 | all(max(2) group(1.1) each(output(count())))"
+        expected = "select * from schema where (query) limit 0 | all(max(2) all(group(1.1) each(output(count()))))"
         result = self._inject_max(original, 2)
         self.assertEqual(expected, result)
 
     def test_max_injected_alongside_existing_max_depth(self):
-        """When max_depth is already present, both coexist. Vespa uses the smaller one."""
+        """When max_depth is already present, both coexist at different nesting levels."""
         original = "select * from schema where (query) limit 0 | all( max(100) all(group(color) each(output(count()))))"
         result = self._inject_max(original, 3)
         self.assertIn("max(3)", result)
         self.assertIn("max(100)", result)
+        expected = "select * from schema where (query) limit 0 | all(max(3) all(max(100) all(group(color) each(output(count())))))"
+        self.assertEqual(expected, result)
 
     def test_no_pipe_returns_unchanged(self):
         original = "select * from schema where (query)"
         result = self._inject_max(original, 5)
         self.assertEqual(original, result)
 
+    def test_multiple_max_with_maxdepth_and_fields(self):
+        """Real-world: maxDepth=10, two fields with max(100). All max values coexist."""
+        original = ("select * from schema where (query) limit 0 | all( max(10)"
+                    " all(group(color) max(100) order(-count()) each(output(count())))"
+                    " all(group(brand) max(100) order(-count()) each(output(count()))) )")
+        result = self._inject_max(original, 5)
+        self.assertIn("all(max(5) all(", result)
+        self.assertIn("max(10)", result)
+        self.assertEqual(result.count("max(100)"), 2)
+        self.assertIn("group(color)", result)
+        self.assertIn("group(brand)", result)
+
     @staticmethod
     def _inject_max(facets_yql: str, max_hits: int) -> str:
         """Python equivalent of the Java injectMaxHitsIntoFacetsGrouping method."""
-        pipe_index = facets_yql.rfind('|')
-        if pipe_index == -1:
+        pipe_all_index = facets_yql.rfind("| all(")
+        if pipe_all_index == -1:
             return facets_yql
 
-        select_part = facets_yql[:pipe_index + 1]
-        grouping_part = facets_yql[pipe_index + 1:].strip()
+        select_part = facets_yql[:pipe_all_index + 1]
+        grouping_part = facets_yql[pipe_all_index + 1:].strip()
 
-        max_clause = f"max({max_hits}) "
-        if grouping_part.startswith("all("):
-            grouping_part = "all(" + max_clause + grouping_part[4:]
-        elif grouping_part.startswith("all( "):
-            grouping_part = "all( " + max_clause + grouping_part[5:]
+        if grouping_part.startswith("all( "):
+            inner = grouping_part[5:-1].strip()
         else:
-            return facets_yql
+            inner = grouping_part[4:-1].strip()
 
+        grouping_part = f"all(max({max_hits}) all({inner}))"
         return select_part + " " + grouping_part

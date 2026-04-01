@@ -554,7 +554,11 @@ class HybridSearch:
                 raise core_exceptions.InternalError(
                     f"'sortBy' feature is enabled, but Vespa did not return sortCandidates in the response "
                 )
-            gathered_results["_sortCandidates"] = responses.root.fields.marqo_fields.sort_candidates
+
+            if relevance_cutoff is not None and relevance_cutoff.over_write_sort_candidates_by_relevant_candidates:
+                gathered_results["_sortCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
+            else:
+                gathered_results["_sortCandidates"] = responses.root.fields.marqo_fields.sort_candidates
 
         # Collect metadata for relevance cutoff
         if relevance_cutoff is not None:

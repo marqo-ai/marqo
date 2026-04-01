@@ -458,15 +458,17 @@ public class HybridSearcher extends Searcher {
         String selectPart = facetsYql.substring(0, pipeAllIndex + 1); // includes the "|"
         String groupingPart = facetsYql.substring(pipeAllIndex + 1).trim(); // "all(..."
 
-        // Inject max(N) after "all(" or "all( ".
-        // If an existing max(maxDepth) is already present, both coexist and
-        // Vespa applies the more restrictive (smaller) one.
-        String maxClause = "max(" + maxHits + ") ";
+        // Wrap the existing grouping content with max(N) all(...).
+        // Vespa requires all() or each() after max(), not group() directly.
+        // E.g., all(group(...) each(...)) becomes all(max(N) all(group(...) each(...)))
+        // If already nested (e.g., all( max(10) all(group(...)))), inject max(N) inside.
+        String innerContent;
         if (groupingPart.startsWith("all( ")) {
-            groupingPart = "all( " + maxClause + groupingPart.substring(5);
+            innerContent = groupingPart.substring(5, groupingPart.length() - 1).trim();
         } else {
-            groupingPart = "all(" + maxClause + groupingPart.substring(4);
+            innerContent = groupingPart.substring(4, groupingPart.length() - 1).trim();
         }
+        groupingPart = "all(max(" + maxHits + ") all(" + innerContent + "))";
 
         String result = selectPart + " " + groupingPart;
         logIfVerbose(

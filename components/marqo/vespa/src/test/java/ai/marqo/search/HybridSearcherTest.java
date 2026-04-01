@@ -736,37 +736,42 @@ class HybridSearcherTest {
     class InjectMaxHitsIntoFacetsGroupingTest {
 
         @Test
-        void shouldInjectMaxIntoSimpleGrouping() {
+        void shouldWrapSimpleGroupingWithMaxAndAll() {
+            // all(group(...) each(...)) -> all(max(5) all(group(...) each(...)))
             String input =
                     "select * from schema where (query) limit 0 | all(group(color)"
                             + " each(output(count())))";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
-            assertThat(result).contains("all(max(5)");
-            assertThat(result).contains("group(color)");
+            assertThat(result).endsWith("| all(max(5) all(group(color) each(output(count()))))");
         }
 
         @Test
-        void shouldInjectMaxIntoTotalHitsGrouping() {
+        void shouldWrapTotalHitsGroupingWithMaxAndAll() {
+            // all(group(1.1) each(...)) -> all(max(2) all(group(1.1) each(...)))
             String input =
                     "select * from schema where (query) limit 0 | all(group(1.1)"
                             + " each(output(count())))";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 2, false);
-            assertThat(result).contains("all(max(2)");
-            assertThat(result).contains("group(1.1)");
+            assertThat(result).endsWith("| all(max(2) all(group(1.1) each(output(count()))))");
         }
 
         @Test
-        void shouldInjectMaxAlongsideExistingMaxDepth() {
+        void shouldNestMaxAlongsideExistingMaxDepth() {
+            // all( max(100) all(group(...))) -> all(max(3) all(max(100) all(group(...))))
             String input =
                     "select * from schema where (query) limit 0 | all( max(100) all(group(color)"
                             + " each(output(count()))))";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 3, false);
             assertThat(result).contains("max(3)");
             assertThat(result).contains("max(100)");
+            // Both max values present at different nesting levels
+            assertThat(result)
+                    .endsWith(
+                            "| all(max(3) all(max(100) all(group(color) each(output(count())))))");
         }
 
         @Test
-        void shouldReturnUnchangedWhenNoPipe() {
+        void shouldReturnUnchangedWhenNoPipeAll() {
             String input = "select * from schema where (query)";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
             assertThat(result).isEqualTo(input);
@@ -781,6 +786,8 @@ class HybridSearcherTest {
 
         @Test
         void shouldHandleMultipleFacetFieldsGrouping() {
+            // all( all(group(color)...) all(group(brand)...) ) ->
+            // all(max(10) all(all(group(color)...) all(group(brand)...)))
             String input =
                     "select * from schema where (query) limit 0 | all( all(group(color) max(100)"
                             + " order(-count()) each(output(count()))) all(group(brand) max(100)"
@@ -789,6 +796,33 @@ class HybridSearcherTest {
             assertThat(result).contains("max(10)");
             assertThat(result).contains("group(color)");
             assertThat(result).contains("group(brand)");
+            // Inner per-field max(100) untouched
+            assertThat(result).contains("max(100)");
+        }
+
+        @Test
+        void shouldHandleMultipleMaxWithMaxDepthAndMultipleFields() {
+            // Real-world: user sets maxDepth=10, two facet fields with max(100) each
+            // all( max(10) all(group(color) max(100)...) all(group(brand) max(100)...) )
+            // -> all(max(5) all(max(10) all(group(color) max(100)...) all(group(brand)
+            // max(100)...)))
+            String input =
+                    "select * from schema where (query) limit 0 | all( max(10)"
+                            + " all(group(color) max(100) order(-count()) each(output(count())))"
+                            + " all(group(brand) max(100) order(-count()) each(output(count()))) )";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
+            // Outermost max is our injected one
+            assertThat(result).contains("all(max(5) all(");
+            // User's maxDepth=10 preserved inside
+            assertThat(result).contains("max(10)");
+            // Per-field max(100) preserved (appears twice, once per field)
+            int max100Count = 0;
+            int searchIdx = 0;
+            while ((searchIdx = result.indexOf("max(100)", searchIdx)) != -1) {
+                max100Count++;
+                searchIdx++;
+            }
+            assertThat(max100Count).isEqualTo(2);
         }
     }
 
@@ -843,16 +877,13 @@ class HybridSearcherTest {
             String[] updatedQueries = updatedFacetsYql.split(delimiter);
             assertThat(updatedQueries).hasSize(2);
 
-            // totalHits query: targetHits adjusted to 2, max(2) injected
-            assertThat(updatedQueries[0]).contains("targetHits:2");
-            assertThat(updatedQueries[0]).contains("max(2)");
+            // totalHits query: max(2) wraps the grouping via all(max(2) all(...))
+            assertThat(updatedQueries[0]).contains("all(max(2) all(");
             assertThat(updatedQueries[0]).contains("group(1.1)");
 
-            // facets query: targetHits adjusted to 2, max(2) injected alongside max(10)
-            assertThat(updatedQueries[1]).contains("targetHits:2");
-            assertThat(updatedQueries[1]).contains("max(2)");
+            // facets query: max(2) wraps existing max(10), per-field max(100) untouched
+            assertThat(updatedQueries[1]).contains("all(max(2) all(");
             assertThat(updatedQueries[1]).contains("max(10)");
-            // Inner per-field max(100) should be untouched
             assertThat(updatedQueries[1]).contains("max(100)");
             assertThat(updatedQueries[1]).contains("group(marqo__short_string_fields");
         }
