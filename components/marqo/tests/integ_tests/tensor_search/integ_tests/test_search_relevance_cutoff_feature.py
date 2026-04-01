@@ -189,8 +189,6 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
             limit: int = 10, offset: int = 0,
             hybrid_parameters: Optional[dict] = None,
             rerank_depth_lexical: Optional[int] = None,
-            facets: Optional[dict] = None,
-            track_total_hits: Optional[bool] = None,
     ) -> dict:
         """Helper method to perform search with consistent parameters."""
 
@@ -205,25 +203,19 @@ class TestSearchRelevanceCutoffFeature(MarqoTestCase):
         if index_name is None:
             index_name = cls.unstructured_index_name
 
-        search_query_dict = {
-            "q": query,
-            "searchMethod": SearchMethod.HYBRID,
-            "hybridParameters": hybrid_parameters,
-            "relevanceCutoff": relevance_cutoff,
-            "sortBy": sort_by,
-            "limit": limit,
-            "offset": offset
-        }
-        if facets is not None:
-            search_query_dict["facets"] = facets
-        if track_total_hits is not None:
-            search_query_dict["trackTotalHits"] = track_total_hits
-
         result = json.loads(search(
             index_name=index_name,
             marqo_config=cls.config,
             device="cpu",
-            search_query_dict=search_query_dict
+            search_query_dict={
+                "q": query,
+                "searchMethod": SearchMethod.HYBRID,
+                "hybridParameters": hybrid_parameters,
+                "relevanceCutoff": relevance_cutoff,
+                "sortBy": sort_by,
+                "limit": limit,
+                "offset": offset
+            }
         ).body.decode('utf-8'))
 
         if relevance_cutoff and query == "machine learning artificial intelligence algorithms":
