@@ -14,7 +14,6 @@ dependencies = [
     "memory-profiler>=0.61.0",
     "msgpack>=1.1.2",
     "msgpack-numpy>=0.4.8",
-    "nltk>=3.9.2",
     "orjson>=3.11.3",
     "pillow>=12.1.1",
     "psutil>=7.1.0",
@@ -27,6 +26,10 @@ dependencies = [
     "validators>=0.35.0",
     "marqo-common",
     "pydantic-settings>=2.12.0",
+    "requests>=2.33.1",
+    "jinja2>=3.1.6",
+    "opentelemetry-api>=1.37.0",
+    "opentelemetry-sdk>=1.37.0",
 ]
 
 [dependency-groups]
