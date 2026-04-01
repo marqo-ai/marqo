@@ -2065,6 +2065,11 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
             facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
         )
+
         self.assertEqual(2, result["totalHits"])
         self.assertEqual(0, result["_relevantCandidates"])
         self.assertEqual(2, result["_sortCandidates"])
+
+        for hit in result["hits"]:
+            self.assertNotIn("_lexical_score", hit)
+            self.assertIn("_tensor_score", hit)
