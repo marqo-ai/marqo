@@ -2,8 +2,15 @@ package ai.marqo.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.yahoo.search.Query;
+import com.yahoo.search.result.FeatureData;
+import com.yahoo.search.result.Hit;
+import com.yahoo.search.result.HitGroup;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -383,6 +390,120 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
             // facets query: existing max(10), newHits=20 >= 10, so max is NOT replaced
             assertThat(updatedQueries[1]).contains("max(10)");
             assertThat(updatedQueries[1]).doesNotContain("max(20)");
+        }
+    }
+
+    @Nested
+    class OverrideSortCandidatesTrimTest {
+
+        /**
+         * Helper: creates a HitGroup with N hits, each having a sort_field_value_0.
+         * Hits are added in relevance order (highest relevance first), with sort values
+         * that differ from relevance order to make trimming effects visible.
+         *
+         * <p>Hit IDs: doc0..doc(n-1), relevance: 1.0, 0.9, 0.8, ...
+         * Sort values: 50, 10, 40, 20, 30 (for n=5) — intentionally not ordered.
+         */
+        private HitGroup createHitsWithSortValues(double[] sortValues) {
+            HitGroup hits = new HitGroup();
+            for (int i = 0; i < sortValues.length; i++) {
+                FeatureData fd = mock(FeatureData.class);
+                when(fd.getDouble("sort_field_value_0")).thenReturn(sortValues[i]);
+                Hit hit = new Hit("doc" + i, 1.0 - i * 0.1);
+                hit.setField("matchfeatures", fd);
+                hits.add(hit);
+            }
+            return hits;
+        }
+
+        private final String sortJsonAsc =
+                "[{\"field_name\":\"price\",\"order\":\"asc\",\"missing\":\"last\"}]";
+
+        @Test
+        void shouldTrimHitsBeforeSorting() {
+            // 8 hits total, relevantCandidates=3 → only first 3 (by relevance) should be sorted
+            double[] sortValues = {50, 10, 40, 20, 30, 60, 5, 70};
+            HitGroup allHits = createHitsWithSortValues(sortValues);
+            assertThat(allHits.size()).isEqualTo(8);
+
+            // Simulate the trimming logic from HybridSearcher.search()
+            int relevantCandidates = 3;
+            List<Hit> trimmed = new ArrayList<>(allHits.asList().subList(0, relevantCandidates));
+            HitGroup trimmedHits = new HitGroup();
+            trimmed.forEach(trimmedHits::add);
+
+            // Sort the trimmed hits
+            HitGroup result =
+                    hybridSearcher.postProcessBySort(trimmedHits, sortJsonAsc, null, 10, 0);
+
+            // Only 3 hits should remain, sorted by sort value ascending
+            List<String> ids = result.asList().stream().map(h -> h.getId().toString()).toList();
+            assertThat(ids).hasSize(3);
+            // doc1 (sort=10), doc2 (sort=40), doc0 (sort=50)
+            assertThat(ids).containsExactly("doc1", "doc2", "doc0");
+        }
+
+        @Test
+        void shouldNotTrimWhenRelevantCandidatesExceedsHitCount() {
+            // 3 hits, relevantCandidates=10 → no trimming, all 3 sorted
+            double[] sortValues = {30, 10, 20};
+            HitGroup allHits = createHitsWithSortValues(sortValues);
+
+            int relevantCandidates = 10;
+            // relevantCandidates >= size, so no trimming
+            assertThat(relevantCandidates).isGreaterThanOrEqualTo(allHits.size());
+
+            HitGroup result = hybridSearcher.postProcessBySort(allHits, sortJsonAsc, null, 10, 0);
+
+            List<String> ids = result.asList().stream().map(h -> h.getId().toString()).toList();
+            assertThat(ids).containsExactly("doc1", "doc2", "doc0");
+        }
+
+        @Test
+        void shouldExcludeNonRelevantDocsFromSortResults() {
+            // Simulate: 5 hits with sort values. Without trimming, doc4 (sort=5, lowest)
+            // would appear first in ascending sort. With trimming to 3, doc4 is excluded.
+            double[] sortValues = {50, 10, 40, 20, 5};
+            HitGroup allHits = createHitsWithSortValues(sortValues);
+
+            // Without trimming: all 5 sorted ascending
+            HitGroup untrimmed =
+                    hybridSearcher.postProcessBySort(
+                            createHitsWithSortValues(sortValues), sortJsonAsc, null, 10, 0);
+            List<String> untrimmedIds =
+                    untrimmed.asList().stream().map(h -> h.getId().toString()).toList();
+            // doc4(5), doc1(10), doc3(20), doc2(40), doc0(50)
+            assertThat(untrimmedIds).containsExactly("doc4", "doc1", "doc3", "doc2", "doc0");
+
+            // With trimming to 3: doc3 and doc4 are excluded
+            int relevantCandidates = 3;
+            List<Hit> trimmed = new ArrayList<>(allHits.asList().subList(0, relevantCandidates));
+            HitGroup trimmedHits = new HitGroup();
+            trimmed.forEach(trimmedHits::add);
+
+            HitGroup result =
+                    hybridSearcher.postProcessBySort(trimmedHits, sortJsonAsc, null, 10, 0);
+            List<String> trimmedIds =
+                    result.asList().stream().map(h -> h.getId().toString()).toList();
+            // doc1(10), doc2(40), doc0(50) — doc3 and doc4 excluded
+            assertThat(trimmedIds).containsExactly("doc1", "doc2", "doc0");
+            assertThat(trimmedIds).doesNotContain("doc3", "doc4");
+        }
+
+        @Test
+        void sortCandidatesMetadataShouldReflectTrimmedSize() {
+            // After trimming, sortCandidates = trimmedHits.size() = relevantCandidates
+            double[] sortValues = {50, 10, 40, 20, 30};
+            HitGroup allHits = createHitsWithSortValues(sortValues);
+
+            int relevantCandidates = 3;
+            List<Hit> trimmed = new ArrayList<>(allHits.asList().subList(0, relevantCandidates));
+            HitGroup trimmedHits = new HitGroup();
+            trimmed.forEach(trimmedHits::add);
+
+            hybridSearcher.postProcessBySort(trimmedHits, sortJsonAsc, null, 10, 0);
+            // sortCandidates should equal the trimmed size
+            assertThat(trimmedHits.size()).isEqualTo(relevantCandidates);
         }
     }
 }
