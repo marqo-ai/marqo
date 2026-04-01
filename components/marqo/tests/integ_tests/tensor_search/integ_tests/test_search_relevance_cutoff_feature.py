@@ -1660,12 +1660,13 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(8, result["totalHits"])
 
     def test_total_hits_with_relevance_cutoff_matches_relevant_candidates(self):
-        """With relevance cutoff, totalHits should equal _relevantCandidates, not all matches."""
+        """With relevance cutoff and affectFacets, totalHits should equal _relevantCandidates, not all matches."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.3},
+                "affectFacets": True,
             },
             track_total_hits=True,
         )
@@ -1685,12 +1686,13 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(3, result["facets"]["color"]["blue"]["count"])
 
     def test_string_facets_with_relevance_cutoff_only_counts_relevant(self):
-        """With relevance cutoff, string facets should only count relevant documents."""
+        """With relevance cutoff and affectFacets, string facets should only count relevant documents."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.3},
+                "affectFacets": True,
             },
             facets={"fields": {"color": {"type": "string"}}},
         )
@@ -1717,6 +1719,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.3},
+                "affectFacets": True,
             },
             facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
@@ -1726,12 +1729,13 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(total_facet_count, len(result["hits"]))
 
     def test_array_facets_with_relevance_cutoff(self):
-        """Array facets should only count relevant documents when relevance cutoff is enabled."""
+        """Array facets should only count relevant documents when affectFacets is enabled."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.3},
+                "affectFacets": True,
             },
             facets={"fields": {"tags": {"type": "array"}}},
         )
@@ -1746,12 +1750,13 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_tags, result["facets"]["tags"])
 
     def test_number_facets_with_relevance_cutoff(self):
-        """Number facets should only compute stats from relevant documents."""
+        """Number facets should only compute stats from relevant documents when affectFacets is enabled."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.3},
+                "affectFacets": True,
             },
             facets={"fields": {"price": {"type": "number"}}},
         )
@@ -1766,12 +1771,13 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
             self.assertAlmostEqual(max(prices), price_facet["max"], places=1)
 
     def test_low_relevance_cutoff_threshold_preserves_all_facets(self):
-        """A very low relevance cutoff threshold should not filter any results."""
+        """A very low relevance cutoff threshold with affectFacets should not filter any results."""
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.01},
+                "affectFacets": True,
             },
             facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
@@ -1792,6 +1798,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.3},
+                "affectFacets": True,
             },
             facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
@@ -1815,6 +1822,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
                 "method": "relative_max_score",
                 "probeDepth": 1000,
                 "parameters": {"relativeScoreFactor": 0.3},
+                "affectFacets": True,
             },
             track_total_hits=True,
             limit=10,
@@ -1841,6 +1849,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
                         "method": "relative_max_score",
                         "probeDepth": 1000,
                         "parameters": {"relativeScoreFactor": 0.3},
+                        "affectFacets": True,
                     },
                     facets={"fields": {"color": {"type": "string"}}},
                     track_total_hits=True,

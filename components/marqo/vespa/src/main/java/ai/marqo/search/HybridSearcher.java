@@ -176,6 +176,8 @@ public class HybridSearcher extends Searcher {
                 query.properties().getInteger("marqo__hybrid.relevanceCutoff.probeDepth", null);
         Double relevanceCutoffParameter =
                 readRelevanceCutoffParameter(query, relevanceCutoffMethod);
+        Boolean relevanceCutoffAffectFacets =
+                query.properties().getBoolean("marqo__hybrid.relevanceCutoff.affectFacets", false);
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
@@ -225,8 +227,10 @@ public class HybridSearcher extends Searcher {
         }
         // --- End relevance cut-off handling ---
 
+        // Only pass relevantCandidates to facets when affectFacets is opted in
+        Integer facetsRelevantCandidates = relevanceCutoffAffectFacets ? relevantCandidates : null;
         List<Future<Result>> futureFacets =
-                getFacetsFutureList(query, execution, verbose, collapse, relevantCandidates);
+                getFacetsFutureList(query, execution, verbose, collapse, facetsRelevantCandidates);
 
         // --- Update the query hits, offset and targetHits, if sort or relevance cut-off is used
         boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;

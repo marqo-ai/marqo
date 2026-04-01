@@ -235,6 +235,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 # No parameters for other methods
                 pass
             query["marqo__hybrid.relevanceCutoff.probeDepth"] = marqo_query.relevance_cutoff.probe_depth
+            query["marqo__hybrid.relevanceCutoff.affectFacets"] = marqo_query.relevance_cutoff.affect_facets
         # Sort by part
         if marqo_query.sort_by:
             query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
