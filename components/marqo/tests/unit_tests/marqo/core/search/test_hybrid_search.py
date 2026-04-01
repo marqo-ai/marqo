@@ -956,9 +956,8 @@ class TestInjectMaxHitsIntoFacetsGrouping(TestCase):
         result = self._inject_max(original, 2)
         self.assertEqual(expected, result)
 
-    def test_max_injected_with_existing_max_depth(self):
-        """When max_depth is already present, both max clauses coexist.
-        The relevance cutoff max(N) takes precedence as it comes first."""
+    def test_max_injected_alongside_existing_max_depth(self):
+        """When max_depth is already present, both coexist. Vespa uses the smaller one."""
         original = "select * from schema where (query) limit 0 | all( max(100) all(group(color) each(output(count()))))"
         result = self._inject_max(original, 3)
         self.assertIn("max(3)", result)
@@ -970,7 +969,7 @@ class TestInjectMaxHitsIntoFacetsGrouping(TestCase):
         self.assertEqual(original, result)
 
     @staticmethod
-    def _inject_max(facets_yql: str, relevant_candidates: int) -> str:
+    def _inject_max(facets_yql: str, max_hits: int) -> str:
         """Python equivalent of the Java injectMaxHitsIntoFacetsGrouping method."""
         pipe_index = facets_yql.rfind('|')
         if pipe_index == -1:
@@ -979,7 +978,7 @@ class TestInjectMaxHitsIntoFacetsGrouping(TestCase):
         select_part = facets_yql[:pipe_index + 1]
         grouping_part = facets_yql[pipe_index + 1:].strip()
 
-        max_clause = f"max({relevant_candidates}) "
+        max_clause = f"max({max_hits}) "
         if grouping_part.startswith("all("):
             grouping_part = "all(" + max_clause + grouping_part[4:]
         elif grouping_part.startswith("all( "):

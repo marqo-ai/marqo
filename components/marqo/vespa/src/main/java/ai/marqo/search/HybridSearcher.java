@@ -74,6 +74,7 @@ public class HybridSearcher extends Searcher {
     private static final double MISSING_SORT_VALUE_SENTINEL = -1e50;
 
     private static final String MARQO_METADATA_FIELDS = "marqo__fields";
+    private static final String FACETS_YQL_QUERY_DELIMITER = "\n---MARQO-YQL-QUERY-DELIMITER---\n";
 
     @VisibleForTesting
     @JsonInclude(Include.NON_NULL)
@@ -227,12 +228,7 @@ public class HybridSearcher extends Searcher {
         }
         // --- End relevance cut-off handling ---
 
-        // Only pass relevantCandidates to facets when affectFacets is opted in
-        Integer facetsRelevantCandidates = relevanceCutoffAffectFacets ? relevantCandidates : null;
-        List<Future<Result>> futureFacets =
-                getFacetsFutureList(query, execution, verbose, collapse, facetsRelevantCandidates);
-
-        // --- Update the query hits, offset and targetHits, if sort or relevance cut-off is used
+        // --- Update the query hits, offset, targetHits, and facets YQL
         boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;
         boolean isSortByEnabled = sortByFields != null;
 
@@ -242,7 +238,14 @@ public class HybridSearcher extends Searcher {
                         relevantCandidates,
                         sortByMinSortCandidates,
                         isRelevanceCutoffMethodEnabled,
-                        isSortByEnabled);
+                        isSortByEnabled,
+                        Boolean.TRUE.equals(relevanceCutoffAffectFacets),
+                        verbose);
+
+        // Launch facets AFTER updateQueryHitsOffsetsAndTargetHits so the facets subqueries
+        // inherit the adjusted targetHits and max(N) grouping.
+        List<Future<Result>> futureFacets =
+                getFacetsFutureList(query, execution, verbose, collapse);
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
@@ -398,28 +401,16 @@ public class HybridSearcher extends Searcher {
 
     @VisibleForTesting
     List<Future<Result>> getFacetsFutureList(
-            Query query,
-            Execution execution,
-            boolean verbose,
-            boolean collapse,
-            Integer relevantCandidates) {
+            Query query, Execution execution, boolean verbose, boolean collapse) {
         // Check for custom facets YQL properties - expect array of strings
         String[] facetsYqlQueries =
                 query.properties()
                         .getString("marqo__yql.facets", "")
-                        .split("\n---MARQO-YQL-QUERY-DELIMITER---\n");
+                        .split(FACETS_YQL_QUERY_DELIMITER);
         List<Future<Result>> futureFacets = new ArrayList<>();
 
         for (String facetsYql : facetsYqlQueries) {
             if (!facetsYql.isEmpty()) {
-                // When relevance cutoff is active, inject max(relevantCandidates) into the
-                // grouping expression so Vespa only aggregates over documents that pass the
-                // cutoff. The facets queries use lexical ranking (same as the probe), so the
-                // top N by relevance correspond to the relevant candidates.
-                if (relevantCandidates != null) {
-                    facetsYql =
-                            injectMaxHitsIntoFacetsGrouping(facetsYql, relevantCandidates, verbose);
-                }
                 // Create a subquery for each facet query
                 Query queryFacets =
                         createSubQuery(
@@ -454,48 +445,40 @@ public class HybridSearcher extends Searcher {
      * @return The modified facets YQL with max(N) injected.
      */
     @VisibleForTesting
-    String injectMaxHitsIntoFacetsGrouping(
-            String facetsYql, int relevantCandidates, boolean verbose) {
-        // Find the pipe separator between the select clause and grouping expression
-        int pipeIndex = facetsYql.lastIndexOf('|');
-        if (pipeIndex == -1) {
+    String injectMaxHitsIntoFacetsGrouping(String facetsYql, int maxHits, boolean verbose) {
+        // Find "| all(" or "| all( " — the separator between select clause and grouping.
+        // We match on "| all(" rather than just "|" to be defensive against "|" appearing
+        // in field names, search terms, or other parts of the YQL.
+        int pipeAllIndex = facetsYql.lastIndexOf("| all(");
+        if (pipeAllIndex == -1) {
             logIfVerbose(
-                    "No pipe found in facets YQL, skipping max injection: " + facetsYql, verbose);
-            return facetsYql;
-        }
-
-        String selectPart = facetsYql.substring(0, pipeIndex + 1);
-        String groupingPart = facetsYql.substring(pipeIndex + 1).trim();
-
-        // Inject max(N) after "all(" or "all( "
-        String maxClause = "max(" + relevantCandidates + ") ";
-        if (groupingPart.startsWith("all(")) {
-            groupingPart = "all(" + maxClause + groupingPart.substring(4);
-        } else if (groupingPart.startsWith("all( ")) {
-            groupingPart = "all( " + maxClause + groupingPart.substring(5);
-        } else {
-            logIfVerbose(
-                    "Grouping does not start with all(, skipping max injection: " + groupingPart,
+                    "No '| all(' found in facets YQL, skipping max injection: " + facetsYql,
                     verbose);
             return facetsYql;
         }
 
+        String selectPart = facetsYql.substring(0, pipeAllIndex + 1); // includes the "|"
+        String groupingPart = facetsYql.substring(pipeAllIndex + 1).trim(); // "all(..."
+
+        // Inject max(N) after "all(" or "all( ".
+        // If an existing max(maxDepth) is already present, both coexist and
+        // Vespa applies the more restrictive (smaller) one.
+        String maxClause = "max(" + maxHits + ") ";
+        if (groupingPart.startsWith("all( ")) {
+            groupingPart = "all( " + maxClause + groupingPart.substring(5);
+        } else {
+            groupingPart = "all(" + maxClause + groupingPart.substring(4);
+        }
+
         String result = selectPart + " " + groupingPart;
         logIfVerbose(
-                String.format(
-                        "Injected max(%d) into facets grouping: %s", relevantCandidates, result),
+                String.format("Injected max(%d) into facets grouping: %s", maxHits, result),
                 verbose);
         return result;
     }
 
     /**
-     * Updates the query hits, offsets, and targetHits based on the provided parameters.
-     * @param query the query to update.
-     * @param relevantCandidates the number of relevant candidates found in the probe search.
-     * @param sortByMinSortCandidates the minimum number of candidates required for sorting, from Marqo
-     * @param isRelevanceCutoffEnabled whether relevance cutoff is enabled.
-     * @param isSortByEnabled whether sorting is enabled.
-     * @return The updated query with new hits, offsets, and targetHits.
+     * Overload without facets parameters — delegates with false defaults.
      */
     public Query updateQueryHitsOffsetsAndTargetHits(
             Query query,
@@ -503,6 +486,37 @@ public class HybridSearcher extends Searcher {
             Integer sortByMinSortCandidates,
             boolean isRelevanceCutoffEnabled,
             boolean isSortByEnabled) {
+        return updateQueryHitsOffsetsAndTargetHits(
+                query,
+                relevantCandidates,
+                sortByMinSortCandidates,
+                isRelevanceCutoffEnabled,
+                isSortByEnabled,
+                false,
+                false);
+    }
+
+    /**
+     * Updates the query hits, offsets, and targetHits based on the provided parameters.
+     * Also updates the facets YQL: adjusts targetHits to match the main query and,
+     * when facetsRelevantCandidates is provided, injects max(N) into facets grouping.
+     * @param query the query to update.
+     * @param relevantCandidates the number of relevant candidates found in the probe search.
+     * @param sortByMinSortCandidates the minimum number of candidates required for sorting, from Marqo
+     * @param isRelevanceCutoffEnabled whether relevance cutoff is enabled.
+     * @param isSortByEnabled whether sorting is enabled.
+     * @param affectFacets whether to also adjust facets YQL (targetHits and max(N) grouping).
+     * @param verbose whether to log detailed information.
+     * @return The updated query with new hits, offsets, and targetHits.
+     */
+    public Query updateQueryHitsOffsetsAndTargetHits(
+            Query query,
+            Integer relevantCandidates,
+            Integer sortByMinSortCandidates,
+            boolean isRelevanceCutoffEnabled,
+            boolean isSortByEnabled,
+            boolean affectFacets,
+            boolean verbose) {
 
         // Validate input parameters
         if (!isRelevanceCutoffEnabled && !isSortByEnabled) {
@@ -584,6 +598,25 @@ public class HybridSearcher extends Searcher {
                             tensorYQL, newTensorTargetHits, efSearch);
             query.properties().set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, tensorYQLUpdated);
         }
+
+        // When affectFacets is opted in, update facets YQL:
+        // - Adjust targetHits to newTensorTargetHits (consistent with main tensor query)
+        // - Inject max(newHits) into grouping expressions
+        String facetsYql = query.properties().getString("marqo__yql.facets", "");
+        if (affectFacets && !facetsYql.isEmpty()) {
+            String delimiter = FACETS_YQL_QUERY_DELIMITER;
+            String[] queries = facetsYql.split(delimiter);
+            for (int i = 0; i < queries.length; i++) {
+                if (!queries[i].isEmpty()) {
+                    if (currentTensorTargetHits != null) {
+                        queries[i] = overwriteTargetHitsIfPresent(queries[i], newTensorTargetHits);
+                    }
+                    queries[i] = injectMaxHitsIntoFacetsGrouping(queries[i], newHits, verbose);
+                }
+            }
+            query.properties().set("marqo__yql.facets", String.join(delimiter, queries));
+        }
+
         return query;
     }
 

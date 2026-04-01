@@ -697,7 +697,8 @@ class HybridSearcherTest {
         @Test
         void shouldInjectMaxIntoMultipleFacetYqlDelimitedQueries() {
             // Verify that injectMaxHitsIntoFacetsGrouping works on each part of a
-            // delimiter-separated facets YQL (simulating what getFacetsFutureList does)
+            // delimiter-separated facets YQL (simulating what updateQueryHitsOffsetsAndTargetHits
+            // does)
             String delimiter = "\n---MARQO-YQL-QUERY-DELIMITER---\n";
             String facetsYql =
                     "SELECT * FROM s WHERE true | all(group(color) each(output(count())))"
@@ -721,7 +722,8 @@ class HybridSearcherTest {
 
         @Test
         void shouldNotModifyFacetsYqlWhenRelevanceCutoffIsNull() {
-            // When relevantCandidates is null, getFacetsFutureList should pass YQL unchanged
+            // When facetsRelevantCandidates is null, updateQueryHitsOffsetsAndTargetHits skips max
+            // injection
             String originalYql =
                     "SELECT * FROM s WHERE true | all(group(color) each(output(count())))";
 
@@ -754,7 +756,7 @@ class HybridSearcherTest {
         }
 
         @Test
-        void shouldInjectMaxIntoGroupingWithExistingMaxDepth() {
+        void shouldInjectMaxAlongsideExistingMaxDepth() {
             String input =
                     "select * from schema where (query) limit 0 | all( max(100) all(group(color)"
                             + " each(output(count()))))";
@@ -787,6 +789,111 @@ class HybridSearcherTest {
             assertThat(result).contains("max(10)");
             assertThat(result).contains("group(color)");
             assertThat(result).contains("group(brand)");
+        }
+    }
+
+    @Nested
+    class UpdateQueryWithAffectFacetsTest {
+
+        @Test
+        void shouldAdjustFacetsYqlTargetHitsAndInjectMax() {
+            // Simulate a real disjunction query with facets, relevanceCutoff affectFacets=true,
+            // relevantCandidates=5, no sort. The facets YQL contains two delimiter-separated
+            // queries: totalHits and a string facet with maxDepth=10.
+            String delimiter = "\n---MARQO-YQL-QUERY-DELIMITER---\n";
+            String totalHitsYql =
+                    "select * from marqo__index where ("
+                            + "default contains \"universe\" OR default contains \"ocean\" OR "
+                            + "({targetHits:2, approximate:True, hnsw.exploreAdditionalHits:1998}"
+                            + "nearestNeighbor(marqo__embeddings_text, marqo__query_embedding))"
+                            + ") limit 0 | all(group(1.1) each(output(count())))";
+            String facetsYql =
+                    "select * from marqo__index where ("
+                            + "default contains \"universe\" OR default contains \"ocean\" OR "
+                            + "({targetHits:2, approximate:True, hnsw.exploreAdditionalHits:1998}"
+                            + "nearestNeighbor(marqo__embeddings_text, marqo__query_embedding))"
+                            + ") limit 0 | all( max(10) all(group(marqo__short_string_fields"
+                            + "{\"color\"}) max(100) order(-count()) each(output(count()))) )";
+            String combinedFacetsYql = totalHitsYql + delimiter + facetsYql;
+
+            // Set up query with hits=2, offset=0 and tensor YQL with targetHits:2
+            Query query = new Query();
+            query.setHits(2);
+            query.setOffset(0);
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from marqo__index where "
+                                    + "({targetHits:2, approximate:True,"
+                                    + " hnsw.exploreAdditionalHits:1998}"
+                                    + "nearestNeighbor(marqo__embeddings_text,"
+                                    + " marqo__query_embedding))");
+            query.properties().set("marqo__yql.facets", combinedFacetsYql);
+
+            // relevantCandidates=5, no sort, affectFacets=true
+            Query result =
+                    hybridSearcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 5, null, true, false, true, false);
+
+            // newHits = min(relevantCandidates=5, limit+offset=2) = 2
+            assertThat(result.getHits()).isEqualTo(2);
+
+            // Facets YQL should use newHits=2 for max and newTensorTargetHits=2 for targetHits
+            String updatedFacetsYql = result.properties().getString("marqo__yql.facets");
+            String[] updatedQueries = updatedFacetsYql.split(delimiter);
+            assertThat(updatedQueries).hasSize(2);
+
+            // totalHits query: targetHits adjusted to 2, max(2) injected
+            assertThat(updatedQueries[0]).contains("targetHits:2");
+            assertThat(updatedQueries[0]).contains("max(2)");
+            assertThat(updatedQueries[0]).contains("group(1.1)");
+
+            // facets query: targetHits adjusted to 2, max(2) injected alongside max(10)
+            assertThat(updatedQueries[1]).contains("targetHits:2");
+            assertThat(updatedQueries[1]).contains("max(2)");
+            assertThat(updatedQueries[1]).contains("max(10)");
+            // Inner per-field max(100) should be untouched
+            assertThat(updatedQueries[1]).contains("max(100)");
+            assertThat(updatedQueries[1]).contains("group(marqo__short_string_fields");
+        }
+
+        @Test
+        void shouldNotModifyFacetsYqlWhenAffectFacetsIsFalse() {
+            String delimiter = "\n---MARQO-YQL-QUERY-DELIMITER---\n";
+            String totalHitsYql =
+                    "select * from marqo__index where (query OR "
+                            + "({targetHits:2, approximate:True, hnsw.exploreAdditionalHits:1998}"
+                            + "nearestNeighbor(marqo__embeddings_text, marqo__query_embedding))"
+                            + ") limit 0 | all(group(1.1) each(output(count())))";
+            String facetsYql =
+                    "select * from marqo__index where (query OR "
+                            + "({targetHits:2, approximate:True, hnsw.exploreAdditionalHits:1998}"
+                            + "nearestNeighbor(marqo__embeddings_text, marqo__query_embedding))"
+                            + ") limit 0 | all( max(10) all(group(color) max(100)"
+                            + " each(output(count()))) )";
+            String combinedFacetsYql = totalHitsYql + delimiter + facetsYql;
+
+            Query query = new Query();
+            query.setHits(2);
+            query.setOffset(0);
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from marqo__index where "
+                                    + "({targetHits:2, approximate:True,"
+                                    + " hnsw.exploreAdditionalHits:1998}"
+                                    + "nearestNeighbor(marqo__embeddings_text,"
+                                    + " marqo__query_embedding))");
+            query.properties().set("marqo__yql.facets", combinedFacetsYql);
+
+            // affectFacets=false
+            Query result =
+                    hybridSearcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 5, null, true, false, false, false);
+
+            // Facets YQL should be unchanged
+            String updatedFacetsYql = result.properties().getString("marqo__yql.facets");
+            assertThat(updatedFacetsYql).isEqualTo(combinedFacetsYql);
         }
     }
 }

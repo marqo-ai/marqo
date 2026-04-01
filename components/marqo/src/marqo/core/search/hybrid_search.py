@@ -568,12 +568,6 @@ class HybridSearch:
             gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
             gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
 
-            # When affectFacets is opted in, totalHits should reflect only relevant candidates.
-            # The Vespa-side max(N) in grouping handles facets correctly, but for totalHits we
-            # override directly with _relevantCandidates since it's the authoritative count.
-            if relevance_cutoff.affect_facets and track_total_hits is not None and "totalHits" in gathered_results:
-                gathered_results["totalHits"] = responses.root.fields.marqo_fields.relevant_candidates
-
         return gathered_results
 
     def _max_value_check_for_total_hits(self, gathered_results: Dict) -> Dict:
