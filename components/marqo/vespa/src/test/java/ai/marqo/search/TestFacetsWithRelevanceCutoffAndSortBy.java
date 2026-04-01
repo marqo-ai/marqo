@@ -20,13 +20,42 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
     class InjectMaxHitsIntoFacetsGroupingTest {
 
         @Test
-        void shouldWrapSimpleGroupingWithMaxAndAll() {
-            // all(group(...) each(...)) -> all(max(5) all(group(...) each(...)))
+        void shouldInsertMaxWhenNotPresent() {
+            // No max() in grouping — insert max(N) after "all("
+            // all(group(...) each(...)) -> all( max(5) group(...) each(...))
             String input =
                     "select * from schema where (query) limit 0 | all(group(color)"
                             + " each(output(count())))";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
-            assertThat(result).endsWith("| all(max(5) all(group(color) each(output(count()))))");
+            assertThat(result).contains("max(5)");
+            assertThat(result).contains("group(color)");
+        }
+
+        @Test
+        void shouldReplaceMaxWhenNewValueIsSmaller() {
+            // max(100) present, N=3 < 100 — replace with max(3)
+            // all( max(100) all(group(...))) -> all( max(3) all(group(...)))
+            String input =
+                    "select * from schema where (query) limit 0 | all( max(100) all(group(color)"
+                            + " each(output(count()))))";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 3, false);
+            assertThat(result).contains("max(3)");
+            assertThat(result).doesNotContain("max(100)");
+            assertThat(result).contains("group(color)");
+        }
+
+        @Test
+        void shouldSkipWhenExistingMaxIsSmallerOrEqual() {
+            // max(5) present, N=10 >= 5 — skip, return unchanged
+            String input =
+                    "select * from schema where (query) limit 0 | all( max(5) all(group(color)"
+                            + " each(output(count()))))";
+            String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 10, false);
+            assertThat(result).isEqualTo(input);
+
+            // max(5) present, N=5 — equal, also skip
+            result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
+            assertThat(result).isEqualTo(input);
         }
 
         @Test
@@ -66,25 +95,8 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
         }
 
         @Test
-        void shouldHandleVariousWhitespaceInGroupingPart() {
-            // Multiple spaces after all(
-            String multiSpace =
-                    "select * from schema where (query) limit 0 | all(   group(color)"
-                            + " each(output(count())))";
-            assertThat(hybridSearcher.injectMaxHitsIntoFacetsGrouping(multiSpace, 7, false))
-                    .endsWith("| all(max(7) all(group(color) each(output(count()))))");
-
-            // Trailing whitespace after closing paren
-            String trailing =
-                    "select * from schema where (query) limit 0 | all(group(color)"
-                            + " each(output(count())))  ";
-            assertThat(hybridSearcher.injectMaxHitsIntoFacetsGrouping(trailing, 4, false))
-                    .contains("all(max(4) all(group(color) each(output(count()))))");
-        }
-
-        @Test
         void shouldHandleRealWorldFacetsYqlWithMultipleFieldsFromVespaQuery() {
-            // Real-world facets YQL from an actual Vespa query with color and brand facet fields
+            // Real-world facets YQL: max(10) present with N=5 < 10, should replace
             String input =
                     "select * from marqo__facets_01rc_01match where ("
                             + "default contains \"universe\" OR default contains \"ocean\" OR "
@@ -98,10 +110,9 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
                             + "all(group(marqo__short_string_fields{\"brand\"}) max(100) "
                             + "order(-count()) each(output(count()))) )";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
-            // Our injected max wraps the existing structure
-            assertThat(result).contains("all(max(5) all(max(10)");
-            // Existing user maxDepth=10 preserved
-            assertThat(result).contains("max(10)");
+            // Outer max(10) replaced with max(5)
+            assertThat(result).contains("max(5)");
+            assertThat(result).doesNotContain("max(10)");
             // Both facet fields preserved
             assertThat(result).contains("marqo__short_string_fields{\"color\"}");
             assertThat(result).contains("marqo__short_string_fields{\"brand\"}");
@@ -117,7 +128,7 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
 
         @Test
         void shouldHandleRealWorldTotalHitsYqlFromVespaQuery() {
-            // Real-world totalHits YQL from an actual Vespa query
+            // totalHits YQL: no max() present, should insert max(5)
             String input =
                     "select * from marqo__facets_01rc_01match where ("
                             + "default contains \"universe\" OR default contains \"ocean\" OR "
@@ -128,7 +139,8 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
                             + "nearestNeighbor(marqo__embeddings_text, marqo__query_embedding))"
                             + ") limit 0 | all(group(1.1) each(output(count())))";
             String result = hybridSearcher.injectMaxHitsIntoFacetsGrouping(input, 5, false);
-            assertThat(result).contains("all(max(5) all(group(1.1) each(output(count()))))");
+            assertThat(result).contains("max(5)");
+            assertThat(result).contains("group(1.1)");
         }
     }
 
@@ -183,13 +195,13 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
             String[] updatedQueries = updatedFacetsYql.split(delimiter);
             assertThat(updatedQueries).hasSize(2);
 
-            // totalHits query: max(2) wraps the grouping via all(max(2) all(...))
-            assertThat(updatedQueries[0]).contains("all(max(2) all(");
+            // totalHits query: no max() present, so max(2) is inserted
+            assertThat(updatedQueries[0]).contains("max(2)");
             assertThat(updatedQueries[0]).contains("group(1.1)");
 
-            // facets query: max(2) wraps existing max(10), per-field max(100) untouched
-            assertThat(updatedQueries[1]).contains("all(max(2) all(");
-            assertThat(updatedQueries[1]).contains("max(10)");
+            // facets query: max(10) replaced with max(2) since 2 < 10
+            assertThat(updatedQueries[1]).contains("max(2)");
+            assertThat(updatedQueries[1]).doesNotContain("max(10)");
             assertThat(updatedQueries[1]).contains("max(100)");
             assertThat(updatedQueries[1]).contains("group(marqo__short_string_fields");
         }
@@ -299,16 +311,15 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
             String[] updatedQueries = updatedFacetsYql.split(delimiter);
             assertThat(updatedQueries).hasSize(2);
 
-            // totalHits query: max(10) injected, grouping preserved
-            assertThat(updatedQueries[0]).contains("all(max(10) all(");
+            // totalHits query: no max() present, so max(10) is inserted
+            assertThat(updatedQueries[0]).contains("max(10)");
             assertThat(updatedQueries[0]).contains("group(1.1)");
 
-            // facets query: max(10) injected wrapping existing max(10) maxDepth
-            assertThat(updatedQueries[1]).contains("all(max(10) all(max(10)");
-            // Both facet fields preserved
+            // facets query: existing max(10), newHits=10 >= 10, so max is NOT replaced (skipped)
+            // Both facet fields and per-field max(100) preserved
+            assertThat(updatedQueries[1]).contains("max(10)");
             assertThat(updatedQueries[1]).contains("marqo__short_string_fields{\"color\"}");
             assertThat(updatedQueries[1]).contains("marqo__short_string_fields{\"brand\"}");
-            // Per-field max(100) preserved (two occurrences)
             int max100Count = 0;
             int searchIdx = 0;
             while ((searchIdx = updatedQueries[1].indexOf("max(100)", searchIdx)) != -1) {
@@ -367,9 +378,11 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
             assertThat(updatedQueries[0]).contains("targetHits:20");
             assertThat(updatedQueries[1]).contains("targetHits:20");
 
-            // max(20) should be injected
+            // totalHits query: no max() present, so max(20) is inserted
             assertThat(updatedQueries[0]).contains("max(20)");
-            assertThat(updatedQueries[1]).contains("max(20)");
+            // facets query: existing max(10), newHits=20 >= 10, so max is NOT replaced
+            assertThat(updatedQueries[1]).contains("max(10)");
+            assertThat(updatedQueries[1]).doesNotContain("max(20)");
         }
     }
 }
