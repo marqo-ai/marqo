@@ -1709,7 +1709,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_facets, result["facets"])
         self.assertEqual(expected_hits, returned_hits)
 
-    def test_overwrite_sort_candidates_aligns_sort_candidates_with_relevant_candidates(self):
+    def test_override_sort_candidates_aligns_sort_candidates_with_relevant_candidates(self):
         """With overrideSortCandidatesWithRelevantCandidates, _sortCandidates equals _relevantCandidates."""
         result = self._search(
             relevance_cutoff={
@@ -1735,7 +1735,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_facets, result["facets"])
         self.assertEqual(expected_hits, returned_hits)
 
-    def test_overwrite_sort_candidates_aligns_sort_candidates_with_relevant_candidates_with_two_facets(self):
+    def test_override_sort_candidates_aligns_sort_candidates_with_relevant_candidates_with_two_facets(self):
         """With overrideSortCandidatesWithRelevantCandidates, _sortCandidates equals _relevantCandidates."""
         result = self._search(
             relevance_cutoff={
