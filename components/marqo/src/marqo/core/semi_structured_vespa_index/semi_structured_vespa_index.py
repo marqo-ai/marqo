@@ -636,7 +636,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
 
-        if hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]:
+        if (hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]
+                or hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)):
             query["marqo__expose_pre_rerank_score"] = True
 
         # Tell the custom searcher what type of custom score reranking will be done
