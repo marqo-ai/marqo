@@ -274,7 +274,9 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("alpha found: %.2f", alpha), verbose);
         logIfVerbose(String.format("RRF k found: %d", rrf_k), verbose);
         logIfVerbose(String.format("Rerank count global found: %d", rerankDepthGlobal), verbose);
-        logIfVerbose(String.format("Rerank depth start global found: %d", rerankDepthStartGlobal), verbose);
+        logIfVerbose(
+                String.format("Rerank depth start global found: %d", rerankDepthStartGlobal),
+                verbose);
         logIfVerbose(String.format("Limit found: %d", limit), verbose);
         logIfVerbose(String.format("Offset found: %d", offset), verbose);
         logIfVerbose(String.format("Timeout int found: %d", timeout), verbose);
@@ -1050,10 +1052,22 @@ public class HybridSearcher extends Searcher {
     /**
      * Post-processes the result list, applying global score modifiers and reranking.
      *
-     * <p>If rerankDepthStartGlobal is set, hits [0, rerankDepthStartGlobal) are preserved as-is
-     * (their scores and order are unchanged). Only hits [rerankDepthStartGlobal, rerankDepthGlobal)
-     * are subject to global score modifiers and reranking. For preserved hits,
-     * MARQO_PRE_RERANK_SCORE is set equal to their current score since no reranking occurs.
+     * <p>Hits are split into three segments:
+     * <ul>
+     *   <li><b>Preserved</b> {@code [0, rerankDepthStart)}: pinned at positions [0, rerankDepthStart)
+     *       in the final result, in their original order, with their original scores unchanged.
+     *       These hits are NEVER re-sorted, even if a tail hit ends up with a higher score.</li>
+     *   <li><b>Reranked</b> {@code [rerankDepthStart, rerankDepth)}: global score modifiers applied,
+     *       then re-sorted by modified score.</li>
+     *   <li><b>Excess</b> {@code [rerankDepth, limit)}: retain original scores (no modification).</li>
+     * </ul>
+     *
+     * <p>Final result order: {@code [preserved hits | sorted(reranked hits + excess hits)]}.
+     * Reranked hits and excess hits are sorted together — an excess hit's original score competes
+     * directly with the reranked hits' modified scores.
+     *
+     * <p>For preserved hits, MARQO_PRE_RERANK_SCORE is set equal to their current score since no
+     * score modification occurs (both fields reflect the original pre-RRF-fusion score).
      */
     HitGroup postProcessResults(
             HitGroup hitsForPostProcessing,
@@ -1073,7 +1087,9 @@ public class HybridSearcher extends Searcher {
         // Split original hits into three lists:
         //   preservedHits:  hits [0, rerankStart) — kept as-is
         //   resultToRerank: hits [rerankStart, rerankDepthGlobal) — subject to score modifiers
-        //   excessHits:     hits [rerankDepthGlobal, limit) — appended unsorted after reranking
+        //   excessHits:     hits [rerankDepthGlobal, limit) — retain original scores; interleaved
+        // by
+        //                   score with reranked hits when finalHits is sorted by trim()
         HitGroup preservedHits = new HitGroup();
         HitGroup resultToRerank = new HitGroup();
         HitGroup excessHits = new HitGroup();
@@ -1179,29 +1195,67 @@ public class HybridSearcher extends Searcher {
         logIfVerbose("Reranked result list (SORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
-        // Concatenate: preserved segment + re-sorted reranked segment + excess hits
-        HitGroup finalHits = new HitGroup();
-        finalHits.addAll(preservedHits.asList());
-        finalHits.addAll(resultToRerank.asList());
-
+        // Build the tail: reranked hits + excess hits sorted together by final score.
+        // Excess hits retain their original unmodified scores and are interleaved with
+        // reranked hits (which have modified scores) based on score comparison.
+        HitGroup tailHits = new HitGroup();
+        tailHits.addAll(resultToRerank.asList());
         if (limit > rerankDepthGlobal) {
-            // Add excess hits to the end of reranked results
             logIfVerbose(
                     String.format(
-                            "Adding %d excess hits to the end of reranked results.",
-                            excessHits.size()),
+                            "Adding %d excess hits to tail for joint sorting.", excessHits.size()),
                     verbose);
-            finalHits.addAll(excessHits.asList());
+            tailHits.addAll(excessHits.asList());
+        }
+        // Sort and truncate the tail to the number of positions available after preserved hits
+        int tailLimit = Math.max(0, limit - rerankStart);
+        tailHits.trim(0, tailLimit);
+
+        logIfVerbose("Tail hits (reranked + excess, sorted): ", verbose);
+        logHitGroup(tailHits, verbose);
+
+        // Build final result: preserved hits occupy positions [0, rerankStart) in their original
+        // order and with their original scores; the sorted tail fills positions [rerankStart,
+        // limit).
+        //
+        // Preserved hits must stay at their original positions regardless of how their scores
+        // compare to tail hits — a preserved hit is never demoted even if a tail hit has a
+        // higher score. Since HitGroup.trim() re-sorts all hits, we temporarily assign preserved
+        // hits inflated scores to pin them at the top, then restore their original scores after.
+        List<Hit> preservedList = preservedHits.asList();
+        if (preservedList.isEmpty()) {
+            // No preserved hits — the tail is the complete final result
+            logIfVerbose("Final result list: ", verbose);
+            logHitGroup(tailHits, verbose);
+            return tailHits;
         }
 
-        // Paginate and/or trim
-        // Result list should always have limit length (if possible)
-        logIfVerbose(
-                String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
-                verbose);
+        // Save original scores before inflation
+        double[] savedPreservedScores = new double[preservedList.size()];
+        for (int i = 0; i < preservedList.size(); i++) {
+            savedPreservedScores[i] = preservedList.get(i).getRelevance().getScore();
+        }
+        // Assign decreasing scores above the top tail score so preserved hits sort before all
+        // tail hits and maintain their relative ordering among themselves
+        double tailTopScore = tailHits.size() > 0 ? tailHits.get(0).getRelevance().getScore() : 0.0;
+        double pinnedBase = tailTopScore + preservedList.size() + 1.0;
+        for (int i = 0; i < preservedList.size(); i++) {
+            preservedList.get(i).setRelevance(pinnedBase - i);
+        }
+
+        HitGroup finalHits = new HitGroup();
+        finalHits.addAll(preservedList);
+        finalHits.addAll(tailHits.asList());
         finalHits.trim(0, limit);
 
-        logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
+        // Restore original scores for preserved hits — they now occupy positions [0,
+        // preservedList.size())
+        List<Hit> finalList = finalHits.asList();
+        for (int i = 0; i < preservedList.size() && i < finalList.size(); i++) {
+            finalList.get(i).setRelevance(savedPreservedScores[i]);
+        }
+
+        logIfVerbose("Final result list: ", verbose);
         logHitGroup(finalHits, verbose);
 
         return finalHits;

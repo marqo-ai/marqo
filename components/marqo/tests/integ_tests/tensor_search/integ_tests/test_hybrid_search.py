@@ -1339,6 +1339,159 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(len(modified_res["hits"]), 3)
                 self.assertEqual(["tensor2", "tensor1", "both1"], [hit["_id"] for hit in modified_res["hits"]])
 
+            # Cases 9-11: rerankDepthStart permutations.
+            #
+            # Behavior: preserved hits [0, rerankDepthStart) are PINNED at positions [0, rerankDepthStart)
+            # in the final result — they never move regardless of score. Reranked hits and excess hits
+            # are sorted together by final score and fill positions [rerankDepthStart, limit).
+            #
+            # Final result shape: [preserved in original order | sorted(reranked + excess)]
+            #
+            # Score modifier effects (applied only to reranked segment):
+            #   tensor2: 2*score+2  (~2.03, highest when modified)
+            #   tensor1: score+1    (~1.02, positive when modified)
+            #   both1:   score+0.0001 (~0.033 when modified; preserved → stays ~0.033)
+            #   lexical2: -score-1  (~-1.02, negative when modified)
+            #   lexical1: -2*score-2 (~-2.03, lowest when modified)
+            #
+            # Original RRF scores: both1 (~0.033) > tensor1≈lexical1 (~0.016) > tensor2≈lexical2 (~0.016)
+
+            with self.subTest("Case 9: rerankDepthStart=1, rerankDepth=5, limit=5 — preserve first hit, rerank rest, no excess"):
+                # Preserve: [both1] — pinned at position 0 with original score (~0.033)
+                # Rerank:   {tensor1, lexical1, tensor2, lexical2} — all get score modifiers applied
+                # Excess:   none
+                # Tail sorted by modified score:
+                #   tensor2(2.03) > tensor1(1.02) > lexical2(-1.02) > lexical1(-2.03)
+                # Final: [both1 (preserved at pos 0), tensor2, tensor1, lexical2, lexical1]
+                # both1's original score (~0.033) would place it in the middle if sorted, but it stays
+                # pinned at position 0 because it is preserved.
+                modified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(**{
+                        "multiply_score_by": [
+                            {"field_name": "mult_field_1", "weight": 1},
+                        ],
+                        "add_to_score": [
+                            {"field_name": "add_field_1", "weight": 1}
+                        ]
+                    }),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=5,
+                    rerank_depth=5,
+                    rerank_depth_start=1
+                )
+                self.assertEqual(len(modified_res["hits"]), 5)
+                # both1 is preserved and stays at position 0
+                self.assertEqual(modified_res["hits"][0]["_id"], "both1")
+                self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["both1"])
+                # Tail (positions 1-4): reranked hits sorted by modified score
+                self.assertEqual(["tensor2", "tensor1", "lexical2", "lexical1"],
+                                 [hit["_id"] for hit in modified_res["hits"][1:]])
+                self.assertAlmostEqual(modified_res["hits"][1]["_score"], 2 * unmodified_scores["tensor2"] + 2)
+                self.assertAlmostEqual(modified_res["hits"][2]["_score"], 1 * unmodified_scores["tensor1"] + 1)
+                self.assertAlmostEqual(modified_res["hits"][3]["_score"], -1 * unmodified_scores["lexical2"] - 1)
+                self.assertAlmostEqual(modified_res["hits"][4]["_score"], -2 * unmodified_scores["lexical1"] - 2)
+
+            with self.subTest("Case 10: rerankDepthStart=1, rerankDepth=3, limit=5 — preserve first, rerank middle, excess at end"):
+                # Preserve: [both1] — pinned at position 0 with original score (~0.033)
+                # Rerank:   {tensor1, lexical1} (indices 1-2) — score modifiers applied
+                #           tensor1 -> ~1.02 (positive), lexical1 -> ~-2.03 (very negative)
+                # Excess:   {tensor2, lexical2} (indices 3-4) — original scores ~0.016 each
+                # Tail = sorted(reranked + excess):
+                #   tensor1(1.02) > tensor2/lexical2(~0.016) > tensor2/lexical2(~0.016) > lexical1(-2.03)
+                # Final: [both1 (preserved at pos 0), tensor1, {tensor2/lexical2 in either order}, lexical1]
+                # Note: both1 stays at position 0 even though its original score (~0.033) is HIGHER than
+                # tensor2/lexical2 (~0.016). Preservation pins it, not its score.
+                modified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(**{
+                        "multiply_score_by": [
+                            {"field_name": "mult_field_1", "weight": 1},
+                        ],
+                        "add_to_score": [
+                            {"field_name": "add_field_1", "weight": 1}
+                        ]
+                    }),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=5,
+                    rerank_depth=3,
+                    rerank_depth_start=1
+                )
+                self.assertEqual(len(modified_res["hits"]), 5)
+                # both1 pinned at position 0 (preserved)
+                self.assertEqual(modified_res["hits"][0]["_id"], "both1")
+                self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["both1"])
+                # Tail position 1: tensor1 (highest modified score in tail)
+                self.assertEqual(modified_res["hits"][1]["_id"], "tensor1")
+                self.assertAlmostEqual(modified_res["hits"][1]["_score"], 1 * unmodified_scores["tensor1"] + 1)
+                # Tail positions 2-3: excess hits {tensor2, lexical2} in either order (original scores)
+                self.assertIn(set([hit["_id"] for hit in modified_res["hits"][2:4]]), [{"tensor2", "lexical2"}])
+                for hit in modified_res["hits"][2:4]:
+                    self.assertEqual(hit["_score"], unmodified_scores[hit["_id"]])
+                # Tail position 4: lexical1 (lowest modified score in tail)
+                self.assertEqual(modified_res["hits"][4]["_id"], "lexical1")
+                self.assertAlmostEqual(modified_res["hits"][4]["_score"], -2 * unmodified_scores["lexical1"] - 2)
+
+            with self.subTest("Case 11: rerankDepthStart=3, rerankDepth=5, limit=5 — preserve first 3, rerank last 2, no excess"):
+                # Preserve: [both1, X, Y] (indices 0-2, where {X,Y}={tensor1,lexical1}) —
+                #           pinned at positions 0-2 in their original order, original scores
+                # Rerank:   {tensor2, lexical2} (indices 3-4) — score modifiers applied
+                #           tensor2 -> ~2.03 (highest), lexical2 -> ~-1.02 (negative)
+                # Excess:   none
+                # Tail sorted: [tensor2, lexical2]
+                # Final: [both1, X, Y, tensor2, lexical2]
+                # tensor1 and lexical1 have equal original RRF scores; their relative order is
+                # non-deterministic but both stay in the preserved segment (positions 1 and 2).
+                modified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(**{
+                        "multiply_score_by": [
+                            {"field_name": "mult_field_1", "weight": 1},
+                        ],
+                        "add_to_score": [
+                            {"field_name": "add_field_1", "weight": 1}
+                        ]
+                    }),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=5,
+                    rerank_depth=5,
+                    rerank_depth_start=3
+                )
+                self.assertEqual(len(modified_res["hits"]), 5)
+                # Preserved segment at positions 0-2: both1 always first (highest original score),
+                # then tensor1 and lexical1 in non-deterministic order
+                self.assertEqual(modified_res["hits"][0]["_id"], "both1")
+                self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["both1"])
+                self.assertIn(set([hit["_id"] for hit in modified_res["hits"][1:3]]), [{"tensor1", "lexical1"}])
+                for hit in modified_res["hits"][1:3]:
+                    self.assertAlmostEqual(hit["_score"], unmodified_scores[hit["_id"]])
+                # Tail at positions 3-4: tensor2 (highest modified) then lexical2 (negative)
+                self.assertEqual(modified_res["hits"][3]["_id"], "tensor2")
+                self.assertAlmostEqual(modified_res["hits"][3]["_score"], 2 * unmodified_scores["tensor2"] + 2)
+                self.assertEqual(modified_res["hits"][4]["_id"], "lexical2")
+                self.assertAlmostEqual(modified_res["hits"][4]["_score"], -1 * unmodified_scores["lexical2"] - 1)
+
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):

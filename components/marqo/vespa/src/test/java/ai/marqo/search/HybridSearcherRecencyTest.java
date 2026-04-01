@@ -337,7 +337,8 @@ class HybridSearcherRecencyTest {
             hits.add(createHitWithRecencyScore("index:test/0/doc1", 1.0, 0.8));
             hits.add(createHitWithRecencyScore("index:test/0/doc2", 0.9, 0.6));
 
-            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
+            HitGroup result =
+                    hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
 
             // Should apply recency directly: score * recencyScore
             assertThat(result.get(0).getRelevance().getScore()).isEqualTo(0.8);
@@ -356,7 +357,8 @@ class HybridSearcherRecencyTest {
             HitGroup hits = new HitGroup();
             hits.add(createHitWithRecencyScore("index:test/0/doc1", 1.0, 0.5));
 
-            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
+            HitGroup result =
+                    hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
 
             // Score should remain unchanged
             assertThat(result.get(0).getRelevance().getScore()).isEqualTo(1.0);
@@ -377,7 +379,8 @@ class HybridSearcherRecencyTest {
             hits.add(createHitWithRecencyScore("index:test/0/doc2", 1.0, 0.3)); // 1.0 * 0.3 = 0.3
             hits.add(createHitWithRecencyScore("index:test/0/doc3", 0.6, 0.8)); // 0.6 * 0.8 = 0.48
 
-            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
+            HitGroup result =
+                    hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
 
             // After sorting, doc1 should be first (0.5), then doc3 (0.48), then doc2 (0.3)
             assertThat(result.get(0).getId().toString()).contains("doc1");
@@ -427,7 +430,8 @@ class HybridSearcherRecencyTest {
             }
 
             // Request limit=5, offset=0
-            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, null, 5, 0, false);
+            HitGroup result =
+                    hybridSearcher.postProcessResults(hits, query, null, null, 5, 0, false);
 
             assertThat(result.size()).isEqualTo(5);
         }
@@ -446,7 +450,8 @@ class HybridSearcherRecencyTest {
             hits.add(createHitWithRecencyScore("index:test/0/doc1", 1.0, 0.8));
             hits.add(createHitWithRecencyScore("index:test/0/doc2", 0.9, 0.6));
 
-            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
+            HitGroup result =
+                    hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
 
             // Additive mode: score + (recencyScore * weight)
             // doc1: 1.0 + (0.8 * 0.5) = 1.0 + 0.4 = 1.4
@@ -467,7 +472,8 @@ class HybridSearcherRecencyTest {
             HitGroup hits = new HitGroup();
             hits.add(createHitWithRecencyScore("index:test/0/doc1", 1.0, 0.8));
 
-            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
+            HitGroup result =
+                    hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
 
             // Multiplicative mode (default): score * recencyScore
             // doc1: 1.0 * 0.8 = 0.8
@@ -489,7 +495,8 @@ class HybridSearcherRecencyTest {
             hits.add(createHitWithRecencyScore("index:test/0/doc2", 1.0, 0.3)); // 1.0 + 0.3 = 1.3
             hits.add(createHitWithRecencyScore("index:test/0/doc3", 0.6, 0.8)); // 0.6 + 0.8 = 1.4
 
-            HitGroup result = hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
+            HitGroup result =
+                    hybridSearcher.postProcessResults(hits, query, null, null, 10, 0, false);
 
             // After sorting: doc1 (1.5), doc3 (1.4), doc2 (1.3)
             assertThat(result.get(0).getId().toString()).contains("doc1");
