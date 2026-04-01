@@ -179,6 +179,9 @@ public class HybridSearcher extends Searcher {
                 readRelevanceCutoffParameter(query, relevanceCutoffMethod);
         Boolean relevanceCutoffAffectFacets =
                 query.properties().getBoolean("marqo__hybrid.relevanceCutoff.affectFacets", false);
+        Boolean relevanceCutoffOverrideSortCandidates =
+                query.properties()
+                        .getBoolean("marqo__hybrid.relevanceCutoff.overrideSortCandidates", false);
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
@@ -239,7 +242,7 @@ public class HybridSearcher extends Searcher {
                         sortByMinSortCandidates,
                         isRelevanceCutoffMethodEnabled,
                         isSortByEnabled,
-                        Boolean.TRUE.equals(relevanceCutoffAffectFacets),
+                        relevanceCutoffAffectFacets,
                         verbose);
 
         List<Future<Result>> futureFacets =
@@ -325,6 +328,17 @@ public class HybridSearcher extends Searcher {
         HitGroup processedHits;
         Integer sortCandidates = null;
         if (sortByFields != null) {
+            // When overrideSortCandidates is set, trim hits to only relevant candidates
+            // before sorting, so that non-relevant documents are excluded from sort results.
+            if (relevanceCutoffOverrideSortCandidates
+                    && relevantCandidates != null
+                    && relevantCandidates < hitsForPostProcessing.size()) {
+                List<Hit> trimmed =
+                        new ArrayList<>(
+                                hitsForPostProcessing.asList().subList(0, relevantCandidates));
+                hitsForPostProcessing = new HitGroup();
+                trimmed.forEach(hitsForPostProcessing::add);
+            }
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
                     postProcessBySort(
@@ -349,6 +363,11 @@ public class HybridSearcher extends Searcher {
         // Extract recency multiplier from match features after post-processing (only if recency is
         // enabled)
         processedHits = extractRecencyScore(processedHits, query, verbose);
+
+        // Override sortCandidates with relevantCandidates when requested
+        if (relevanceCutoffOverrideSortCandidates && relevantCandidates != null) {
+            sortCandidates = relevantCandidates;
+        }
 
         MarqoMetadataFields marqoMetadataFields =
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
@@ -442,6 +461,11 @@ public class HybridSearcher extends Searcher {
      * @param verbose Whether to log the modification.
      * @return The modified facets YQL with max(N) injected.
      */
+    // Regex to find "| all(" followed by optional whitespace and an optional "max(M)" in the
+    // outermost grouping expression. Uses lastIndexOf for the "|" split, then regex on the
+    // grouping part.
+    private static final Pattern OUTER_MAX_PATTERN = Pattern.compile("^all\\(\\s*max\\((\\d+)\\)");
+
     @VisibleForTesting
     String injectMaxHitsIntoFacetsGrouping(String facetsYql, int maxHits, boolean verbose) {
         if (facetsYql == null || facetsYql.isEmpty()) {
@@ -468,39 +492,44 @@ public class HybridSearcher extends Searcher {
         String selectPart = facetsYql.substring(0, pipeAllIndex + 1); // includes the "|"
         String groupingPart = facetsYql.substring(pipeAllIndex + 1).trim(); // "all(..."
 
-        // Validate groupingPart has the expected structure: starts with "all(" and ends with ")"
-        if (!groupingPart.startsWith("all(") || !groupingPart.endsWith(")")) {
+        // Check if there's already a max(M) in the outermost all().
+        // Pattern: all( max(M) ... ) — with optional whitespace after "all("
+        Matcher matcher = OUTER_MAX_PATTERN.matcher(groupingPart);
+        String result;
+        if (matcher.find()) {
+            int existingMax = Integer.parseInt(matcher.group(1));
+            if (maxHits < existingMax) {
+                // Replace max(M) with max(N) since N is more restrictive
+                result =
+                        selectPart
+                                + " "
+                                + groupingPart.substring(0, matcher.start(1))
+                                + maxHits
+                                + groupingPart.substring(matcher.end(1));
+                logIfVerbose(
+                        String.format(
+                                "Replaced max(%d) with max(%d) in facets grouping: %s",
+                                existingMax, maxHits, result),
+                        verbose);
+            } else {
+                // Existing max is already <= maxHits, skip
+                logIfVerbose(
+                        String.format(
+                                "Existing max(%d) <= %d, skipping injection", existingMax, maxHits),
+                        verbose);
+                return facetsYql;
+            }
+        } else {
+            // No max(M) present — wrap inner content with max(N) all(...)
+            // e.g., all(group(1.1) each(...)) -> all(max(N) all(group(1.1) each(...)))
+            // e.g., all( all(group(...) ...)) -> all(max(N) all(all(group(...) ...)))
+            // Note: for facets, inner content already starts with all(), so no extra nesting.
+            String innerContent = groupingPart.substring(4, groupingPart.length() - 1).trim();
+            result = selectPart + " all(max(" + maxHits + ") all(" + innerContent + "))";
             logIfVerbose(
-                    "Grouping part does not match expected 'all(...)' structure, "
-                            + "skipping max injection: "
-                            + groupingPart,
+                    String.format("Inserted max(%d) into facets grouping: %s", maxHits, result),
                     verbose);
-            return facetsYql;
         }
-
-        // Extract the inner content of all(...), handling variable whitespace after "all("
-        // e.g., "all(group(...)...)" or "all( max(100) all(group(...)...))"
-        String innerRaw =
-                groupingPart.substring(4, groupingPart.length() - 1); // between "all(" and ")"
-        String innerContent = innerRaw.trim();
-
-        if (innerContent.isEmpty()) {
-            logIfVerbose(
-                    "Empty grouping content in facets YQL, skipping max injection: " + facetsYql,
-                    verbose);
-            return facetsYql;
-        }
-
-        // Wrap the existing grouping content with max(N) all(...).
-        // Vespa requires all() or each() after max(), not group() directly.
-        // E.g., all(group(...) each(...)) becomes all(max(N) all(group(...) each(...)))
-        // If already nested (e.g., all( max(10) all(group(...)))), inject max(N) inside.
-        groupingPart = "all(max(" + maxHits + ") all(" + innerContent + "))";
-
-        String result = selectPart + " " + groupingPart;
-        logIfVerbose(
-                String.format("Injected max(%d) into facets grouping: %s", maxHits, result),
-                verbose);
         return result;
     }
 

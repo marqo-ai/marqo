@@ -236,6 +236,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 pass
             query["marqo__hybrid.relevanceCutoff.probeDepth"] = marqo_query.relevance_cutoff.probe_depth
             query["marqo__hybrid.relevanceCutoff.affectFacets"] = marqo_query.relevance_cutoff.affect_facets
+            query["marqo__hybrid.relevanceCutoff.overrideSortCandidates"] = marqo_query.relevance_cutoff.override_sort_candidates_with_relevant_candidates
 
             # If relevanceCutoff.lexicalOperand is set, build a separate probe YQL with the overridden operand
             if marqo_query.relevance_cutoff.lexical_operand is not None:

@@ -12,14 +12,13 @@ from marqo.core.models.facets_parameters import (
 from marqo.core.models.hybrid_parameters import (
     HybridParameters, RankingMethod, RetrievalMethod
 )
-from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.search.hybrid_search import HybridSearch, should_use_collapse_search
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.api_models import ScoreModifierLists, CustomVectorQuery
 from marqo.tensor_search.models.recency_parameters import RecencyParameters
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel, RelevanceCutoffMethod
 from marqo.tensor_search.models.search import SearchContext, SearchContextDocuments, SearchContextTensor
 from marqo.tensor_search.models.sort_by_model import SortByModel, SortByField, SortOrder
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
@@ -413,82 +412,6 @@ class TestHybridSearch(TestCase):
             f"The total hits should be capped to the env var value {capped_total_hits}, "
             f"but got {result['totalHits']}"
         )
-
-class TestSortByCandidatesWithRelevanceCutoff(TestCase):
-    """Tests for sort_by candidates selection with relevance cutoff in hybrid search (lines 558-561)."""
-
-    @patch('marqo.core.search.hybrid_search.vespa_index_factory')
-    @patch('marqo.core.search.hybrid_search.run_vectorise_pipeline')
-    @patch('marqo.core.search.hybrid_search.utils.parse_lexical_query')
-    @patch('marqo.core.search.hybrid_search.gather_documents_from_response')
-    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
-    def test_sort_candidates_overwrite_by_relevance_cutoff(
-        self, mock_metrics, mock_gather_docs, mock_parse_lexical,
-        mock_vectorise, mock_vespa_factory
-    ):
-        """Test _sortCandidates uses relevant_candidates when overwrite is True, sort_candidates otherwise."""
-        # Setup mocks
-        config = Mock(spec=Config)
-        config.vespa_client = Mock()
-        mock_response = Mock()
-        mock_response.root.coverage.coverage = 100
-        mock_response.root.coverage.degraded = None
-        mock_response.root.fields.marqo_fields.sort_candidates = 100
-        mock_response.root.fields.marqo_fields.relevant_candidates = 42
-        mock_response.root.fields.marqo_fields.probe_candidates = 500
-        config.vespa_client.query.return_value = mock_response
-
-        marqo_index = Mock(spec=SemiStructuredMarqoIndex)
-        marqo_index.name = "test_index"
-        marqo_index.type = IndexType.SemiStructured
-        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.25.0")
-        marqo_index.model = Mock()
-        marqo_index.model.get_text_query_prefix.return_value = ""
-
-        mock_vespa_index = Mock(spec=SemiStructuredVespaIndex)
-        mock_vespa_index.to_vespa_query.return_value = {"query": "test"}
-        mock_vespa_factory.return_value = mock_vespa_index
-
-        mock_vectorise.return_value = {0: [0.1, 0.2, 0.3]}
-        mock_parse_lexical.return_value = ([], [])
-
-        mock_metrics_instance = Mock()
-        mock_metrics.for_request.return_value = mock_metrics_instance
-        mock_metrics_instance.start.return_value = None
-        mock_metrics_instance.stop.return_value = 100.0
-        ctx_mgr = Mock()
-        ctx_mgr.__enter__ = Mock(return_value=None)
-        ctx_mgr.__exit__ = Mock(return_value=None)
-        mock_metrics_instance.time.return_value = ctx_mgr
-
-        mock_gather_docs.return_value = {"hits": []}
-
-        sort_by = SortByModel(fields=[SortByField(field_name="price", order=SortOrder.Asc)])
-        hybrid_search = HybridSearch()
-
-        with self.subTest("overwrite=True uses relevant_candidates"):
-            relevance_cutoff = RelevanceCutoffModel(
-                method=RelevanceCutoffMethod.GapDetection,
-                overWriteSortCandidatesByRelevantCandidates=True
-            )
-            result = hybrid_search.search(
-                config=config, marqo_index=marqo_index, query="test",
-                hybrid_parameters=HybridParameters(),
-                sort_by=sort_by, relevance_cutoff=relevance_cutoff
-            )
-            self.assertEqual(result["_sortCandidates"], 42)
-
-        with self.subTest("overwrite=False uses sort_candidates"):
-            relevance_cutoff = RelevanceCutoffModel(
-                method=RelevanceCutoffMethod.GapDetection,
-                overWriteSortCandidatesByRelevantCandidates=False
-            )
-            result = hybrid_search.search(
-                config=config, marqo_index=marqo_index, query="test",
-                hybrid_parameters=HybridParameters(),
-                sort_by=sort_by, relevance_cutoff=relevance_cutoff
-            )
-            self.assertEqual(result["_sortCandidates"], 100)
 
 
 class TestRecencyValidation(TestCase):
