@@ -2034,3 +2034,15 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         returned_hits = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(expected_facets, result["facets"])
         self.assertEqual(expected_hits, returned_hits)
+
+    def test_search_operand_works_with_quoted_queries(self):
+        """Ensure quoted queries still work"""
+        result = self._search(
+            query = '\"void\" \"test\"',
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+            lexical_operand=None # use default
+        )
+        for hit in result["hits"]:
+            self.assertNotIn("_lexical_score", hit)
+            self.assertIn("_tensor_score", hit)

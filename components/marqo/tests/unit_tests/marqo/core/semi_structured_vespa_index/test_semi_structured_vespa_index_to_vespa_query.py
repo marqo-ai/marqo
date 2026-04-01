@@ -1404,9 +1404,13 @@ class TestSemiStructuredVespaIndexToVespaQueryCollapseSortBy(MarqoTestCase):
 class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery):
     """Tests for the lexicalOperand parameter in semi-structured index."""
 
+    _SENTINEL = object()
+
     def _make_hybrid_query(self, lexical_operand=None, rerank_depth_lexical=None,
-                           or_phrases=None, and_phrases=None, relevance_cutoff=None):
+                           or_phrases=_SENTINEL, and_phrases=None, relevance_cutoff=None):
         """Helper to create a MarqoHybridQuery with the given lexicalOperand."""
+        if or_phrases is self._SENTINEL:
+            or_phrases = ['search']
         hp = HybridParameters(
             retrievalMethod=RetrievalMethod.Disjunction,
             rankingMethod=RankingMethod.RRF,
@@ -1418,7 +1422,7 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
             limit=10,
             offset=0,
             vector_query=[0.1, 0.2, 0.3, 0.4],
-            or_phrases=or_phrases or ['search'],
+            or_phrases=or_phrases,
             and_phrases=and_phrases or [],
             hybrid_parameters=hp,
             relevance_cutoff=relevance_cutoff,
@@ -1547,6 +1551,84 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
 
         # No separate probe YQL should be set (Java will use the main lexical YQL)
         self.assertNotIn('marqo__yql.lexical.probe', vespa_query)
+
+    def test_all_quoted_terms_with_lexical_operand_or_still_uses_and(self):
+        """When the query is fully quoted like '"this" "is" "a" "sentence"', all terms become and_phrases.
+        Even with lexicalOperand='or', the and_phrases are always joined with AND because
+        lexicalOperand only affects or_phrases (unquoted terms)."""
+        for lexical_operand in ['or', 'and', 'weakAnd']:
+            with self.subTest(lexical_operand=lexical_operand):
+                q = self._make_hybrid_query(
+                    lexical_operand=lexical_operand,
+                    or_phrases=[],
+                    and_phrases=['this', 'is', 'a', 'sentence'],
+                )
+                vespa_query = self.vespa_index.to_vespa_query(q)
+
+                lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+                expected = ('select * from test_index where '
+                            '(default contains "this" AND default contains "is" '
+                            'AND default contains "a" AND default contains "sentence")')
+                self.assertEqual(expected, lexical_yql)
+
+    def test_all_quoted_terms_with_lexical_operand_or_generate_or_terms_is_empty(self):
+        """When all terms are quoted (and_phrases only), _generate_or_terms returns empty string
+        regardless of lexicalOperand, since lexicalOperand only controls or_phrases."""
+        for lexical_operand in ['or', 'and', 'weakAnd']:
+            with self.subTest(lexical_operand=lexical_operand):
+                q = self._make_hybrid_query(
+                    lexical_operand=lexical_operand,
+                    or_phrases=[],
+                    and_phrases=['this', 'is', 'a', 'sentence'],
+                )
+                result = self.vespa_index._generate_or_terms(q)
+                self.assertEqual(result, '')
+
+    def test_mixed_quoted_and_unquoted_with_lexical_operand_or(self):
+        """When query has both quoted and unquoted terms like 'hello "exact phrase" world',
+        unquoted terms use OR (from lexicalOperand) while quoted terms always use AND."""
+        q = self._make_hybrid_query(
+            lexical_operand='or',
+            or_phrases=['hello', 'world'],
+            and_phrases=['exact phrase'],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(q)
+
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        expected = ('select * from test_index where '
+                    '((default contains "hello" OR default contains "world") '
+                    'AND (default contains "exact phrase"))')
+        self.assertEqual(expected, lexical_yql)
+
+    def test_all_quoted_terms_with_lexical_operand_or_and_relevance_cutoff(self):
+        """When all terms are quoted and lexicalOperand='or' with relevanceCutoff override,
+        both main and probe YQL should use AND since all terms are in and_phrases.
+        The relevanceCutoff.lexicalOperand override has no effect when or_phrases is empty."""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters=RelativeMaxScoreParameters(relativeScoreFactor=0.5),
+            lexicalOperand='or'
+        )
+        q = self._make_hybrid_query(
+            lexical_operand='and',
+            or_phrases=[],
+            and_phrases=['this', 'is', 'a', 'sentence'],
+            relevance_cutoff=relevance_cutoff
+        )
+        vespa_query = self.vespa_index.to_vespa_query(q)
+
+        # Main lexical YQL should use AND (and_phrases are always AND-joined)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        expected = ('select * from test_index where '
+                    '(default contains "this" AND default contains "is" '
+                    'AND default contains "a" AND default contains "sentence")')
+        self.assertEqual(expected, lexical_yql)
+
+        # Probe YQL: even with relevanceCutoff.lexicalOperand='or', it only affects or_phrases.
+        # Since or_phrases is empty, the probe YQL is identical to main.
+        probe_yql = vespa_query.get('marqo__yql.lexical.probe', '')
+        if probe_yql:
+            self.assertEqual(expected, probe_yql)
 
 
 if __name__ == '__main__':
