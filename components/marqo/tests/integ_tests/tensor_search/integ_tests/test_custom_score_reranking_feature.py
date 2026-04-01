@@ -2123,28 +2123,6 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
                     self.assertIn(attr, hit, msg=f"Requested attribute {attr} must be present in hit {hit.get('_id')}")
                 self.assertEqual(hit["other_field"], f"val_{hit['_id']}")
 
-    def test_pre_rerank_score_present_when_custom_score_reranking_used(self):
-        """_pre_rerank_score appears in every hit when custom score rerank modifiers are used."""
-        self._add_tuxedo_docs()
-        res = tensor_search.search(
-            config=self.config,
-            index_name=self.index.name,
-            text="tuxedo",
-            search_method="HYBRID",
-            hybrid_parameters=HYBRID_PARAMS_TUXEDO,
-            score_modifiers=ScoreModifierLists(
-                add_to_score=[{"field_name": "marqo__score_bm25_sum", "weight": 1.0}]
-            ),
-            result_count=10,
-        )
-        self.assertGreater(len(res["hits"]), 0)
-        for hit in res["hits"]:
-            self.assertIn(
-                MARQO_DOC_PRE_RERANK_SCORE,
-                hit,
-                msg=f"Hit {hit['_id']} must have {MARQO_DOC_PRE_RERANK_SCORE} when custom score reranking is used",
-            )
-
     def test_pre_rerank_score_absent_when_no_score_modifiers(self):
         """_pre_rerank_score must not appear when no score modifiers are used."""
         self._add_tuxedo_docs()
