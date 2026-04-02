@@ -105,3 +105,58 @@ class TestSearchQuery(MarqoTestCase):
             _ = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, hybridParameters=HybridParameters(queryLexical="test"))
 
         self.assertIn("Query(q) cannot be provided for HYBRID search when hybridParameters.queryTensor or hybridParameters.queryLexical is provided", str(e.exception))
+
+    def test_rerank_depth_start_fails_for_non_hybrid_search(self):
+        """rerankDepthStart is only supported for HYBRID search."""
+        with self.subTest("TENSOR search"):
+            with self.assertRaises(ValidationError) as e:
+                _ = SearchQuery(q="test", searchMethod=SearchMethod.TENSOR, rerankDepthStart=2)
+            self.assertIn("'rerankDepthStart' is currently only supported for 'HYBRID' search method",
+                          str(e.exception))
+
+        with self.subTest("LEXICAL search"):
+            with self.assertRaises(ValidationError) as e:
+                _ = SearchQuery(q="test", searchMethod=SearchMethod.LEXICAL, rerankDepthStart=2)
+            self.assertIn("'rerankDepthStart' is currently only supported for 'HYBRID' search method",
+                          str(e.exception))
+
+    def test_rerank_depth_start_fails_if_negative(self):
+        """rerankDepthStart cannot be negative."""
+        with self.assertRaises(ValidationError) as e:
+            _ = SearchQuery(
+                q="test", searchMethod=SearchMethod.HYBRID,
+                hybridParameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Disjunction,
+                    rankingMethod=RankingMethod.RRF,
+                ),
+                rerankDepthStart=-1,
+            )
+        self.assertIn("rerankDepthStart cannot be negative", str(e.exception))
+
+    def test_rerank_depth_start_fails_if_gte_rerank_depth(self):
+        """rerankDepthStart must be strictly less than rerankDepth."""
+        with self.subTest("equal"):
+            with self.assertRaises(ValidationError) as e:
+                _ = SearchQuery(
+                    q="test", searchMethod=SearchMethod.HYBRID,
+                    hybridParameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                    ),
+                    rerankDepthStart=10,
+                    rerankDepth=10,
+                )
+            self.assertIn("rerankDepthStart must be less than rerankDepth", str(e.exception))
+
+        with self.subTest("greater"):
+            with self.assertRaises(ValidationError) as e:
+                _ = SearchQuery(
+                    q="test", searchMethod=SearchMethod.HYBRID,
+                    hybridParameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                    ),
+                    rerankDepthStart=15,
+                    rerankDepth=10,
+                )
+            self.assertIn("rerankDepthStart must be less than rerankDepth", str(e.exception))
