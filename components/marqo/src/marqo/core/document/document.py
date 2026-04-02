@@ -33,6 +33,8 @@ logger = get_logger(__name__)
 
 class Document:
     """A class that handles the document API in Marqo"""
+    GENERIC_UPDATE_DOCUMENT_ERROR_MESSAGE = "Marqo vector store couldn't update the document. " + \
+                                            "Please see: " + update_documents_response() + " for more details"
 
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, inference: Inference):
         self.vespa_client = vespa_client
@@ -153,17 +155,42 @@ class Document:
         # 1. Retrieve those documents, which contain maps in the update request, from Vespa.
         # 2. If there's any documents that dont' exist in Vespa, we will append them to unsuccessful_docs
         if marqo_index.type is IndexType.SemiStructured and documents_that_contain_maps: # Only retrieve the document back if the partial update request contains maps and the index is semi-structured
-            get_batch_response = self.vespa_client.get_batch(ids = list(documents_that_contain_maps.keys()), fields = [
+            fetch_ids = list(documents_that_contain_maps.keys())
+            get_batch_response = self.vespa_client.get_batch(ids = fetch_ids, fields = [
                 VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_VERSION_UUID], schema = marqo_index.schema_name)
             responses = get_batch_response.responses
-            for resp in responses:
+
+            if len(responses) != len(fetch_ids):
+                raise InternalError(
+                    f"Vespa get batch response count {len(responses)} does not match the number of requested documents "
+                    f"{len(fetch_ids)}. This likely indicates an issue with Vespa or the Vespa client."
+                )
+
+            for idx, resp in enumerate(responses):
                 if resp.document:
                     existing_vespa_documents[resp.document.fields[VESPA_FIELD_ID]] = resp.document.dict()
-                else: 
-                    id = self.extract_document_id_from_vespa_id(resp) # Extract the document id from the Vespa response. Vespa response will contain the document id even though the document was not found.
-                    unsuccessful_docs.append((documents_that_contain_maps.get(id), MarqoUpdateDocumentsItem(id = id,
-                                                                                                         status = int(api_exceptions.BadRequestError.status_code),
-                                                                                                         error = "Marqo vector store couldn't update the document. Please see: " + update_documents_response() + " for more details")))
+                else:
+                    # The order of get_batch_response is guaranteed to be the same as the order of fetch_ids,
+                    # so we can rely on the index to get the id of the document that doesn't exist in Vespa.
+                    # Vespa returned id will prune some characters e.g, #, so we have to get the id from fetch_ids
+                    # instead of resp.id
+                    id = fetch_ids[idx]
+                    unsuccessful_docs.append(
+                        (
+                            # id is from fetch_ids, and fetch_ids is from documents_that_contain_maps,
+                            # so we are sure that the id is in documents_that_contain_maps
+                            documents_that_contain_maps[id], MarqoUpdateDocumentsItem(
+                            id=id,
+                            status=int(api_exceptions.BadRequestError.status_code),
+                            # We should always return message instead of error in the documents' response.
+                            # To keep backwards compatibility, we return both
+                            message=resp.message if resp.message \
+                            else self.GENERIC_UPDATE_DOCUMENT_ERROR_MESSAGE,
+                            error=resp.message if resp.message \
+                            else self.GENERIC_UPDATE_DOCUMENT_ERROR_MESSAGE
+                            )
+                        )
+                    )
                     documents_that_contain_maps_but_dont_exist_in_vespa.add(id)
 
         for index, doc in enumerate(partial_documents):
@@ -331,5 +358,8 @@ class Document:
                                          processingTimeMs=add_docs_processing_time_ms)
 
     def extract_document_id_from_vespa_id(self, resp):
+        # TODO - This method is not reliable as Vespa might prune the document ID in the response if
+        #  the ID certain characters (e.g., #). We should update our code to either remove those illegal characters
+        #  from the document ID before feeding to Vespa, or implement a more reliable solution
         doc_id = resp.id.split('::')[-1] if resp.id else None
         return doc_id
