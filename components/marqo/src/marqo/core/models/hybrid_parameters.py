@@ -7,6 +7,12 @@ from marqo.base_model import StrictBaseModel
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
 
+class LexicalOperand(str, Enum):
+    Or = 'or'
+    And = 'and'
+    WeakAnd = 'weakAnd'
+
+
 class RetrievalMethod(str, Enum):
     Disjunction = 'disjunction'
     Tensor = 'tensor'
@@ -60,6 +66,7 @@ class HybridParameters(StrictBaseModel):
     weakAndParameters: Optional[WeakAndParameters] = None
     rerankCount: Optional[int] = Field(None, ge=1)
     secondPhaseModifier: Optional[bool] = None
+    lexicalOperand: Optional[LexicalOperand] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):
