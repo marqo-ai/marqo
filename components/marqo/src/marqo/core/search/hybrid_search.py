@@ -385,6 +385,11 @@ class HybridSearch:
                     f"This index was created with schema version {marqo_index.schema_template_version or marqo_index.marqo_version} "
                 )
 
+        if hybrid_parameters.lexicalOperand and not isinstance(marqo_index, SemiStructuredMarqoIndex):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"'lexicalOperand is only supported for unstructured indexes "
+            )
+
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
         # split queries into lexical and tensor

@@ -5,7 +5,7 @@ from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod
+from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, LexicalOperand
 from marqo.core.models.custom_score_rerank import ParsedCustomScoreKey
 from marqo.core.models.marqo_index import DistanceMetric, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
@@ -30,6 +30,7 @@ from marqo.tensor_search.models.recency_parameters import RecencyParameters, App
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
 from marqo.tensor_search.models.collapse_model import CollapseModel
+
 
 
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
@@ -162,12 +163,29 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             )
         return terms
 
+    @staticmethod
+    def _apply_lexical_operand(
+            lexical_operand: LexicalOperand, terms: list,
+            rerank_depth_lexical: Optional[int] = None) -> str:
+        """Apply an explicit lexical operand to combine terms."""
+        if lexical_operand == LexicalOperand.Or:
+            return ' OR '.join(terms)
+        elif lexical_operand == LexicalOperand.And:
+            return ' AND '.join(terms)
+        elif lexical_operand == LexicalOperand.WeakAnd:
+            if rerank_depth_lexical is not None:
+                return f'{{targetHits:{rerank_depth_lexical}}}weakAnd({", ".join(terms)})'
+            return f'weakAnd({", ".join(terms)})'
+        else:
+            raise InternalError(f'Unknown lexical operand: {lexical_operand}')
+
     def _generate_or_terms(
         self,
         marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery],
         is_facets_term: bool = False,
         is_ranking_term: bool = False,
         attributes_to_search: Optional[List[str]] = None,
+        lexical_operand_override: Optional[LexicalOperand] = None,
     ) -> str:
         """Generate the OR/weakAnd terms for the lexical search term."""
         if not marqo_query.or_phrases:
@@ -199,8 +217,16 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         if is_facets_term:
             return ' OR '.join(terms)
+
         if is_ranking_term:
             return f'weakAnd({", ".join(terms)})'
+
+        lexical_operand = lexical_operand_override or (
+            marqo_query.hybrid_parameters.lexicalOperand if isinstance(marqo_query, MarqoHybridQuery) else None
+        )
+        if lexical_operand is not None:
+            return self._apply_lexical_operand(lexical_operand, terms, rerank_depth_lexical)
+
         if rerank_depth_lexical is not None:
             if rerank_depth_lexical <= 0:
                 raise InternalError('RerankDepthLexical is less than or equal to 0 in _get_lexical_search_term')
@@ -215,6 +241,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         is_facets_term: bool = False,
         is_ranking_term: bool = False,
         attributes_to_search: Optional[List[str]] = None,
+        lexical_operand_override: Optional[LexicalOperand] = None,
     ) -> str:
         """
         Builds a lexical YQL search term for a query. It has an OR-query part (optional phrases)
@@ -256,6 +283,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             is_facets_term=is_facets_term,
             is_ranking_term=is_ranking_term,
             attributes_to_search=attributes_to_search,
+            lexical_operand_override=lexical_operand_override
         )
         if marqo_query.and_phrases:
             and_terms = ' AND '.join([

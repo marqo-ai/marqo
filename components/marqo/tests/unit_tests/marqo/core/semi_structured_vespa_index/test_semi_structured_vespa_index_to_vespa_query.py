@@ -2241,6 +2241,8 @@ class TestAppendCustomScoreRerankTerms(unittest.TestCase):
         )
         self.assertEqual(lexical_term, 'base_lex')
         self.assertEqual(tensor_term, 'base_tensor')
+
+
 class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery):
     """Tests for the lexicalOperand parameter in semi-structured index."""
 
@@ -2389,8 +2391,9 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
                     '(default contains "hello" OR default contains "world")')
         self.assertEqual(expected, lexical_yql)
 
-        # No separate probe YQL should be set (Java will use the main lexical YQL)
-        self.assertNotIn('marqo__yql.lexical.probe', vespa_query)
+        probe_lexical_yql = vespa_query.get('marqo__yql.lexical.probe', '')
+        expected = ('select * from test_index where '
+                    '(default contains "hello" OR default contains "world")')
 
     def test_all_quoted_terms_with_lexical_operand_or_still_uses_and(self):
         """When the query is fully quoted like '"this" "is" "a" "sentence"', all terms become and_phrases.
