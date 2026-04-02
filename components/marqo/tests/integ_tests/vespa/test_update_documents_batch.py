@@ -104,6 +104,40 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertIsNone(messages[0])
         self.assertIsNotNone(messages[1])
 
+    def test_get_batch_preserves_input_order(self):
+        """Test that get_batch returns responses in the same order as the input IDs,
+        with a mix of existing and non-existing documents against real Vespa."""
+        documents = [
+            VespaDocument(id=f"order-{i}", fields={"title": f"Title {i}"})
+            for i in range(6)
+        ]
+        self.client.feed_batch(documents, self.TEST_SCHEMA)
+
+        # Request in shuffled order, mixing existing and non-existing IDs
+        requested_ids = [
+            "order-4",          # exists
+            "nonexistent-1",    # doesn't exist
+            "order-1",          # exists
+            "order-5",          # exists
+            "nonexistent-2",    # doesn't exist
+            "order-0",          # exists
+            "nonexistent-3",    # doesn't exist
+            "order-2",          # exists
+        ]
+
+        batch_response = self.client.get_batch(ids=requested_ids, schema=self.TEST_SCHEMA)
+
+        self.assertEqual(len(batch_response.responses), len(requested_ids))
+        for i, expected_id in enumerate(requested_ids):
+            resp = batch_response.responses[i]
+            actual_id = resp.id.split("::")[-1] if resp.id else None
+            self.assertEqual(actual_id, expected_id,
+                             f"Response at position {i} should be for '{expected_id}', got '{actual_id}'")
+            if expected_id.startswith("order-"):
+                self.assertEqual(resp.status, 200)
+            else:
+                self.assertEqual(resp.status, 404)
+
     def test_update_documents_batch_network_error(self):
         update_documents = [
             VespaDocument(id="doc1", fields={"title": {"assign": "Network Failure Test"}}),
