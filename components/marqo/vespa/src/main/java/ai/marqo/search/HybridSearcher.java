@@ -1951,6 +1951,8 @@ public class HybridSearcher extends Searcher {
     HitGroup applyGlobalScoreModifiers(HitGroup hits, Query query, boolean verbose) {
         FeatureData hitMatchFeatures;
         Double mult_modifier, add_modifier, original_score, modified_score, recencyScore;
+        boolean exposePreRerankScore =
+                query.properties().getBoolean("marqo__expose_pre_rerank_score", false);
         if (hits.size() == 0) {
             logIfVerbose("No hits to apply score modifiers to. Returning.", verbose);
             return hits;
@@ -2091,8 +2093,11 @@ public class HybridSearcher extends Searcher {
                     }
 
                     original_score = hit.getRelevance().getScore();
-                    // Expose pre-rerank score whenever we apply any global score modifiers
-                    hit.setField(MARQO_PRE_RERANK_SCORE, original_score);
+                    // Expose pre-rerank score only when explicitly requested, so old Marqo versions
+                    // that don't know this field can still parse results after a rollback.
+                    if (exposePreRerankScore) {
+                        hit.setField(MARQO_PRE_RERANK_SCORE, original_score);
+                    }
                     double baseScore = original_score * effectiveMult + effectiveAdd;
 
                     if (!applyRecency) {

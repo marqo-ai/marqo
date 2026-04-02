@@ -225,6 +225,55 @@ class TestStructuredVespaIndexToVespaQuery(unittest.TestCase):
         self.assertNotIn('marqo__custom_score_add_weights_global', str(vespa_query.get('query_features', {})))
         self.assertNotIn('marqo__custom_score_mult_weights_global', str(vespa_query.get('query_features', {})))
 
+    def _hybrid_query(self, score_modifiers=None):
+        return MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1, 0.2, 0.3, 0.4],
+            or_phrases=['search'],
+            and_phrases=[],
+            hybrid_parameters=HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                alpha=0.5,
+                rrfK=60,
+            ),
+            score_modifiers=score_modifiers,
+        )
+
+    def test_expose_pre_rerank_score_set_when_global_score_modifiers_present(self):
+        """marqo__expose_pre_rerank_score is True when global (non-custom) score modifiers are used."""
+        marqo_query = self._hybrid_query(
+            score_modifiers=[
+                ScoreModifier(field='popularity', weight=1.0, type=ScoreModifierType.Add),
+            ],
+        )
+        # Call _to_vespa_hybrid_query directly to bypass field-existence validation.
+        vespa_query = self.vespa_index._to_vespa_hybrid_query(marqo_query)
+        self.assertTrue(vespa_query.get('marqo__expose_pre_rerank_score'))
+
+    def test_expose_pre_rerank_score_set_when_custom_score_rerank_modifiers_present(self):
+        """marqo__expose_pre_rerank_score is True when custom score rerank modifiers are used."""
+        marqo_query = self._hybrid_query(
+            score_modifiers=[
+                ScoreModifier(
+                    field=f'{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_sum',
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        # Call _to_vespa_hybrid_query directly to bypass field-existence validation.
+        vespa_query = self.vespa_index._to_vespa_hybrid_query(marqo_query)
+        self.assertTrue(vespa_query.get('marqo__expose_pre_rerank_score'))
+
+    def test_expose_pre_rerank_score_absent_when_no_score_modifiers(self):
+        """marqo__expose_pre_rerank_score is not set when no score modifiers are used."""
+        marqo_query = self._hybrid_query()
+        vespa_query = self.vespa_index._to_vespa_hybrid_query(marqo_query)
+        self.assertNotIn('marqo__expose_pre_rerank_score', vespa_query)
+
 
 if __name__ == '__main__':
     unittest.main()
