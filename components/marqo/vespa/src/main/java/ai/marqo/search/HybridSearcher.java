@@ -333,11 +333,20 @@ public class HybridSearcher extends Searcher {
             if (relevanceCutoffOverrideSortCandidates
                     && relevantCandidates != null
                     && relevantCandidates < hitsForPostProcessing.size()) {
-                List<Hit> trimmed =
-                        new ArrayList<>(
-                                hitsForPostProcessing.asList().subList(0, relevantCandidates));
-                hitsForPostProcessing = new HitGroup();
-                trimmed.forEach(hitsForPostProcessing::add);
+
+                int targetTrimSize =
+                        (sortByMinSortCandidates != null)
+                                ? Math.max(sortByMinSortCandidates, relevantCandidates)
+                                : relevantCandidates;
+                targetTrimSize = Math.min(targetTrimSize, hitsForPostProcessing.size());
+
+                if (targetTrimSize < hitsForPostProcessing.size()) {
+                    List<Hit> trimmed =
+                            new ArrayList<>(
+                                    hitsForPostProcessing.asList().subList(0, targetTrimSize));
+                    hitsForPostProcessing = new HitGroup();
+                    trimmed.forEach(hitsForPostProcessing::add);
+                }
             }
             // If sortBy is set, we will sort the hits after post-processing
             processedHits =
@@ -363,12 +372,6 @@ public class HybridSearcher extends Searcher {
         // Extract recency multiplier from match features after post-processing (only if recency is
         // enabled)
         processedHits = extractRecencyScore(processedHits, query, verbose);
-
-        // Override sortCandidates with relevantCandidates when requested
-        if (relevanceCutoffOverrideSortCandidates && relevantCandidates != null) {
-            sortCandidates = relevantCandidates;
-        }
-
         MarqoMetadataFields marqoMetadataFields =
                 new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
 
