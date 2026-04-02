@@ -425,6 +425,20 @@ def apply_latest_schema_template(index_name: str, force: bool = False, dry_run: 
     return JSONResponse(content=result, status_code=200)
 
 
+@app.patch("/indexes/{index_name}/index-settings")
+@utils.enable_ops_api()
+def update_index_settings(index_name: str, settings_dict: dict,
+                          force: bool = False, dry_run: bool = False,
+                          marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    from marqo.api.models.update_index_settings import UpdateIndexSettingsBodyParams
+    body = parse_request_object(UpdateIndexSettingsBodyParams, settings_dict)
+    res = marqo_config.index_management.update_index_settings_by_settings_dict(
+        index_name=index_name, settings_dict=body.dict(by_alias=True), force=force, dry_run=dry_run
+    )
+    return JSONResponse(content=res)
+
+
 @app.get("/indexes/{index_name}/health")
 def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """
