@@ -1,7 +1,7 @@
 import unittest
 from pydantic.v1 import ValidationError
 
-from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod, WeakAndParameters
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod, WeakAndParameters, LexicalOperand
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
 from marqo.core.models.facets_parameters import FacetsParameters, FieldFacetsConfiguration, RangeConfiguration
@@ -400,6 +400,43 @@ class TestHybridParametersValidation(unittest.TestCase):
                 )
             self.assertIn("weakAndParameters", str(ctx.exception))
             self.assertIn("rerankDepthLexical", str(ctx.exception))
+
+
+class TestLexicalOperand(unittest.TestCase):
+    """Tests for lexicalOperand parameter in HybridParameters."""
+
+    def test_lexical_operand_valid_values(self):
+        """Test that all valid lexicalOperand values are accepted."""
+        for operand in ['or', 'and', 'weakAnd']:
+            with self.subTest(operand=operand):
+                hp = HybridParameters(lexicalOperand=operand)
+                self.assertEqual(hp.lexicalOperand, operand)
+
+    def test_lexical_operand_none_by_default(self):
+        """Test that lexicalOperand defaults to None."""
+        hp = HybridParameters()
+        self.assertIsNone(hp.lexicalOperand)
+
+    def test_lexical_operand_invalid_value(self):
+        """Test that invalid lexicalOperand values are rejected."""
+        with self.assertRaises(ValidationError):
+            HybridParameters(lexicalOperand="invalid")
+
+    def test_lexical_operand_works_with_any_retrieval_method(self):
+        """Test that lexicalOperand works with different retrieval/ranking combos."""
+        test_cases = [
+            ("disjunction_rrf", RetrievalMethod.Disjunction, RankingMethod.RRF),
+            ("lexical_lexical", RetrievalMethod.Lexical, RankingMethod.Lexical),
+            ("lexical_tensor", RetrievalMethod.Lexical, RankingMethod.Tensor),
+        ]
+        for name, retrieval, ranking in test_cases:
+            with self.subTest(name):
+                hp = HybridParameters(
+                    retrievalMethod=retrieval,
+                    rankingMethod=ranking,
+                    lexicalOperand='or'
+                )
+                self.assertEqual(hp.lexicalOperand, 'or')
 
 
 class TestWeakAndParameters(unittest.TestCase):
