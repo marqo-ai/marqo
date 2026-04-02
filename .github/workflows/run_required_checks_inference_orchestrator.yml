@@ -26,12 +26,12 @@ jobs:
           fetch-depth: 0
           path: marqo
 
-      - name: Check for Non-Markdown Changes
+      - name: Check for Relevant Changes
         id: check_changes
         run: |
           cd marqo
           set -x
-          
+
           # Determine BASE_COMMIT and HEAD_COMMIT based on the event type
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             BASE_COMMIT=${{ github.event.pull_request.base.sha }}
@@ -52,10 +52,25 @@ jobs:
           echo "Base commit: $BASE_COMMIT"
           echo "Head commit: $HEAD_COMMIT"
 
-          # Perform the diff to check for non-documentation changes
-          if git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md)$'; then
+          # Get changed non-documentation files
+          CHANGED_FILES=$(git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md)$' || true)
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No non-documentation changes found"
+            echo "non_documentation_changes_found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Inference orchestrator tests run when changes are in:
+          # - components/inference_orchestrator/
+          # - components/model_management/
+          # - components/common/
+          # - Any path outside component directories (root files, .github/, etc.)
+          # They do NOT run when changes are exclusively in components/marqo/
+          if echo "$CHANGED_FILES" | grep -qvE '^components/marqo/'; then
+            echo "Relevant changes found for inference orchestrator"
             echo "non_documentation_changes_found=true" >> "$GITHUB_OUTPUT"
           else
+            echo "Changes are only in components/marqo/, skipping inference orchestrator tests"
             echo "non_documentation_changes_found=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -81,7 +96,7 @@ jobs:
     secrets: inherit
 
   # GitHub status will rely on the result of this step to determine if the PR is ready for merge
-  Report-required-test-status:
+  Report-required-test-status-inference-orchestrator:
     needs: [Determine-changes, Run-coverage-checks]
     runs-on: ubuntu-latest
     if: always()
@@ -89,7 +104,7 @@ jobs:
       - name: Set integration test status
         run: |
           if [[ "${{ needs.Determine-changes.outputs.non_documentation_changes_found }}" == "false" ]]; then
-            echo "Tests skipped due to markdown-only changes"
+            echo "Tests skipped - no relevant changes for inference orchestrator"
           elif [[ "${{ needs.Run-coverage-checks.result }}" == "success" ]]; then
             echo "Tests completed successfully"
           else

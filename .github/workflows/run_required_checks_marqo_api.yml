@@ -84,7 +84,7 @@ jobs:
     uses: ./.github/workflows/run_required_checks_coverage_marqo_api.yml
 
   # GitHub status will rely on the result of this step to determine if the PR is ready for merge
-  Report-required-test-status:
+  Report-required-test-status-marqo-api:
     needs: [Determine-changes, Run-coverage-checks]
     runs-on: ubuntu-latest
     if: always()

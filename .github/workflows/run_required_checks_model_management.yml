@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0
           path: marqo
 
-      - name: Check for Non-Markdown Changes
+      - name: Check for Relevant Changes
         id: check_changes
         run: |
           cd marqo
@@ -52,10 +52,24 @@ jobs:
           echo "Base commit: $BASE_COMMIT"
           echo "Head commit: $HEAD_COMMIT"
 
-          # Perform the diff to check for non-documentation changes
-          if git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md)$'; then
+          # Get changed non-documentation files
+          CHANGED_FILES=$(git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md)$' || true)
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No non-documentation changes found"
+            echo "non_documentation_changes_found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Model management tests run when changes are in:
+          # - components/model_management/
+          # - components/common/
+          # - Any path outside component directories (root files, .github/, etc.)
+          # They do NOT run when changes are exclusively in components/marqo/ and/or components/inference_orchestrator/
+          if echo "$CHANGED_FILES" | grep -qvE '^components/(marqo|inference_orchestrator)/'; then
+            echo "Relevant changes found for model management"
             echo "non_documentation_changes_found=true" >> "$GITHUB_OUTPUT"
           else
+            echo "Changes are only in components/marqo/ and/or components/inference_orchestrator/, skipping model management tests"
             echo "non_documentation_changes_found=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -81,7 +95,7 @@ jobs:
     secrets: inherit
 
   # GitHub status will rely on the result of this step to determine if the PR is ready for merge
-  Report-required-test-status:
+  Report-required-test-status-model-management:
     needs: [Determine-changes, Run-coverage-checks]
     runs-on: ubuntu-latest
     if: always()
@@ -89,7 +103,7 @@ jobs:
       - name: Set integration test status
         run: |
           if [[ "${{ needs.Determine-changes.outputs.non_documentation_changes_found }}" == "false" ]]; then
-            echo "Tests skipped due to markdown-only changes"
+            echo "Tests skipped - no relevant changes for model management"
           elif [[ "${{ needs.Run-coverage-checks.result }}" == "success" ]]; then
             echo "Tests completed successfully"
           else
