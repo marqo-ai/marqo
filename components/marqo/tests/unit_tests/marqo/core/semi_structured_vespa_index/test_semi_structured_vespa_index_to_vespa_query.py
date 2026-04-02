@@ -2574,7 +2574,7 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
 
     def test_custom_score_tensor_ranking_term_always_weakand_with_lexical_operand(self):
         """Tensor YQL's extra BM25 ranking term must use weakAnd regardless of lexicalOperand.
-        The tensor YQL is identical across all lexicalOperand values since it only affects lexical retrieval."""
+        The tensor YQL is identical across all lexicalOtest_no_lexical_fields_returns_false_regardless_of_lexical_operandperand values since it only affects lexical retrieval."""
         expected_tensor = (
             'select * from test_index where '
             'rank(('
@@ -2599,6 +2599,25 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
                 vespa_query = self.vespa_index.to_vespa_query(q)
                 tensor_yql = vespa_query.get('marqo__yql.tensor', '')
                 self.assertEqual(expected_tensor, tensor_yql)
+
+    def test_no_lexical_fields_returns_false_regardless_of_lexical_operand(self):
+        """When the index has no lexical fields, the lexical YQL must be 'False' regardless of lexicalOperand."""
+        no_lex_index = self._create_semi_structured_marqo_index(
+            name='test_index',
+            lexical_field_names=[],
+            tensor_field_names=['title', 'description'],
+        )
+        vi_no_lex = SemiStructuredVespaIndex(no_lex_index)
+        expected = 'select * from test_index where (False)'
+        for lexical_operand in ['or', 'and', 'weakAnd', None]:
+            with self.subTest(lexical_operand=lexical_operand):
+                q = self._make_hybrid_query(
+                    lexical_operand=lexical_operand,
+                    or_phrases=['hello', 'world'],
+                )
+                vespa_query = vi_no_lex.to_vespa_query(q)
+                lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+                self.assertEqual(expected, lexical_yql)
 
 
 if __name__ == '__main__':
