@@ -2053,7 +2053,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         small, and min_sort_candidates is set, we use min_sort_candidates to do facets, retrieval, and sort
         """
         result = self._search(
-            query = 'void',
+            query = 'sea solar',
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
@@ -2065,6 +2065,13 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
             facets={"fields": {"color": {"type": "string"}}},
             track_total_hits=True,
         )
+
+        hits = [hit["_id"] for hit in result["hits"]]
+        expected_hits = ["doc6", "doc3"]
+        self.assertEqual(expected_hits, hits)
+
+        #
+        self.assertIn("facets", result)
 
         self.assertEqual(2, result["totalHits"])
         self.assertEqual(0, result["_relevantCandidates"])
