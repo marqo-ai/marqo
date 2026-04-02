@@ -50,6 +50,7 @@ class SearchQuery(BaseMarqoModel):
     limit: int = 10
     offset: int = 0
     rerankDepth: Optional[int] = None
+    rerankDepthStart: Optional[int] = None
     efSearch: Optional[int] = None
     approximate: Optional[bool] = None
     approximateThreshold: Optional[float] = None
@@ -173,6 +174,7 @@ class SearchQuery(BaseMarqoModel):
         hybrid_parameters = values.get('hybridParameters')
         search_method = values.get('searchMethod')
         rerank_depth = values.get('rerankDepth')
+        rerank_depth_start = values.get('rerankDepthStart')
 
         if rerank_depth is not None:
             if search_method.upper() == SearchMethod.LEXICAL:
@@ -183,6 +185,17 @@ class SearchQuery(BaseMarqoModel):
                 raise ValueError(f"rerankDepth cannot be negative.")
         if hybrid_parameters and hybrid_parameters.rerankDepthTensor and hybrid_parameters.rerankDepthTensor < 0:
             raise ValueError(f"rerankDepthTensor cannot be negative.")
+
+        if rerank_depth_start is not None:
+            if search_method.upper() in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+                raise ValueError(f"'rerankDepthStart' is currently only supported for 'HYBRID' search method.")
+            if rerank_depth_start < 0:
+                raise ValueError(f"rerankDepthStart cannot be negative.")
+            if rerank_depth is not None and rerank_depth_start >= rerank_depth:
+                raise ValueError(
+                    f"rerankDepthStart must be less than rerankDepth. "
+                    f"Got rerankDepthStart={rerank_depth_start}, rerankDepth={rerank_depth}."
+                )
 
         return values
 

@@ -460,6 +460,7 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
                 search_method=search_query.searchMethod,
                 result_count=search_query.limit, offset=search_query.offset,
                 rerank_depth=search_query.rerankDepth,
+                rerank_depth_start=search_query.rerankDepthStart,
                 ef_search=search_query.efSearch, approximate=search_query.approximate,
                 approximate_threshold=search_query.approximateThreshold,
                 reranker=search_query.reRanker,

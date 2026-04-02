@@ -326,7 +326,7 @@ class SortByTest {
         verify(spy, times(1))
                 .postProcessBySort(any(HitGroup.class), anyString(), any(), anyInt(), anyInt());
         verify(spy, never())
-                .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+                .postProcessResults(any(), any(), any(), any(), anyInt(), anyInt(), anyBoolean());
     }
 
     /*
@@ -345,7 +345,7 @@ class SortByTest {
         doReturn(null).when(spy).extractTensorRankFeature(any(), contains("add_weights_global"));
         doReturn(new HitGroup())
                 .when(spy)
-                .postProcessResults(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+                .postProcessResults(any(), any(), any(), any(), anyInt(), anyInt(), anyBoolean());
 
         Query q = new Query("?q");
         q.properties().set("hits", 1);
@@ -356,7 +356,8 @@ class SortByTest {
 
         spy.search(q, makeEmptyExec());
 
-        verify(spy, times(1)).postProcessResults(any(), eq(q), any(), eq(1), eq(0), eq(false));
+        verify(spy, times(1))
+                .postProcessResults(any(), eq(q), any(), any(), eq(1), eq(0), eq(false));
         verify(spy, never()).postProcessBySort(any(), anyString(), any(), anyInt(), anyInt());
     }
 

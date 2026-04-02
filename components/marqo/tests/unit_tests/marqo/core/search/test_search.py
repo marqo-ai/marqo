@@ -261,6 +261,26 @@ class SearchTest(unittest.TestCase):
         )
         self.assertEqual(call_args['marqo__hybrid.rerankDepthGlobal'], 15)
 
+    def test_hybrid_search_with_rerank_depth_start(self):
+        tensor_search.search(
+            self.config, "index_name", "query",
+            search_method="hybrid", rerank_depth=50, rerank_depth_start=5
+        )
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(call_args['marqo__hybrid.rerankDepthGlobal'], 50)
+        self.assertEqual(call_args['marqo__hybrid.rerankDepthStartGlobal'], 5)
+
+    def test_hybrid_search_without_rerank_depth_start_does_not_set_property(self):
+        tensor_search.search(
+            self.config, "index_name", "query",
+            search_method="hybrid", rerank_depth=50
+        )
+        self.vespa_client_mock.query.assert_called_once()
+        call_args = self.vespa_client_mock.query.call_args[1]
+        self.assertEqual(call_args['marqo__hybrid.rerankDepthGlobal'], 50)
+        self.assertNotIn('marqo__hybrid.rerankDepthStartGlobal', call_args)
+
     def test_hybrid_search_with_filter_and_score_modifiers(self):
         self.set_index_to_return(self.unstructured_index)
         tensor_search.search(

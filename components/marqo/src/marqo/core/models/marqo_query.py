@@ -72,6 +72,7 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     score_modifiers_lexical: Optional[List[ScoreModifier]] = None
     score_modifiers_tensor: Optional[List[ScoreModifier]] = None
     global_rerank_depth: Optional[int] = None
+    global_rerank_depth_start: Optional[int] = None
     facets: Optional[FacetsParameters] = None
     track_total_hits: Optional[bool] = None
     relevance_cutoff: Optional[RelevanceCutoffModel] = None

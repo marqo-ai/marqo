@@ -636,6 +636,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
 
+        if marqo_query.global_rerank_depth_start is not None:
+            query["marqo__hybrid.rerankDepthStartGlobal"] = marqo_query.global_rerank_depth_start
+
         if (hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]
                 or hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)):
             query["marqo__expose_pre_rerank_score"] = True

@@ -31,6 +31,7 @@ class HybridSearchInternalParameters(StrictBaseModel):
     result_count: int = 5
     offset: int = 0
     rerank_depth: Optional[int] = None
+    rerank_depth_start: Optional[int] = None
     ef_search: Optional[int] = None
     approximate: bool = True
     approximate_threshold: Optional[float] = None
@@ -70,6 +71,7 @@ class CollapseSearch:
             config: Config,
             marqo_index: MarqoIndex, query: Optional[Union[None, str, CustomVectorQuery]],
             result_count: int = 5, offset: int = 0, rerank_depth: Optional[int] = None,
+            rerank_depth_start: Optional[int] = None,
             ef_search: Optional[int] = None, approximate: bool = True,
             approximate_threshold: Optional[float] = None,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
@@ -105,6 +107,7 @@ class CollapseSearch:
             result_count=result_count,
             offset=offset,
             rerank_depth=rerank_depth,
+            rerank_depth_start=rerank_depth_start,
             ef_search=ef_search,
             approximate=approximate,
             approximate_threshold=approximate_threshold,
