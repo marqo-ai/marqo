@@ -2204,7 +2204,6 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         text="dogs",
                         search_method="HYBRID",
-                        rerank_depth=5,
                         rerank_depth_start=2,
                     )
                 self.assertIn("'rerankDepthStart' search parameter is only supported for indexes created "
