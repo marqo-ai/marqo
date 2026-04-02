@@ -357,7 +357,7 @@ class Document:
         return MarqoAddDocumentsResponse(errors=errors, index_name=index_name, items=new_items,
                                          processingTimeMs=add_docs_processing_time_ms)
 
-    def extract_document_id_from_vespa_id(self, resp):
+    def extract_document_id_from_vespa_id(self, resp) -> Optional[str]:
         # TODO - This method is not reliable as Vespa might prune the document ID in the response if
         #  the ID certain characters (e.g., #). We should update our code to either remove those illegal characters
         #  from the document ID before feeding to Vespa, or implement a more reliable solution

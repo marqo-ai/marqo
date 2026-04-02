@@ -2246,10 +2246,14 @@ class TestAppendCustomScoreRerankTerms(unittest.TestCase):
 class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery):
     """Tests for the lexicalOperand parameter in semi-structured index."""
 
+    # Sentinel object used as the default value for or_phrases so we can distinguish
+    # "caller didn't pass or_phrases" from "caller explicitly passed None or []".
+    # Using None would be ambiguous since None/[] are valid values a caller might pass.
     _SENTINEL = object()
 
     def _make_hybrid_query(self, lexical_operand=None, rerank_depth_lexical=None,
-                           or_phrases=_SENTINEL, and_phrases=None, relevance_cutoff=None):
+                           or_phrases=_SENTINEL, and_phrases=None, relevance_cutoff=None,
+                           score_modifiers=None, searchable_attributes_lexical=None):
         """Helper to create a MarqoHybridQuery with the given lexicalOperand."""
         if or_phrases is self._SENTINEL:
             or_phrases = ['search']
@@ -2258,6 +2262,7 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
             rankingMethod=RankingMethod.RRF,
             lexicalOperand=lexical_operand,
             rerankDepthLexical=rerank_depth_lexical,
+            searchableAttributesLexical=searchable_attributes_lexical,
         )
         return MarqoHybridQuery(
             index_name='test_index',
@@ -2268,6 +2273,7 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
             and_phrases=and_phrases or [],
             hybrid_parameters=hp,
             relevance_cutoff=relevance_cutoff,
+            score_modifiers=score_modifiers,
         )
 
     def test_lexical_operand_or_uses_or_join(self):
@@ -2394,6 +2400,9 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
         probe_lexical_yql = vespa_query.get('marqo__yql.lexical.probe', '')
         expected = ('select * from test_index where '
                     '(default contains "hello" OR default contains "world")')
+        self.assertEqual(
+            expected, probe_lexical_yql
+        )
 
     def test_all_quoted_terms_with_lexical_operand_or_still_uses_and(self):
         """When the query is fully quoted like '"this" "is" "a" "sentence"', all terms become and_phrases.
@@ -2464,7 +2473,8 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
         lexical_yql = vespa_query.get('marqo__yql.lexical', '')
         expected = ('select * from test_index where '
                     '(default contains "this" AND default contains "is" '
-                    'AND default contains "a" AND default contains "sentence")')
+                    'AND default contains "a" AND default con'
+                    'tains "sentence")')
         self.assertEqual(expected, lexical_yql)
 
         # Probe YQL: even with relevanceCutoff.lexicalOperand='or', it only affects or_phrases.
@@ -2472,6 +2482,123 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
         probe_yql = vespa_query.get('marqo__yql.lexical.probe', '')
         if probe_yql:
             self.assertEqual(expected, probe_yql)
+
+
+    def test_custom_score_ranking_term_always_weakand_regardless_of_lexical_operand(self):
+        """Custom score modifier ranking terms (is_ranking_term=True) must always use weakAnd,
+        regardless of the lexicalOperand setting. lexicalOperand only affects the main retrieval query."""
+        expected = ('weakAnd((marqo__lexical_title contains "hello"), '
+                    '(marqo__lexical_title contains "world"))')
+        for lexical_operand in ['or', 'and', 'weakAnd']:
+            with self.subTest(lexical_operand=lexical_operand):
+                q = self._make_hybrid_query(
+                    lexical_operand=lexical_operand,
+                    or_phrases=['hello', 'world'],
+                )
+                result = self.vespa_index._generate_or_terms(
+                    q, is_ranking_term=True, attributes_to_search=['title']
+                )
+                self.assertEqual(expected, result)
+
+    def test_custom_score_ranking_term_weakand_with_lexical_operand_or_full_query(self):
+        """End-to-end: with lexicalOperand='or' and BM25 custom score, the main retrieval uses OR
+        but the extra rank() term must use weakAnd."""
+        q = self._make_hybrid_query(
+            lexical_operand='or',
+            or_phrases=['hello', 'world'],
+            searchable_attributes_lexical=['description'],
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        expected_lexical = (
+            'select * from test_index where '
+            '(rank('
+            '(marqo__lexical_description contains "hello") OR (marqo__lexical_description contains "world"), '
+            'weakAnd((marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world"))))')
+        self.assertEqual(expected_lexical, lexical_yql)
+
+    def test_custom_score_ranking_term_weakand_with_lexical_operand_and_full_query(self):
+        """End-to-end: with lexicalOperand='and' and BM25 custom score, the main retrieval uses AND
+        but the extra rank() term must use weakAnd."""
+        q = self._make_hybrid_query(
+            lexical_operand='and',
+            or_phrases=['hello', 'world'],
+            searchable_attributes_lexical=['description'],
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        expected_lexical = (
+            'select * from test_index where '
+            '(rank('
+            '(marqo__lexical_description contains "hello") AND (marqo__lexical_description contains "world"), '
+            'weakAnd((marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world"))))')
+        self.assertEqual(expected_lexical, lexical_yql)
+
+    def test_custom_score_ranking_term_weakand_with_lexical_operand_weakand_full_query(self):
+        """End-to-end: with lexicalOperand='weakAnd' and BM25 custom score, both the main retrieval
+        and the extra rank() term use weakAnd."""
+        q = self._make_hybrid_query(
+            lexical_operand='weakAnd',
+            or_phrases=['hello', 'world'],
+            searchable_attributes_lexical=['description'],
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        expected_lexical = (
+            'select * from test_index where '
+            '(rank('
+            'weakAnd((marqo__lexical_description contains "hello"), (marqo__lexical_description contains "world")), '
+            'weakAnd((marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world"))))')
+        self.assertEqual(expected_lexical, lexical_yql)
+
+    def test_custom_score_tensor_ranking_term_always_weakand_with_lexical_operand(self):
+        """Tensor YQL's extra BM25 ranking term must use weakAnd regardless of lexicalOperand.
+        The tensor YQL is identical across all lexicalOperand values since it only affects lexical retrieval."""
+        expected_tensor = (
+            'select * from test_index where '
+            'rank(('
+            '({targetHits:10, approximate:True, hnsw.exploreAdditionalHits:1990}'
+            'nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR '
+            '({targetHits:10, approximate:True, hnsw.exploreAdditionalHits:1990}'
+            'nearestNeighbor(marqo__embeddings_description, marqo__query_embedding))), '
+            'weakAnd((marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world")))')
+        for lexical_operand in ['or', 'and', 'weakAnd']:
+            with self.subTest(lexical_operand=lexical_operand):
+                q = self._make_hybrid_query(
+                    lexical_operand=lexical_operand,
+                    or_phrases=['hello', 'world'],
+                    score_modifiers=[
+                        ScoreModifier(
+                            field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                            weight=1.0,
+                            type=ScoreModifierType.Add,
+                        ),
+                    ],
+                )
+                vespa_query = self.vespa_index.to_vespa_query(q)
+                tensor_yql = vespa_query.get('marqo__yql.tensor', '')
+                self.assertEqual(expected_tensor, tensor_yql)
 
 
 if __name__ == '__main__':

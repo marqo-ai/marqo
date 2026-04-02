@@ -1618,7 +1618,6 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         pass  # Override parent to preserve documents between tests
 
     @classmethod
-
     def _search(cls, query="universe ocean intelligence world vocabulary millions day", relevance_cutoff=None,
                 facets=None, track_total_hits=None, limit=10, hybrid_parameters=None, sort_by=None, offset=0, alpha=0.5,
                 collapse_fields=None, lexical_operand=None):

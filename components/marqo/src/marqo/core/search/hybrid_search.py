@@ -387,7 +387,7 @@ class HybridSearch:
 
         if hybrid_parameters.lexicalOperand and not isinstance(marqo_index, SemiStructuredMarqoIndex):
             raise core_exceptions.UnsupportedFeatureError(
-                f"'lexicalOperand is only supported for unstructured indexes "
+                f"'lexicalOperand' is only supported for unstructured indexes "
             )
 
         # Determine the text query prefix
