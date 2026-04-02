@@ -548,9 +548,13 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 )
 
             else:
-                lexical_yql_for_probe = self._get_lexical_search_term(
+                probe_lexical_term = self._get_lexical_search_term(
                     marqo_query, lexical_operand_override=marqo_query.relevance_cutoff.lexical_operand \
                     if fields_to_search_lexical else "False"
+                )
+                lexical_yql_for_probe = (
+                    f'select {select_attributes} from {self._marqo_index.schema_name} '
+                    f'where ({probe_lexical_term}){filter_term}'
                 )
 
         # Assign parameters to query
