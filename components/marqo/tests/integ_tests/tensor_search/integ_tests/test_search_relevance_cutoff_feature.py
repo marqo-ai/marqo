@@ -2070,7 +2070,8 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         expected_hits = ["doc6", "doc3"]
         self.assertEqual(expected_hits, hits)
 
-        #
+        # Facets results is not stable due to different match set, so we only
+        # assert the existence
         self.assertIn("facets", result)
 
         self.assertEqual(2, result["totalHits"])
