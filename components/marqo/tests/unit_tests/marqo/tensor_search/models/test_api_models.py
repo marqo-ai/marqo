@@ -267,7 +267,31 @@ class TestSearchQuery(unittest.TestCase):
                     searchMethod=SearchMethod.LEXICAL,
                     rerankDepthStart=5,
                 )
-            self.assertIn("'rerankDepthStart' is currently not supported for 'LEXICAL' search method", str(cm.exception))
+            self.assertIn("'rerankDepthStart' is currently only supported for 'HYBRID' search method", str(cm.exception))
+
+        with self.subTest("invalid: rerankDepthStart for TENSOR search"):
+            with self.assertRaises(ValidationError) as cm:
+                SearchQuery(
+                    q="test",
+                    searchMethod=SearchMethod.TENSOR,
+                    rerankDepthStart=5,
+                )
+            self.assertIn("'rerankDepthStart' is currently only supported for 'HYBRID' search method", str(cm.exception))
+
+        with self.subTest("valid: rerankDepthStart for hybrid with non-RRF ranking method"):
+            # rerankDepthStart is not restricted to RRF — it applies at the tail of the
+            # global phase regardless of ranking method
+            non_rrf_params = HybridParameters(
+                retrievalMethod=RetrievalMethod.Tensor,
+                rankingMethod=RankingMethod.Tensor,
+            )
+            query = SearchQuery(
+                q="test",
+                searchMethod=SearchMethod.HYBRID,
+                hybridParameters=non_rrf_params,
+                rerankDepthStart=2,
+            )
+            self.assertEqual(query.rerankDepthStart, 2)
 
     def test_image_download_headers_validation(self):
         """Test validation of image download headers."""

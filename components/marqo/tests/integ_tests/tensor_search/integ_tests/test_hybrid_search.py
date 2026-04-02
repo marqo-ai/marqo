@@ -2190,6 +2190,26 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertIn("'rerankDepth' search parameter is only supported for indexes created "
                               "with Marqo version 2.15.0", str(e.exception))
 
+    def test_hybrid_search_rerank_depth_start_old_version_fails(self):
+        """
+        rerank_depth_start can only be set for indexes created with Marqo 2.27.0 onward.
+        Indexes older than 2.27.0 must raise UnsupportedFeatureError.
+        """
+        for index in [self.unstructured_default_text_index, self.semi_structured_text_index_2_14,
+                      self.structured_text_index_2_14]:
+            with self.subTest(index=type(index)):
+                with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        rerank_depth=5,
+                        rerank_depth_start=2,
+                    )
+                self.assertIn("'rerankDepthStart' search parameter is only supported for indexes created "
+                              "with Marqo version 2.27.0", str(e.exception))
+
     def test_hybrid_search_score_modifiers_wrong_ranking_method_fails(self):
         # Structured / semi-structured score modifiers but not RRF
         with self.subTest("score_modifiers for structured/semi-structured but not RRF ranking"):

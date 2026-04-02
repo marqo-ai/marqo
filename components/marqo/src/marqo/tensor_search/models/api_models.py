@@ -187,10 +187,8 @@ class SearchQuery(BaseMarqoModel):
             raise ValueError(f"rerankDepthTensor cannot be negative.")
 
         if rerank_depth_start is not None:
-            if search_method.upper() == SearchMethod.LEXICAL:
-                raise ValueError(f"'rerankDepthStart' is currently not supported for 'LEXICAL' search method.")
-            if hybrid_parameters is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
-                raise ValueError(f"'rerankDepthStart' is currently only supported for 'HYBRID' search with the 'RRF' rankingMethod.")
+            if search_method.upper() in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+                raise ValueError(f"'rerankDepthStart' is currently only supported for 'HYBRID' search method.")
             if rerank_depth_start < 0:
                 raise ValueError(f"rerankDepthStart cannot be negative.")
             if rerank_depth is not None and rerank_depth_start >= rerank_depth:
