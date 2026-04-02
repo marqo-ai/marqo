@@ -538,9 +538,20 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
 
         # Base lexical YQL without custom-score extra rank() terms. Used for relevance-cutoff probe only.
-        lexical_yql_for_probe = (
-            f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
-        )
+        # Later code will modify lexical_term so we need to build the probe query early here
+        lexical_yql_for_probe = None
+        if getattr(marqo_query, "relevance_cutoff", None) is not None:
+            if not marqo_query.relevance_cutoff.lexical_operand:
+                # If the relevance_cutoff has no lexical_operand, it uses whatever is used in the main lexical query
+                lexical_yql_for_probe = (
+                    f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
+                )
+
+            else:
+                lexical_yql_for_probe = self._get_lexical_search_term(
+                    marqo_query, lexical_operand_override=marqo_query.relevance_cutoff.lexical_operand \
+                    if fields_to_search_lexical else "False"
+                )
 
         # Assign parameters to query
         query_inputs = {
@@ -647,15 +658,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose,
+            "marqo__yql.lexical.probe": lexical_yql_for_probe
 
         }
 
         query = {k: v for k, v in query.items() if v is not None}
-
-        # When relevance cutoff is used, send a separate probe lexical YQL without custom-score
-        # extra rank() terms so the probe is unchanged by custom score rerank.
-        if getattr(marqo_query, "relevance_cutoff", None) is not None:
-            query["marqo__yql.lexical.probe"] = lexical_yql_for_probe
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
@@ -813,19 +820,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query["marqo__hybrid.relevanceCutoff.affectFacets"] = marqo_query.relevance_cutoff.affect_facets
             query["marqo__hybrid.relevanceCutoff.overrideSortCandidates"] = marqo_query.relevance_cutoff.override_sort_candidates_with_relevant_candidates
 
-            # If relevanceCutoff.lexicalOperand is set, build a separate probe YQL with the overridden operand
-            if marqo_query.relevance_cutoff.lexical_operand is not None:
-                probe_lexical_term = self._get_lexical_search_term(
-                    marqo_query, lexical_operand_override=marqo_query.relevance_cutoff.lexical_operand
-                )
-
-                select_attributes = self._get_select_attributes(marqo_query)
-                filter_term = self._get_filter_term(marqo_query)
-                filter_term = f' AND ({filter_term})' if filter_term else ''
-                query["marqo__yql.lexical.probe"] = (
-                    f'select {select_attributes} from {self._marqo_index.schema_name} '
-                    f'where ({probe_lexical_term}){filter_term}'
-                )
         # Sort by part
         if marqo_query.sort_by:
             query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
