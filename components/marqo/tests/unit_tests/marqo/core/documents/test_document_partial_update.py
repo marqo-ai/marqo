@@ -112,25 +112,25 @@ class TestDocumentPartialUpdateMapHandling(MarqoTestCase):
 
         self.assertIn("does not match", str(ctx.exception))
 
-    def test_existing_map_doc_is_fetched_and_used(self):
-        """Test that an existing document with maps is fetched and passed to to_vespa_partial_document.
-
-        Covers line 169 (enumerate loop) and 170-171 (document found path)."""
+    def test_existing_map_doc_passes_fetched_data_to_vespa_index(self):
+        """Test that when get_batch finds a document, its fields are passed as
+        existing_vespa_document to to_vespa_partial_document for map merging."""
         docs = [
             {"_id": "existing-doc", "int_map": {"k": 1}},
         ]
 
+        fetched_fields = {
+            VESPA_FIELD_ID: "existing-doc",
+            INT_FIELDS: '{"k": 5}',
+            FLOAT_FIELDS: "{}",
+            VESPA_DOC_FIELD_TYPES: "{}",
+            VESPA_DOC_VERSION_UUID: "abc",
+        }
         existing_resp = GetBatchDocumentResponse(
             status=200,
             pathId="/document/v1/test_schema/test_schema/docid/existing-doc",
             id="id:test_schema:test_schema::existing-doc",
-            fields={
-                VESPA_FIELD_ID: "existing-doc",
-                INT_FIELDS: '{"k": 1}',
-                FLOAT_FIELDS: "{}",
-                VESPA_DOC_FIELD_TYPES: "{}",
-                VESPA_DOC_VERSION_UUID: "abc",
-            },
+            fields=fetched_fields,
         )
         self.mock_vespa_client.get_batch.return_value = GetBatchResponse(
             responses=[existing_resp], errors=False
@@ -149,11 +149,16 @@ class TestDocumentPartialUpdateMapHandling(MarqoTestCase):
 
             self.document.partial_update_documents(docs, self.semi_structured_index)
 
-        # Verify get_batch was called with the correct IDs
-        self.mock_vespa_client.get_batch.assert_called_once()
-        call_kwargs = self.mock_vespa_client.get_batch.call_args
-        self.assertEqual(call_kwargs[1]['ids'] if 'ids' in call_kwargs[1] else call_kwargs[0][0],
-                         ["existing-doc"])
+        # Verify to_vespa_partial_document received the fetched Vespa document
+        # (second arg is the existing doc used for map merging)
+        mock_vespa_index.to_vespa_partial_document.assert_called_once()
+        call_args = mock_vespa_index.to_vespa_partial_document.call_args[0]
+        existing_doc_arg = call_args[1]
+        self.assertIsNotNone(existing_doc_arg,
+                             "Existing vespa document should be passed for map merging")
+        # document.dict() nests fields under 'fields' key
+        self.assertEqual(existing_doc_arg["fields"][VESPA_FIELD_ID], "existing-doc")
+        self.assertEqual(existing_doc_arg["fields"][INT_FIELDS], '{"k": 5}')
 
     def test_vespa_error_message_is_surfaced_in_response(self):
         """Test that Vespa's error message is preserved in the response item."""
