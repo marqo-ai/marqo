@@ -4,6 +4,7 @@ on:
     branches:
       - mainline
       - releases/*
+      - ci/scope-workflow-triggers-by-component  # Temporary: for testing path filtering
   push:
     branches:
       - mainline
