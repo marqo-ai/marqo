@@ -1,0 +1,70 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  claude-review:
+    if: github.event.pull_request.draft == false && github.event.sender.type != 'Bot'
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this PR and provide inline feedback using the GitHub review system. Follow these steps:
+
+            1. **Start a review**: Use `mcp__github__create_pending_pull_request_review` to begin a pending review
+            2. **Get diff information**: Use `mcp__github__get_pull_request_diff` to understand the code changes and line numbers
+            3. **Add inline comments**: Use `mcp__github__add_pull_request_review_comment_to_pending_review` for each specific piece of feedback on particular lines
+            4. **Submit the review**: Use `mcp__github__submit_pending_pull_request_review` with event type "COMMENT" (not "REQUEST_CHANGES") to publish all comments as a non-blocking review
+
+            Focus your review on:
+            - Bugs you can demonstrate from the diff (not speculative "could cause issues")
+            - Security vulnerabilities with a concrete attack vector
+            - Logic errors where code contradicts its own intent
+
+            Quality bar — only comment when you can:
+            - Point to the specific lines that conflict or break
+            - Explain what goes wrong (not what "might" go wrong)
+            - Propose a concrete fix
+
+            Do NOT comment on:
+            - Nullability or type concerns unless you can trace an actual null path in the diff
+            - Missing error handling unless you can show a caller that breaks
+            - Design opinions (hardcoded values, page sizes, ID formats) without evidence of a bug
+            - Inconsistencies that are explained by types or models outside the diff — if you can't see the type definition, don't guess
+            - Style, naming, or documentation unless it causes ambiguity that leads to bugs
+            - Over-engineering suggestions (adding configurability, abstractions, error wrappers)
+
+            Guidelines:
+            - Don't state that you reviewed the PR
+            - Don't comment on positive aspects unless particularly notable
+            - Don't summarize what the PR does
+            - Fewer high-confidence comments are far better than many speculative ones
+            - If you have zero issues to raise, just say "Ready to merge"
+            - End with a single sentence: either "Ready to merge" or what needs to be addressed
+
+            Use the repository's AGENTS.md for guidance on style and conventions.
+
+            **Important**: Submit as "COMMENT" type so the review doesn't block the PR.
+
+          claude_args: '--model claude-opus-4-6 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),mcp__github__create_pending_pull_request_review,mcp__github__add_pull_request_review_comment_to_pending_review,mcp__github__submit_pending_pull_request_review,mcp__github__get_pull_request_diff"'
