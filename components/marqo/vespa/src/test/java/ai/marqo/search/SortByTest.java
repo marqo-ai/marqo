@@ -1164,7 +1164,7 @@ class SortByTest {
         void shouldExcludeNullValuesFromJsonSerialization() {
             // Create metadata with some null values
             HybridSearcher.MarqoMetadataFields metadataWithNulls =
-                    new HybridSearcher.MarqoMetadataFields(5, null, 10);
+                    new HybridSearcher.MarqoMetadataFields(5, null, 10, null);
 
             // Test JSON serialization excludes nulls
             StringBuilder json = new StringBuilder();
@@ -1184,7 +1184,7 @@ class SortByTest {
         void shouldIncludeAllNonNullValuesInJsonSerialization() {
             // Create metadata with all non-null values
             HybridSearcher.MarqoMetadataFields metadataComplete =
-                    new HybridSearcher.MarqoMetadataFields(8, 12, 6);
+                    new HybridSearcher.MarqoMetadataFields(8, 12, 6, 20);
 
             // Test JSON serialization includes all values
             StringBuilder json = new StringBuilder();
@@ -1195,6 +1195,7 @@ class SortByTest {
             assertThat(jsonString).contains("\"sortCandidates\":8");
             assertThat(jsonString).contains("\"probeCandidates\":12");
             assertThat(jsonString).contains("\"relevantCandidates\":6");
+            assertThat(jsonString).contains("\"postProcessSize\":20");
 
             // Should not contain null
             assertThat(jsonString).doesNotContain("null");
@@ -1204,7 +1205,7 @@ class SortByTest {
         void shouldHandleAllNullValuesInJsonSerialization() {
             // Create metadata with all null values
             HybridSearcher.MarqoMetadataFields metadataAllNulls =
-                    new HybridSearcher.MarqoMetadataFields(null, null, null);
+                    new HybridSearcher.MarqoMetadataFields(null, null, null, null);
 
             // Test JSON serialization with all nulls
             StringBuilder json = new StringBuilder();
