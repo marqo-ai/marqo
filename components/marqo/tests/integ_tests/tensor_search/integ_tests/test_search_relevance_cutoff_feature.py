@@ -2407,37 +2407,21 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
         }
         self.assertEqual(expected_facets, result["facets"])
 
-    def test_apply_in_lexical_preserves_all_tensor_matches(self):
-        """With applyInRetrieval='lexical', the strict cutoff limits the lexical leg
-        (only 1 relevant candidate passes), while tensor retrieval is unrestricted.
-        All 9 docs still appear because tensor fetches the full result set.
-        The top hit has both scores (lexical + tensor), the rest have only _tensor_score.
-        """
-        result = self._search(
-            query='ocean species',
-            lexical_operand="and",
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.9},
-                "lexicalOperand": "or",
-                "applyInRetrieval": "lexical",
-            },
-        )
-
-        expected_ids = {'long_3', 'long_2', 'long_5', 'long_4', 'long_7', 'anchor', 'long_8', 'long_1', 'long_6'}
-        returned_ids = {r['_id'] for r in result['hits']}
-
-        self.assertEqual(1, result["_relevantCandidates"])
-        self.assertEqual(expected_ids, returned_ids)
-
-        self.assertIn("_lexical_score", result["hits"][0])
-        self.assertIn("_tensor_score", result["hits"][0])
-
-        # Since cutoff limits lexical to 1, remaining results come from tensor only
-        for hit in result['hits'][1:]:
-            self.assertNotIn("_lexical_score", hit)
-            self.assertIn("_tensor_score", hit)
+    def test_apply_in_lexical_is_not_supported(self):
+        """applyInRetrieval='lexical' is currently blocked because it would require
+        a very large tensor targetHits on the unrestricted tensor leg."""
+        with self.assertRaises(Exception):
+            self._search(
+                query='ocean species',
+                lexical_operand="and",
+                relevance_cutoff={
+                    "method": "relative_max_score",
+                    "probeDepth": 1000,
+                    "parameters": {"relativeScoreFactor": 0.9},
+                    "lexicalOperand": "or",
+                    "applyInRetrieval": "lexical",
+                },
+            )
 
     def test_apply_in_both_blocks_irrelevant_documents_in_both_retrievals(self):
         """With applyInRetrieval='both', the relevance cutoff is applied to both retrievals

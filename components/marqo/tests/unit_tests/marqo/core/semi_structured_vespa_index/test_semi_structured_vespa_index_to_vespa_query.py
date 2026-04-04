@@ -925,7 +925,7 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
 
     def test_apply_in_retrieval_set_in_vespa_query(self):
         """applyInRetrieval should be passed to Vespa query when set."""
-        for value in [ApplyInRetrieval.Lexical, ApplyInRetrieval.Tensor, ApplyInRetrieval.Both]:
+        for value in [ApplyInRetrieval.Tensor, ApplyInRetrieval.Both]:
             with self.subTest(value=value):
                 self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
                     method=RelevanceCutoffMethod.GapDetection,
