@@ -2080,3 +2080,234 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         for hit in result["hits"]:
             self.assertNotIn("_lexical_score", hit)
             self.assertIn("_tensor_score", hit)
+
+
+@pytest.mark.skip_for_multinode(
+    "Multi-nodes will return different lexical results so we can not assert on the results.")
+class TestRelevanceCutoffApplyInRetrieval(MarqoTestCase):
+    """Tests for applyInRetrieval parameter that targets relevance cutoff to a specific
+    retrieval leg (lexical or tensor) during hybrid disjunction search.
+
+    When applyInRetrieval is set, the cutoff-adjusted hits limit should only apply to the
+    target retrieval leg, while the other leg fetches the full result set.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.index_request = cls.unstructured_marqo_index_request(
+            model=Model(name="hf/all-MiniLM-L6-v2"),
+        )
+        cls.create_indexes([cls.index_request])
+        cls.index_name = cls.index_request.name
+
+        cls.test_docs = [
+            {"_id": "doc1", "text": "The quick brown fox jumps over the lazy dog.",
+             "color": "red", "price": 9.99},
+            {"_id": "doc2", "text": "Artificial intelligence is transforming the modern world.",
+             "color": "red", "price": 24.50},
+            {"_id": "doc3", "text": "The sun sets beautifully over the mountain horizon.",
+             "color": "red", "price": 4.75},
+            {"_id": "doc4", "text": "Learning a new language opens many doors in life.",
+             "color": "red", "price": 49.99},
+            {"_id": "doc5", "text": "Fresh coffee in the morning is the best way to start the day.",
+             "color": "red", "price": 12.00},
+            {"_id": "doc6", "text": "The ocean is home to millions of undiscovered species.",
+             "color": "blue", "price": 7.30},
+            {"_id": "doc7", "text": "Reading books regularly improves focus and vocabulary.",
+             "color": "blue", "price": 33.80},
+            {"_id": "doc8", "text": "Space exploration has uncovered fascinating mysteries of the universe.",
+             "color": "blue", "price": 18.45},
+        ]
+
+        cls.add_documents(
+            config=cls.config,
+            add_docs_params=AddDocsParams(
+                docs=cls.test_docs,
+                index_name=cls.index_name,
+                tensor_fields=['text']
+            )
+        )
+
+    def setUp(self):
+        pass  # Override parent to preserve documents between tests
+
+    @classmethod
+    def _search(cls, query="universe ocean intelligence world vocabulary millions day",
+                relevance_cutoff=None, limit=10, offset=0, alpha=0.5,
+                facets=None, track_total_hits=None, sort_by=None):
+        hybrid_parameters = {
+            "retrievalMethod": "disjunction",
+            "rankingMethod": "rrf",
+            "alpha": alpha,
+        }
+        search_query_dict = {
+            "q": query,
+            "searchMethod": SearchMethod.HYBRID,
+            "hybridParameters": hybrid_parameters,
+            "limit": limit,
+            "offset": offset,
+        }
+        if relevance_cutoff is not None:
+            search_query_dict["relevanceCutoff"] = relevance_cutoff
+        if facets is not None:
+            search_query_dict["facets"] = facets
+        if track_total_hits is not None:
+            search_query_dict["trackTotalHits"] = track_total_hits
+        if sort_by is not None:
+            search_query_dict["sortBy"] = sort_by
+        return json.loads(search(
+            index_name=cls.index_name,
+            marqo_config=cls.config,
+            device="cpu",
+            search_query_dict=search_query_dict
+        ).body.decode('utf-8'))
+
+    def test_apply_in_retrieval_both_matches_default_behavior(self):
+        """applyInRetrieval='both' should produce the same results as no applyInRetrieval."""
+        cutoff_base = {
+            "method": "relative_max_score",
+            "probeDepth": 1000,
+            "parameters": {"relativeScoreFactor": 0.2},
+        }
+        result_default = self._search(relevance_cutoff=cutoff_base)
+        result_both = self._search(relevance_cutoff={**cutoff_base, "applyInRetrieval": "both"})
+
+        default_ids = [hit["_id"] for hit in result_default["hits"]]
+        both_ids = [hit["_id"] for hit in result_both["hits"]]
+        self.assertEqual(default_ids, both_ids)
+        self.assertEqual(result_default["_relevantCandidates"], result_both["_relevantCandidates"])
+
+    def test_apply_in_retrieval_lexical_returns_results(self):
+        """applyInRetrieval='lexical' should still return results and have relevantCandidates."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "applyInRetrieval": "lexical",
+            }
+        )
+        self.assertGreater(len(result["hits"]), 0)
+        self.assertIn("_relevantCandidates", result)
+        self.assertIn("_probeCandidates", result)
+
+    def test_apply_in_retrieval_tensor_returns_results(self):
+        """applyInRetrieval='tensor' should still return results and have relevantCandidates."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "applyInRetrieval": "tensor",
+            }
+        )
+        self.assertGreater(len(result["hits"]), 0)
+        self.assertIn("_relevantCandidates", result)
+        self.assertIn("_probeCandidates", result)
+
+    def test_apply_in_retrieval_lexical_does_not_reduce_tensor_results(self):
+        """When applyInRetrieval='lexical', tensor retrieval should not be limited by cutoff.
+        With a very strict cutoff (high relativeScoreFactor), the tensor leg should still
+        contribute its full result set, potentially yielding more results than 'both' mode."""
+        strict_cutoff = {
+            "method": "relative_max_score",
+            "probeDepth": 1000,
+            "parameters": {"relativeScoreFactor": 0.9},
+        }
+        result_both = self._search(relevance_cutoff=strict_cutoff)
+        result_lexical = self._search(relevance_cutoff={**strict_cutoff, "applyInRetrieval": "lexical"})
+
+        # With 'both', the strict cutoff limits all retrieval. With 'lexical', only
+        # lexical is limited so tensor can contribute more results.
+        self.assertGreaterEqual(len(result_lexical["hits"]), len(result_both["hits"]))
+        # relevantCandidates should be the same (same probe, same cutoff method)
+        self.assertEqual(result_both["_relevantCandidates"], result_lexical["_relevantCandidates"])
+
+    def test_apply_in_retrieval_tensor_does_not_reduce_lexical_results(self):
+        """When applyInRetrieval='tensor', lexical retrieval should not be limited by cutoff.
+        With a very strict cutoff, the lexical leg should still contribute its full result set."""
+        strict_cutoff = {
+            "method": "relative_max_score",
+            "probeDepth": 1000,
+            "parameters": {"relativeScoreFactor": 0.9},
+        }
+        result_both = self._search(relevance_cutoff=strict_cutoff)
+        result_tensor = self._search(relevance_cutoff={**strict_cutoff, "applyInRetrieval": "tensor"})
+
+        # With 'tensor', only tensor is limited so lexical can contribute more results.
+        self.assertGreaterEqual(len(result_tensor["hits"]), len(result_both["hits"]))
+        self.assertEqual(result_both["_relevantCandidates"], result_tensor["_relevantCandidates"])
+
+    def test_apply_in_retrieval_with_pagination(self):
+        """applyInRetrieval should work correctly with offset/limit pagination."""
+        cutoff = {
+            "method": "relative_max_score",
+            "probeDepth": 1000,
+            "parameters": {"relativeScoreFactor": 0.2},
+            "applyInRetrieval": "lexical",
+        }
+        result_page1 = self._search(relevance_cutoff=cutoff, limit=3, offset=0)
+        result_page2 = self._search(relevance_cutoff=cutoff, limit=3, offset=3)
+
+        page1_ids = [hit["_id"] for hit in result_page1["hits"]]
+        page2_ids = [hit["_id"] for hit in result_page2["hits"]]
+
+        # Pages should not overlap
+        self.assertEqual(0, len(set(page1_ids) & set(page2_ids)))
+        self.assertEqual(3, len(page1_ids))
+
+    def test_apply_in_retrieval_with_sort_by(self):
+        """applyInRetrieval should work together with sortBy."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "applyInRetrieval": "lexical",
+            },
+            sort_by={"fields": [{"fieldName": "price"}]},
+        )
+        self.assertGreater(len(result["hits"]), 0)
+        self.assertIn("_sortCandidates", result)
+
+    def test_apply_in_retrieval_with_facets_and_track_total_hits(self):
+        """applyInRetrieval should work with facets and trackTotalHits."""
+        result = self._search(
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.2},
+                "affectFacets": True,
+                "applyInRetrieval": "tensor",
+            },
+            facets={"fields": {"color": {"type": "string"}}},
+            track_total_hits=True,
+        )
+        self.assertIn("facets", result)
+        self.assertIn("color", result["facets"])
+        self.assertIn("totalHits", result)
+        self.assertIn("_relevantCandidates", result)
+
+    def test_apply_in_retrieval_rejected_for_non_disjunction(self):
+        """applyInRetrieval should be rejected when retrievalMethod is not disjunction."""
+        with self.assertRaises(Exception):
+            search_query_dict = {
+                "q": "test query",
+                "searchMethod": SearchMethod.HYBRID,
+                "hybridParameters": {
+                    "retrievalMethod": "tensor",
+                    "rankingMethod": "tensor",
+                },
+                "relevanceCutoff": {
+                    "method": "gap_detection",
+                    "applyInRetrieval": "lexical",
+                },
+                "limit": 10,
+            }
+            search(
+                index_name=self.index_name,
+                marqo_config=self.config,
+                device="cpu",
+                search_query_dict=search_query_dict
+            )
