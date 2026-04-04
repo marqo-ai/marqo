@@ -167,7 +167,7 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
 
             Query result =
                     hybridSearcher.updateQueryHitsOffsetsAndTargetHits(
-                            query, 5, null, true, false, true, false);
+                            query, 5, null, true, false, true, false, false);
 
             assertThat(result.getHits()).isEqualTo(2);
 
@@ -224,7 +224,7 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
 
             Query result =
                     hybridSearcher.updateQueryHitsOffsetsAndTargetHits(
-                            query, 5, null, true, false, false, false);
+                            query, 5, null, true, false, false, false, false);
 
             assertThat(result.properties().getString("marqo__yql.facets"))
                     .isEqualTo(combinedFacetsYql);
@@ -273,7 +273,7 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
             // targetHits unchanged (already 10), facets max(10) unchanged (10 >= 10)
             Query result =
                     hybridSearcher.updateQueryHitsOffsetsAndTargetHits(
-                            query, 5, 10, true, true, true, false);
+                            query, 5, 10, true, true, true, false, false);
 
             assertThat(result.getHits()).isEqualTo(10);
 
@@ -341,7 +341,7 @@ class TestFacetsWithRelevanceCutoffAndSortBy {
             // newHits=20 exceeds original targetHits:10
             Query result =
                     hybridSearcher.updateQueryHitsOffsetsAndTargetHits(
-                            query, 20, 15, true, true, true, false);
+                            query, 20, 15, true, true, true, false, false);
 
             assertThat(result.getHits()).isEqualTo(20);
 

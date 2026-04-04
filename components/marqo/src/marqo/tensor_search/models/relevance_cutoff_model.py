@@ -57,6 +57,9 @@ class RelevanceCutoffModel(StrictBaseModel):
     override_total_hits_with_post_process_candidates: bool = Field(
         False, alias="overrideTotalHitsWithPostProcessCandidates"
     )
+    override_limit_plus_offset: bool = Field(
+        False, alias="overrideLimitPlusOffset"
+    )
 
     @root_validator(pre=False, skip_on_failure=True)
     def _validate_apply_in_retrieval_lexical_not_supported(cls, values):

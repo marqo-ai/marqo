@@ -279,6 +279,9 @@ public class HybridSearcher extends Searcher {
                 query.properties()
                         .getString("marqo__hybrid.relevanceCutoff.applyInRetrieval", null);
         ApplyInRetrieval applyInRetrieval = ApplyInRetrieval.fromString(applyInRetrievalString);
+        Boolean relevanceCutoffOverrideLimitPlusOffset =
+                query.properties()
+                        .getBoolean("marqo__hybrid.relevanceCutoff.overrideLimitPlusOffset", false);
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
@@ -351,6 +354,7 @@ public class HybridSearcher extends Searcher {
                         isRelevanceCutoffMethodEnabled,
                         isSortByEnabled,
                         relevanceCutoffAffectFacets,
+                        relevanceCutoffOverrideLimitPlusOffset,
                         verbose);
 
         // Facet results will always be generated from a cutoff query to produce a conservative
@@ -711,6 +715,7 @@ public class HybridSearcher extends Searcher {
                 isRelevanceCutoffEnabled,
                 isSortByEnabled,
                 false,
+                false,
                 false);
     }
 
@@ -724,6 +729,7 @@ public class HybridSearcher extends Searcher {
      * @param isRelevanceCutoffEnabled whether relevance cutoff is enabled.
      * @param isSortByEnabled whether sorting is enabled.
      * @param affectFacets whether to also adjust facets YQL (targetHits and max(N) grouping).
+     * @param overrideLimitPlusOffset when true, use max(relevantCandidates, limit+offset) instead of min.
      * @param verbose whether to log detailed information.
      * @return The updated query with new hits, offsets, and targetHits.
      */
@@ -734,6 +740,7 @@ public class HybridSearcher extends Searcher {
             boolean isRelevanceCutoffEnabled,
             boolean isSortByEnabled,
             boolean affectFacets,
+            boolean overrideLimitPlusOffset,
             boolean verbose) {
 
         // Validate input parameters
@@ -780,10 +787,14 @@ public class HybridSearcher extends Searcher {
                 newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
             }
         } else if (isRelevanceCutoffEnabled) {
-            // Only relevance cut-off enabled:
-            // - If relevantCandidates < limit+offset: reduce to relevantCandidates
-            // - If relevantCandidates >= limit+offset: keep existing behavior (limit+offset)
-            newHits = Math.min(relevantCandidates, (currentLimit + currentOffset));
+            if (overrideLimitPlusOffset) {
+                // Override mode: expand retrieval to max(relevantCandidates, limit+offset)
+                // so all relevant documents are fetched even if they exceed limit+offset.
+                newHits = Math.max(relevantCandidates, (currentLimit + currentOffset));
+            } else {
+                // Default: reduce to min(relevantCandidates, limit+offset)
+                newHits = Math.min(relevantCandidates, (currentLimit + currentOffset));
+            }
             if (currentTensorTargetHits != null) {
                 newTensorTargetHits = Math.min(newHits, currentTensorTargetHits);
             }

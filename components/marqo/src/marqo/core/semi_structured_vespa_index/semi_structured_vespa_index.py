@@ -826,6 +826,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if marqo_query.relevance_cutoff.apply_in_retrieval is not None:
                 query["marqo__hybrid.relevanceCutoff.applyInRetrieval"] = marqo_query.relevance_cutoff.apply_in_retrieval
 
+            query["marqo__hybrid.relevanceCutoff.overrideLimitPlusOffset"] = marqo_query.relevance_cutoff.override_limit_plus_offset
+
             # If relevanceCutoff.lexicalOperand is set, build a separate probe YQL with the overridden operand
             if marqo_query.relevance_cutoff.lexical_operand is not None:
                 probe_lexical_term = self._get_lexical_search_term(
