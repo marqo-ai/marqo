@@ -791,12 +791,15 @@ public class HybridSearcher extends Searcher {
                 // Override mode: expand retrieval to max(relevantCandidates, limit+offset)
                 // so all relevant documents are fetched even if they exceed limit+offset.
                 newHits = Math.max(relevantCandidates, (currentLimit + currentOffset));
+                if (currentTensorTargetHits != null) {
+                    newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
+                }
             } else {
                 // Default: reduce to min(relevantCandidates, limit+offset)
                 newHits = Math.min(relevantCandidates, (currentLimit + currentOffset));
-            }
-            if (currentTensorTargetHits != null) {
-                newTensorTargetHits = Math.min(newHits, currentTensorTargetHits);
+                if (currentTensorTargetHits != null) {
+                    newTensorTargetHits = Math.min(newHits, currentTensorTargetHits);
+                }
             }
         } else {
             // Only sortByMinSortCandidates provided
