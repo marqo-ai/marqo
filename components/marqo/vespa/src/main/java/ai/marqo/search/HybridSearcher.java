@@ -329,20 +329,29 @@ public class HybridSearcher extends Searcher {
         boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;
         boolean isSortByEnabled = sortByFields != null;
 
-        // When applyInRetrieval targets a specific retrieval leg, skip global cutoff adjustment
-        // so we can apply it selectively to only the target sub-query after creation.
+        // When applyInRetrieval targets a specific retrieval leg, we still let
+        // updateQueryHitsOffsetsAndTargetHits run with cutoff enabled (so it correctly
+        // sets offset=0, rerank count, facets, tensor YQL, etc.), but afterward we
+        // restore the non-target sub-query's hits back to limit+offset to undo the
+        // cutoff reduction on that leg only.
         boolean isSelectiveCutoff = isRelevanceCutoffMethodEnabled
                 && applyInRetrieval != null
                 && applyInRetrieval != ApplyInRetrieval.BOTH;
+
+        // Save the original tensor YQL before cutoff adjustments modify it.
+        // Needed to restore the non-target tensor sub-query's targetHits.
+        String originalTensorYQL = isSelectiveCutoff
+                ? query.properties().getString("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, "")
+                : null;
 
         query =
                 updateQueryHitsOffsetsAndTargetHits(
                         query,
                         relevantCandidates,
                         sortByMinSortCandidates,
-                        isSelectiveCutoff ? false : isRelevanceCutoffMethodEnabled,
+                        isRelevanceCutoffMethodEnabled,
                         isSortByEnabled,
-                        isSelectiveCutoff ? false : relevanceCutoffAffectFacets,
+                        relevanceCutoffAffectFacets,
                         verbose);
 
         List<Future<Result>> futureFacets =
@@ -361,37 +370,27 @@ public class HybridSearcher extends Searcher {
                     createSubQuery(
                             query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
 
-            // Apply selective relevance cutoff to only the target sub-query
+            // For selective cutoff: both sub-queries inherited the cutoff-adjusted
+            // hits/offset/targetHits from the main query. Now restore the NON-TARGET
+            // sub-query back to limit+offset so cutoff only affects the target leg.
             if (isSelectiveCutoff && relevantCandidates != null) {
-                int cutoffHits = Math.min(relevantCandidates, limit + offset);
+                int restoredHits = limit + offset;
                 if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
+                    // Lexical is the target (keeps cutoff), restore tensor
                     logIfVerbose(String.format(
-                            "Applying selective relevance cutoff to lexical sub-query: hits=%d",
-                            cutoffHits), verbose);
-                    queryLexical.setHits(cutoffHits);
-                    queryLexical.setOffset(0);
-                } else if (applyInRetrieval == ApplyInRetrieval.TENSOR) {
-                    logIfVerbose(String.format(
-                            "Applying selective relevance cutoff to tensor sub-query: hits=%d",
-                            cutoffHits), verbose);
-                    queryTensor.setHits(cutoffHits);
-                    queryTensor.setOffset(0);
-                    // Also update tensor targetHits in YQL
-                    String tensorYql = queryTensor.properties().getString("yql", "");
-                    if (!tensorYql.isEmpty()) {
-                        try {
-                            int currentTargetHits = extractCurrentTargetHits(tensorYql);
-                            int newTargetHits = Math.min(relevantCandidates, currentTargetHits);
-                            int efSearch = currentTargetHits
-                                    + extractCurrentExploreAdditionalHits(tensorYql);
-                            String updatedYql = overwriteTargetHitsAndExploreAdditionalHits(
-                                    tensorYql, newTargetHits, efSearch);
-                            queryTensor.properties().set("yql", updatedYql);
-                        } catch (RuntimeException e) {
-                            logIfVerbose("Could not update tensor targetHits for selective "
-                                    + "cutoff: " + e.getMessage(), verbose);
-                        }
+                            "Selective cutoff on lexical: restoring tensor sub-query hits to %d",
+                            restoredHits), verbose);
+                    queryTensor.setHits(restoredHits);
+                    // Restore original tensor YQL targetHits
+                    if (originalTensorYQL != null && !originalTensorYQL.isEmpty()) {
+                        queryTensor.properties().set("yql", originalTensorYQL);
                     }
+                } else if (applyInRetrieval == ApplyInRetrieval.TENSOR) {
+                    // Tensor is the target (keeps cutoff), restore lexical
+                    logIfVerbose(String.format(
+                            "Selective cutoff on tensor: restoring lexical sub-query hits to %d",
+                            restoredHits), verbose);
+                    queryLexical.setHits(restoredHits);
                 }
             }
 
