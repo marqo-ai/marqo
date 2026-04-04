@@ -341,10 +341,12 @@ public class HybridSearcher extends Searcher {
         Query cutoffQuery;
         if (isSelectiveCutoff) {
             cutoffQuery = query.clone();
-            // Prepare the original for the non-target leg: use probeDepth for a stable
-            // retrieval pool independent of pagination (limit+offset would grow with offset).
-            // The final Result also uses this query, so hits must be >= limit+offset.
-            int nonTargetHits = Math.max(relevanceCutoffProbeDepth, limit + offset);
+            // Prepare the original for the non-target leg and final Result.
+            // With sort_by: use probeDepth for a stable sort pool independent of pagination.
+            // Without sort_by: limit+offset is sufficient (consistent with normal RRF behavior).
+            int nonTargetHits = isSortByEnabled
+                    ? Math.max(relevanceCutoffProbeDepth, limit + offset)
+                    : limit + offset;
             query.setOffset(0);
             query.setHits(nonTargetHits);
             query.properties().set(QUERY_RERANK_COUNT, nonTargetHits);
