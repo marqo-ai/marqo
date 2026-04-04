@@ -7,6 +7,12 @@ from marqo.base_model import StrictBaseModel
 from marqo.core.models.hybrid_parameters import LexicalOperand
 
 
+class ApplyInRetrieval(str, Enum):
+    Lexical = 'lexical'
+    Tensor = 'tensor'
+    Both = 'both'
+
+
 class RelevanceCutoffMethod(str, Enum):
     RelativeMaxScore = "relative_max_score"
     GapDetection = "gap_detection"
@@ -47,6 +53,7 @@ class RelevanceCutoffModel(StrictBaseModel):
         False, alias="overrideSortCandidatesWithRelevantCandidates"
     )
     lexical_operand: Optional[LexicalOperand] = Field(None, alias="lexicalOperand")
+    apply_in_retrieval: Optional[ApplyInRetrieval] = Field(None, alias="applyInRetrieval")
 
     @root_validator(pre=False, skip_on_failure=True)
     def _validate_method_and_parameters(cls, values):

@@ -218,6 +218,17 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    private enum ApplyInRetrieval {
+        LEXICAL,
+        TENSOR,
+        BOTH;
+
+        public static ApplyInRetrieval fromString(String value) {
+            if (value == null) return null;
+            return ApplyInRetrieval.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+    }
+
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern DOC_ID_PATTERN =
             Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
@@ -261,6 +272,10 @@ public class HybridSearcher extends Searcher {
         Boolean relevanceCutoffOverrideSortCandidates =
                 query.properties()
                         .getBoolean("marqo__hybrid.relevanceCutoff.overrideSortCandidates", false);
+        String applyInRetrievalString =
+                query.properties()
+                        .getString("marqo__hybrid.relevanceCutoff.applyInRetrieval", null);
+        ApplyInRetrieval applyInRetrieval = ApplyInRetrieval.fromString(applyInRetrievalString);
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
@@ -314,14 +329,20 @@ public class HybridSearcher extends Searcher {
         boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;
         boolean isSortByEnabled = sortByFields != null;
 
+        // When applyInRetrieval targets a specific retrieval leg, skip global cutoff adjustment
+        // so we can apply it selectively to only the target sub-query after creation.
+        boolean isSelectiveCutoff = isRelevanceCutoffMethodEnabled
+                && applyInRetrieval != null
+                && applyInRetrieval != ApplyInRetrieval.BOTH;
+
         query =
                 updateQueryHitsOffsetsAndTargetHits(
                         query,
                         relevantCandidates,
                         sortByMinSortCandidates,
-                        isRelevanceCutoffMethodEnabled,
+                        isSelectiveCutoff ? false : isRelevanceCutoffMethodEnabled,
                         isSortByEnabled,
-                        relevanceCutoffAffectFacets,
+                        isSelectiveCutoff ? false : relevanceCutoffAffectFacets,
                         verbose);
 
         List<Future<Result>> futureFacets =
@@ -339,6 +360,40 @@ public class HybridSearcher extends Searcher {
             Query queryTensor =
                     createSubQuery(
                             query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+
+            // Apply selective relevance cutoff to only the target sub-query
+            if (isSelectiveCutoff && relevantCandidates != null) {
+                int cutoffHits = Math.min(relevantCandidates, limit + offset);
+                if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
+                    logIfVerbose(String.format(
+                            "Applying selective relevance cutoff to lexical sub-query: hits=%d",
+                            cutoffHits), verbose);
+                    queryLexical.setHits(cutoffHits);
+                    queryLexical.setOffset(0);
+                } else if (applyInRetrieval == ApplyInRetrieval.TENSOR) {
+                    logIfVerbose(String.format(
+                            "Applying selective relevance cutoff to tensor sub-query: hits=%d",
+                            cutoffHits), verbose);
+                    queryTensor.setHits(cutoffHits);
+                    queryTensor.setOffset(0);
+                    // Also update tensor targetHits in YQL
+                    String tensorYql = queryTensor.properties().getString("yql", "");
+                    if (!tensorYql.isEmpty()) {
+                        try {
+                            int currentTargetHits = extractCurrentTargetHits(tensorYql);
+                            int newTargetHits = Math.min(relevantCandidates, currentTargetHits);
+                            int efSearch = currentTargetHits
+                                    + extractCurrentExploreAdditionalHits(tensorYql);
+                            String updatedYql = overwriteTargetHitsAndExploreAdditionalHits(
+                                    tensorYql, newTargetHits, efSearch);
+                            queryTensor.properties().set("yql", updatedYql);
+                        } catch (RuntimeException e) {
+                            logIfVerbose("Could not update tensor targetHits for selective "
+                                    + "cutoff: " + e.getMessage(), verbose);
+                        }
+                    }
+                }
+            }
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);

@@ -2,12 +2,13 @@ from unittest import TestCase
 
 from pydantic.v1 import ValidationError
 
-from marqo.core.models.hybrid_parameters import LexicalOperand
+from marqo.core.models.hybrid_parameters import LexicalOperand, HybridParameters, RetrievalMethod
 from marqo.tensor_search.models.relevance_cutoff_model import (
     RelevanceCutoffMethod,
     RelativeMaxScoreParameters,
     MeanStdParameters,
-    RelevanceCutoffModel
+    RelevanceCutoffModel,
+    ApplyInRetrieval
 )
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.enums import SearchMethod
@@ -154,3 +155,80 @@ class TestRelevanceCutoffModel(TestCase):
                 method=RelevanceCutoffMethod.GapDetection,
                 lexicalOperand="invalid"
             )
+
+    def test_apply_in_retrieval_valid_values(self):
+        """Test that valid applyInRetrieval values are accepted."""
+        for value in ['lexical', 'tensor', 'both']:
+            with self.subTest(value=value):
+                m = RelevanceCutoffModel(
+                    method=RelevanceCutoffMethod.GapDetection,
+                    applyInRetrieval=value
+                )
+                self.assertEqual(m.apply_in_retrieval, value)
+
+    def test_apply_in_retrieval_none_by_default(self):
+        """Test that applyInRetrieval defaults to None."""
+        m = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
+        self.assertIsNone(m.apply_in_retrieval)
+
+    def test_apply_in_retrieval_invalid_value(self):
+        """Test that invalid applyInRetrieval values are rejected."""
+        with self.assertRaises(ValidationError):
+            RelevanceCutoffModel(
+                method=RelevanceCutoffMethod.GapDetection,
+                applyInRetrieval="invalid"
+            )
+
+    def test_apply_in_retrieval_requires_disjunction_retrieval_method(self):
+        """Test that applyInRetrieval is rejected when retrievalMethod is not disjunction."""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.GapDetection,
+            applyInRetrieval='lexical'
+        )
+
+        for retrieval_method in [RetrievalMethod.Tensor, RetrievalMethod.Lexical]:
+            with self.subTest(retrievalMethod=retrieval_method):
+                with self.assertRaises(ValidationError) as cm:
+                    SearchQuery(
+                        q="test query",
+                        searchMethod=SearchMethod.HYBRID,
+                        relevanceCutoff=relevance_cutoff,
+                        hybridParameters=HybridParameters(
+                            retrievalMethod=retrieval_method,
+                            rankingMethod='tensor'
+                        )
+                    )
+                self.assertIn("applyInRetrieval", str(cm.exception))
+
+    def test_apply_in_retrieval_accepted_with_disjunction(self):
+        """Test that applyInRetrieval is accepted when retrievalMethod is disjunction."""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.GapDetection,
+            applyInRetrieval='lexical'
+        )
+        sq = SearchQuery(
+            q="test query",
+            searchMethod=SearchMethod.HYBRID,
+            relevanceCutoff=relevance_cutoff,
+            hybridParameters=HybridParameters(
+                retrievalMethod='disjunction',
+                rankingMethod='rrf'
+            )
+        )
+        self.assertEqual(sq.relevance_cutoff.apply_in_retrieval, 'lexical')
+
+    def test_apply_in_retrieval_none_accepted_with_any_retrieval_method(self):
+        """Test that applyInRetrieval=None works with any retrieval method."""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.GapDetection
+        )
+        sq = SearchQuery(
+            q="test query",
+            searchMethod=SearchMethod.HYBRID,
+            relevanceCutoff=relevance_cutoff,
+            hybridParameters=HybridParameters(
+                retrievalMethod='disjunction',
+                rankingMethod='rrf'
+            )
+        )
+        self.assertIsNone(sq.relevance_cutoff.apply_in_retrieval)

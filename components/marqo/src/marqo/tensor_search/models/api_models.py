@@ -385,6 +385,21 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
+    def _validate_apply_in_retrieval_only_works_for_disjunction(cls, values):
+        """Validate that applyInRetrieval requires retrievalMethod=disjunction"""
+        relevance_cutoff = values.get('relevance_cutoff')
+        hybrid_parameters = values.get('hybridParameters')
+        if (relevance_cutoff is not None
+                and relevance_cutoff.apply_in_retrieval is not None
+                and (hybrid_parameters is None
+                     or hybrid_parameters.retrievalMethod != RetrievalMethod.Disjunction)):
+            raise ValueError(
+                "relevanceCutoff.applyInRetrieval can only be set when "
+                "hybridParameters.retrievalMethod is 'disjunction'"
+            )
+        return values
+
+    @root_validator(pre=False)
     def _validate_sort_by_only_works_for_hybrid_search(cls, values):
         """Validate that sortBy is only provided for hybrid search"""
         sort_by = values.get('sort_by')

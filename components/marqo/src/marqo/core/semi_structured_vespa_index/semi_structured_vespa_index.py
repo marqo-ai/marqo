@@ -823,6 +823,22 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query["marqo__hybrid.relevanceCutoff.affectFacets"] = marqo_query.relevance_cutoff.affect_facets
             query["marqo__hybrid.relevanceCutoff.overrideSortCandidates"] = marqo_query.relevance_cutoff.override_sort_candidates_with_relevant_candidates
 
+            if marqo_query.relevance_cutoff.apply_in_retrieval is not None:
+                query["marqo__hybrid.relevanceCutoff.applyInRetrieval"] = marqo_query.relevance_cutoff.apply_in_retrieval
+
+            # If relevanceCutoff.lexicalOperand is set, build a separate probe YQL with the overridden operand
+            if marqo_query.relevance_cutoff.lexical_operand is not None:
+                probe_lexical_term = self._get_lexical_search_term(
+                    marqo_query, lexical_operand_override=marqo_query.relevance_cutoff.lexical_operand
+                )
+
+                select_attributes = self._get_select_attributes(marqo_query)
+                filter_term = self._get_filter_term(marqo_query)
+                filter_term = f' AND ({filter_term})' if filter_term else ''
+                query["marqo__yql.lexical.probe"] = (
+                    f'select {select_attributes} from {self._marqo_index.schema_name} '
+                    f'where ({probe_lexical_term}){filter_term}'
+                )
         # Sort by part
         if marqo_query.sort_by:
             query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
