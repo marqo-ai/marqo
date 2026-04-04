@@ -2186,13 +2186,14 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
     even under a strict cutoff, while using OR for the relevance cutoff probe.
 
     Documents are crafted so that:
-    - 3 docs contain BOTH "ocean" AND "species" (match AND lexical for quoted terms)
-    - 2 docs contain only one of the terms (match OR probe but not AND main search)
-    - 2 docs are semantically related but lack both terms (tensor-only)
-    - 1 doc is unrelated
+    - 1 doc has ONLY "ocean species" (short text, highest lexical score — the anchor)
+    - 8 docs contain "ocean species" plus additional text (longer, lower lexical scores)
 
-    With applyInRetrieval='tensor' + strict cutoff, the lexical leg is unrestricted
-    (uses probeDepth), so all AND-matched docs appear regardless of the cutoff count.
+    All 9 docs match the AND lexical query for "ocean" AND "species".
+    With a strict relativeScoreFactor (0.9), only the short anchor doc (and possibly 1-2
+    others) pass the cutoff threshold. With applyInRetrieval='tensor', the lexical leg is
+    unrestricted (uses probeDepth), so all 9 AND-matched docs are returned regardless of
+    the cutoff count.
     """
 
     @classmethod
@@ -2204,19 +2205,18 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
         cls.create_indexes([cls.index_request])
         cls.index_name = cls.index_request.name
 
-        # 3 docs match "ocean" AND "species" (quoted AND terms)
-        # 2 docs match one of "ocean" or "species" (OR probe only)
-        # 2 docs are semantically related (tensor only)
-        # 1 doc is unrelated
+        # 1 short doc (highest lexical score — the cutoff anchor)
+        # 8 longer docs (all contain "ocean" and "species" but diluted by extra text)
         cls.test_docs = [
-            {"_id": "and_match_1", "text": "The deep ocean is teeming with diverse species of fish and coral."},
-            {"_id": "and_match_2", "text": "Ocean currents transport species across vast marine distances."},
-            {"_id": "and_match_3", "text": "Protecting ocean habitats is essential for preserving endangered species."},
-            {"_id": "ocean_only", "text": "The ocean floor is covered with volcanic rock and sediment."},
-            {"_id": "species_only", "text": "Rainforest species face extinction due to deforestation worldwide."},
-            {"_id": "semantic_1", "text": "Marine biologists study underwater creatures and sea life ecosystems."},
-            {"_id": "semantic_2", "text": "Coral reef conservation efforts protect delicate aquatic environments."},
-            {"_id": "unrelated", "text": "Quantum computing uses qubits to solve complex mathematical problems."},
+            {"_id": "anchor", "text": "ocean species"},
+            {"_id": "long_1", "text": "The deep ocean is teeming with diverse species of fish and coral in tropical waters."},
+            {"_id": "long_2", "text": "Ocean currents transport species across vast marine distances around the globe."},
+            {"_id": "long_3", "text": "Protecting ocean habitats is essential for preserving endangered species worldwide."},
+            {"_id": "long_4", "text": "Scientists discovered new ocean species living near hydrothermal vents on the seabed."},
+            {"_id": "long_5", "text": "The Arctic ocean supports species adapted to extreme cold temperatures and ice."},
+            {"_id": "long_6", "text": "Pollution threatens ocean species that depend on clean water for survival and growth."},
+            {"_id": "long_7", "text": "Mapping the ocean floor revealed species previously unknown to marine biology researchers."},
+            {"_id": "long_8", "text": "Climate change alters ocean temperatures affecting species migration patterns and habitats."},
         ]
 
         cls.add_documents(
@@ -2257,23 +2257,17 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
             search_query_dict=search_query_dict
         ).body.decode('utf-8'))
 
-    def test_apply_in_tensor_with_and_search_preserves_all_lexical_and_matches(self):
+    def test_apply_in_tensor_preserves_all_lexical_and_matches(self):
         """With applyInRetrieval='tensor', a strict cutoff limits tensor retrieval but
-        leaves lexical unrestricted. All documents matching the AND lexical query
-        (quoted terms "ocean" and "species") must appear in results with _lexical_score.
+        leaves lexical unrestricted. All 9 documents matching the AND lexical query
+        ("ocean" AND "species") must appear in results with _lexical_score.
 
-        Setup:
-        - Query: '"ocean" "species"' (quoted → and_phrases, always AND)
-        - Main search: lexicalOperand='and' (for unquoted terms, but all are quoted here)
-        - Relevance cutoff probe: lexicalOperand='or' (more permissive probe)
-        - Cutoff: relativeScoreFactor=0.9 (very strict, few docs pass)
-        - applyInRetrieval='tensor' (cutoff only limits tensor leg)
-
-        Expected: and_match_1, and_match_2, and_match_3 all appear because lexical
-        retrieval is unrestricted by the cutoff.
+        The anchor doc ("ocean species") scores highest in lexical, so with
+        relativeScoreFactor=0.9 the threshold is very high and most longer docs
+        fall below it — but that only affects the tensor leg.
         """
         result = self._search(
-            query='"ocean" "species"',
+            query='ocean species',
             lexical_operand="and",
             relevance_cutoff={
                 "method": "relative_max_score",
@@ -2285,30 +2279,33 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
         )
 
         returned_ids = {hit["_id"] for hit in result["hits"]}
-        and_match_ids = {"and_match_1", "and_match_2", "and_match_3"}
+        all_doc_ids = {"anchor", "long_1", "long_2", "long_3", "long_4",
+                       "long_5", "long_6", "long_7", "long_8"}
 
-        # All 3 AND-matched docs must appear
+        # The strict cutoff should produce few relevantCandidates (the anchor
+        # doc scores much higher than the longer docs)
+        self.assertLess(result["_relevantCandidates"], 9,
+                        "Strict cutoff should not pass all 9 docs")
+
+        # All 9 AND-matched docs must appear (lexical leg is unrestricted)
         self.assertTrue(
-            and_match_ids.issubset(returned_ids),
-            f"Expected all AND matches {and_match_ids} in results, got {returned_ids}"
+            all_doc_ids.issubset(returned_ids),
+            f"Expected all 9 docs {all_doc_ids} in results, got {returned_ids}"
         )
 
-        # AND-matched docs must have _lexical_score (they came from lexical retrieval)
+        # All docs must have _lexical_score (they came from lexical retrieval)
         for hit in result["hits"]:
-            if hit["_id"] in and_match_ids:
+            if hit["_id"] in all_doc_ids:
                 self.assertIn("_lexical_score", hit,
                               f"{hit['_id']} should have _lexical_score from lexical retrieval")
 
-    def test_apply_in_both_with_strict_cutoff_may_lose_lexical_and_matches(self):
-        """With applyInRetrieval='both' (default) and a strict cutoff, the cutoff
-        limits BOTH retrieval legs. When relevantCandidates is smaller than the number
-        of AND-matched docs, some AND matches may be lost.
-
-        This contrasts with applyInRetrieval='tensor' where lexical is unrestricted.
+    def test_apply_in_both_with_strict_cutoff_reduces_results(self):
+        """With default behavior (both legs cutoff), the strict cutoff limits BOTH
+        retrieval legs. Since relevantCandidates < 9, fewer results are returned
+        compared to applyInRetrieval='tensor' where lexical is unrestricted.
         """
-        # First: verify that the strict cutoff does produce few relevantCandidates
         result_both = self._search(
-            query='"ocean" "species"',
+            query='ocean species',
             lexical_operand="and",
             relevance_cutoff={
                 "method": "relative_max_score",
@@ -2318,8 +2315,8 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
             },
         )
 
-        result_tensor = self._search(
-            query='"ocean" "species"',
+        result_tensor_only = self._search(
+            query='ocean species',
             lexical_operand="and",
             relevance_cutoff={
                 "method": "relative_max_score",
@@ -2331,14 +2328,15 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
         )
 
         # Same probe → same relevantCandidates
-        self.assertEqual(result_both["_relevantCandidates"], result_tensor["_relevantCandidates"])
+        self.assertEqual(result_both["_relevantCandidates"],
+                         result_tensor_only["_relevantCandidates"])
 
-        # With 'tensor', at least as many results as 'both' (lexical leg unrestricted)
-        self.assertGreaterEqual(len(result_tensor["hits"]), len(result_both["hits"]))
+        # 'both' should return fewer results since lexical is also restricted
+        self.assertLess(len(result_both["hits"]), len(result_tensor_only["hits"]),
+                        "Default (both) cutoff should return fewer results than tensor-only cutoff")
 
-        # With 'tensor', all 3 AND matches must appear
-        tensor_ids = {hit["_id"] for hit in result_tensor["hits"]}
-        and_match_ids = {"and_match_1", "and_match_2", "and_match_3"}
-        self.assertTrue(and_match_ids.issubset(tensor_ids))
-
-    
+        # 'tensor' mode returns all 9 docs
+        tensor_ids = {hit["_id"] for hit in result_tensor_only["hits"]}
+        all_doc_ids = {"anchor", "long_1", "long_2", "long_3", "long_4",
+                       "long_5", "long_6", "long_7", "long_8"}
+        self.assertTrue(all_doc_ids.issubset(tensor_ids))
