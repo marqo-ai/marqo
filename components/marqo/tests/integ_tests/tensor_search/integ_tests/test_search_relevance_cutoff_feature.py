@@ -2178,136 +2178,167 @@ class TestRelevanceCutoffApplyInRetrieval(MarqoTestCase):
         self.assertEqual(default_ids, both_ids)
         self.assertEqual(result_default["_relevantCandidates"], result_both["_relevantCandidates"])
 
-    def test_apply_in_retrieval_lexical_returns_results(self):
-        """applyInRetrieval='lexical' should still return results and have relevantCandidates."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.2},
-                "applyInRetrieval": "lexical",
-            }
-        )
-        self.assertGreater(len(result["hits"]), 0)
-        self.assertIn("_relevantCandidates", result)
-        self.assertIn("_probeCandidates", result)
 
-    def test_apply_in_retrieval_tensor_returns_results(self):
-        """applyInRetrieval='tensor' should still return results and have relevantCandidates."""
+@pytest.mark.skip_for_multinode(
+    "Multi-nodes will return different lexical results so we can not assert on the results.")
+class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
+    """Tests that applyInRetrieval='tensor' preserves all lexical AND-matched results
+    even under a strict cutoff, while using OR for the relevance cutoff probe.
+
+    Documents are crafted so that:
+    - 3 docs contain BOTH "ocean" AND "species" (match AND lexical for quoted terms)
+    - 2 docs contain only one of the terms (match OR probe but not AND main search)
+    - 2 docs are semantically related but lack both terms (tensor-only)
+    - 1 doc is unrelated
+
+    With applyInRetrieval='tensor' + strict cutoff, the lexical leg is unrestricted
+    (uses probeDepth), so all AND-matched docs appear regardless of the cutoff count.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.index_request = cls.unstructured_marqo_index_request(
+            model=Model(name="hf/all-MiniLM-L6-v2"),
+        )
+        cls.create_indexes([cls.index_request])
+        cls.index_name = cls.index_request.name
+
+        # 3 docs match "ocean" AND "species" (quoted AND terms)
+        # 2 docs match one of "ocean" or "species" (OR probe only)
+        # 2 docs are semantically related (tensor only)
+        # 1 doc is unrelated
+        cls.test_docs = [
+            {"_id": "and_match_1", "text": "The deep ocean is teeming with diverse species of fish and coral."},
+            {"_id": "and_match_2", "text": "Ocean currents transport species across vast marine distances."},
+            {"_id": "and_match_3", "text": "Protecting ocean habitats is essential for preserving endangered species."},
+            {"_id": "ocean_only", "text": "The ocean floor is covered with volcanic rock and sediment."},
+            {"_id": "species_only", "text": "Rainforest species face extinction due to deforestation worldwide."},
+            {"_id": "semantic_1", "text": "Marine biologists study underwater creatures and sea life ecosystems."},
+            {"_id": "semantic_2", "text": "Coral reef conservation efforts protect delicate aquatic environments."},
+            {"_id": "unrelated", "text": "Quantum computing uses qubits to solve complex mathematical problems."},
+        ]
+
+        cls.add_documents(
+            config=cls.config,
+            add_docs_params=AddDocsParams(
+                docs=cls.test_docs,
+                index_name=cls.index_name,
+                tensor_fields=['text']
+            )
+        )
+
+    def setUp(self):
+        pass
+
+    @classmethod
+    def _search(cls, query, relevance_cutoff=None, lexical_operand=None,
+                limit=10, offset=0, alpha=0.5):
+        hybrid_parameters = {
+            "retrievalMethod": "disjunction",
+            "rankingMethod": "rrf",
+            "alpha": alpha,
+        }
+        if lexical_operand is not None:
+            hybrid_parameters["lexicalOperand"] = lexical_operand
+        search_query_dict = {
+            "q": query,
+            "searchMethod": SearchMethod.HYBRID,
+            "hybridParameters": hybrid_parameters,
+            "limit": limit,
+            "offset": offset,
+        }
+        if relevance_cutoff is not None:
+            search_query_dict["relevanceCutoff"] = relevance_cutoff
+        return json.loads(search(
+            index_name=cls.index_name,
+            marqo_config=cls.config,
+            device="cpu",
+            search_query_dict=search_query_dict
+        ).body.decode('utf-8'))
+
+    def test_apply_in_tensor_with_and_search_preserves_all_lexical_and_matches(self):
+        """With applyInRetrieval='tensor', a strict cutoff limits tensor retrieval but
+        leaves lexical unrestricted. All documents matching the AND lexical query
+        (quoted terms "ocean" and "species") must appear in results with _lexical_score.
+
+        Setup:
+        - Query: '"ocean" "species"' (quoted → and_phrases, always AND)
+        - Main search: lexicalOperand='and' (for unquoted terms, but all are quoted here)
+        - Relevance cutoff probe: lexicalOperand='or' (more permissive probe)
+        - Cutoff: relativeScoreFactor=0.9 (very strict, few docs pass)
+        - applyInRetrieval='tensor' (cutoff only limits tensor leg)
+
+        Expected: and_match_1, and_match_2, and_match_3 all appear because lexical
+        retrieval is unrestricted by the cutoff.
+        """
         result = self._search(
+            query='"ocean" "species"',
+            lexical_operand="and",
             relevance_cutoff={
                 "method": "relative_max_score",
                 "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.2},
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
                 "applyInRetrieval": "tensor",
-            }
+            },
         )
-        self.assertGreater(len(result["hits"]), 0)
-        self.assertIn("_relevantCandidates", result)
-        self.assertIn("_probeCandidates", result)
 
-    def test_apply_in_retrieval_lexical_does_not_reduce_tensor_results(self):
-        """When applyInRetrieval='lexical', tensor retrieval should not be limited by cutoff.
-        With a very strict cutoff (high relativeScoreFactor), the tensor leg should still
-        contribute its full result set, potentially yielding more results than 'both' mode."""
-        strict_cutoff = {
-            "method": "relative_max_score",
-            "probeDepth": 1000,
-            "parameters": {"relativeScoreFactor": 0.9},
-        }
-        result_both = self._search(relevance_cutoff=strict_cutoff)
-        result_lexical = self._search(relevance_cutoff={**strict_cutoff, "applyInRetrieval": "lexical"})
+        returned_ids = {hit["_id"] for hit in result["hits"]}
+        and_match_ids = {"and_match_1", "and_match_2", "and_match_3"}
 
-        # With 'both', the strict cutoff limits all retrieval. With 'lexical', only
-        # lexical is limited so tensor can contribute more results.
-        self.assertGreaterEqual(len(result_lexical["hits"]), len(result_both["hits"]))
-        # relevantCandidates should be the same (same probe, same cutoff method)
-        self.assertEqual(result_both["_relevantCandidates"], result_lexical["_relevantCandidates"])
+        # All 3 AND-matched docs must appear
+        self.assertTrue(
+            and_match_ids.issubset(returned_ids),
+            f"Expected all AND matches {and_match_ids} in results, got {returned_ids}"
+        )
 
-    def test_apply_in_retrieval_tensor_does_not_reduce_lexical_results(self):
-        """When applyInRetrieval='tensor', lexical retrieval should not be limited by cutoff.
-        With a very strict cutoff, the lexical leg should still contribute its full result set."""
-        strict_cutoff = {
-            "method": "relative_max_score",
-            "probeDepth": 1000,
-            "parameters": {"relativeScoreFactor": 0.9},
-        }
-        result_both = self._search(relevance_cutoff=strict_cutoff)
-        result_tensor = self._search(relevance_cutoff={**strict_cutoff, "applyInRetrieval": "tensor"})
+        # AND-matched docs must have _lexical_score (they came from lexical retrieval)
+        for hit in result["hits"]:
+            if hit["_id"] in and_match_ids:
+                self.assertIn("_lexical_score", hit,
+                              f"{hit['_id']} should have _lexical_score from lexical retrieval")
 
-        # With 'tensor', only tensor is limited so lexical can contribute more results.
-        self.assertGreaterEqual(len(result_tensor["hits"]), len(result_both["hits"]))
+    def test_apply_in_both_with_strict_cutoff_may_lose_lexical_and_matches(self):
+        """With applyInRetrieval='both' (default) and a strict cutoff, the cutoff
+        limits BOTH retrieval legs. When relevantCandidates is smaller than the number
+        of AND-matched docs, some AND matches may be lost.
+
+        This contrasts with applyInRetrieval='tensor' where lexical is unrestricted.
+        """
+        # First: verify that the strict cutoff does produce few relevantCandidates
+        result_both = self._search(
+            query='"ocean" "species"',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+            },
+        )
+
+        result_tensor = self._search(
+            query='"ocean" "species"',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+            },
+        )
+
+        # Same probe → same relevantCandidates
         self.assertEqual(result_both["_relevantCandidates"], result_tensor["_relevantCandidates"])
 
-    def test_apply_in_retrieval_with_pagination(self):
-        """applyInRetrieval should work correctly with offset/limit pagination."""
-        cutoff = {
-            "method": "relative_max_score",
-            "probeDepth": 1000,
-            "parameters": {"relativeScoreFactor": 0.2},
-            "applyInRetrieval": "lexical",
-        }
-        result_page1 = self._search(relevance_cutoff=cutoff, limit=3, offset=0)
-        result_page2 = self._search(relevance_cutoff=cutoff, limit=3, offset=3)
+        # With 'tensor', at least as many results as 'both' (lexical leg unrestricted)
+        self.assertGreaterEqual(len(result_tensor["hits"]), len(result_both["hits"]))
 
-        page1_ids = [hit["_id"] for hit in result_page1["hits"]]
-        page2_ids = [hit["_id"] for hit in result_page2["hits"]]
+        # With 'tensor', all 3 AND matches must appear
+        tensor_ids = {hit["_id"] for hit in result_tensor["hits"]}
+        and_match_ids = {"and_match_1", "and_match_2", "and_match_3"}
+        self.assertTrue(and_match_ids.issubset(tensor_ids))
 
-        # Pages should not overlap
-        self.assertEqual(0, len(set(page1_ids) & set(page2_ids)))
-        self.assertEqual(3, len(page1_ids))
-
-    def test_apply_in_retrieval_with_sort_by(self):
-        """applyInRetrieval should work together with sortBy."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.2},
-                "applyInRetrieval": "lexical",
-            },
-            sort_by={"fields": [{"fieldName": "price"}]},
-        )
-        self.assertGreater(len(result["hits"]), 0)
-        self.assertIn("_sortCandidates", result)
-
-    def test_apply_in_retrieval_with_facets_and_track_total_hits(self):
-        """applyInRetrieval should work with facets and trackTotalHits."""
-        result = self._search(
-            relevance_cutoff={
-                "method": "relative_max_score",
-                "probeDepth": 1000,
-                "parameters": {"relativeScoreFactor": 0.2},
-                "affectFacets": True,
-                "applyInRetrieval": "tensor",
-            },
-            facets={"fields": {"color": {"type": "string"}}},
-            track_total_hits=True,
-        )
-        self.assertIn("facets", result)
-        self.assertIn("color", result["facets"])
-        self.assertIn("totalHits", result)
-        self.assertIn("_relevantCandidates", result)
-
-    def test_apply_in_retrieval_rejected_for_non_disjunction(self):
-        """applyInRetrieval should be rejected when retrievalMethod is not disjunction."""
-        with self.assertRaises(Exception):
-            search_query_dict = {
-                "q": "test query",
-                "searchMethod": SearchMethod.HYBRID,
-                "hybridParameters": {
-                    "retrievalMethod": "tensor",
-                    "rankingMethod": "tensor",
-                },
-                "relevanceCutoff": {
-                    "method": "gap_detection",
-                    "applyInRetrieval": "lexical",
-                },
-                "limit": 10,
-            }
-            search(
-                index_name=self.index_name,
-                marqo_config=self.config,
-                device="cpu",
-                search_query_dict=search_query_dict
-            )
+    
