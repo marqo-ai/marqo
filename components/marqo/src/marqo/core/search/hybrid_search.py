@@ -569,8 +569,8 @@ class HybridSearch:
 
         # Collect post-process candidates metadata (always returned by Vespa custom searcher)
         if (responses.root.fields and responses.root.fields.marqo_fields
-                and responses.root.fields.marqo_fields.post_process_size is not None):
-            gathered_results["_postProcessCandidates"] = responses.root.fields.marqo_fields.post_process_size
+                and responses.root.fields.marqo_fields.post_process_candidates is not None):
+            gathered_results["_postProcessCandidates"] = responses.root.fields.marqo_fields.post_process_candidates
 
         # Collect metadata for sort by
         if sort_by is not None:
@@ -596,7 +596,6 @@ class HybridSearch:
             if relevance_cutoff.override_total_hits_with_post_process_candidates and \
                 responses.root.fields.marqo_fields.post_process_candidates is not None:
                 gathered_results["totalHits"] = responses.root.fields.marqo_fields.post_process_candidates
-
 
         return gathered_results
 

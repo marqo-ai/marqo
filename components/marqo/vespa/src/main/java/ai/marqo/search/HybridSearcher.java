@@ -97,7 +97,10 @@ public class HybridSearcher extends Searcher {
     @VisibleForTesting
     @JsonInclude(Include.NON_NULL)
     record MarqoMetadataFields(
-            Integer sortCandidates, Integer probeCandidates, Integer relevantCandidates)
+            Integer sortCandidates,
+            Integer probeCandidates,
+            Integer relevantCandidates,
+            Integer postProcessCandidates)
             implements JsonProducer {
 
         @Override
@@ -483,6 +486,7 @@ public class HybridSearcher extends Searcher {
         // Determine post-processing mode based on query parameters
         HitGroup processedHits;
         Integer sortCandidates = null;
+        int postProcessCandidates;
         if (sortByFields != null) {
             // When overrideSortCandidates is set, trim hits to only relevant candidates
             // before sorting, so that non-relevant documents are excluded from sort results.
@@ -509,6 +513,7 @@ public class HybridSearcher extends Searcher {
                     postProcessBySort(
                             hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
             sortCandidates = hitsForPostProcessing.size();
+            postProcessCandidates = hitsForPostProcessing.size();
         } else {
             // If sortBy is not set, we use the default post-processing
             processedHits =
@@ -519,6 +524,7 @@ public class HybridSearcher extends Searcher {
                             limit,
                             offset,
                             verbose);
+            postProcessCandidates = hitsForPostProcessing.size();
         }
 
         if (!futureFacets.isEmpty()) {
@@ -529,7 +535,8 @@ public class HybridSearcher extends Searcher {
         // enabled)
         processedHits = extractRecencyScore(processedHits, query, verbose);
         MarqoMetadataFields marqoMetadataFields =
-                new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
+                new MarqoMetadataFields(
+                        sortCandidates, probeCandidates, relevantCandidates, postProcessCandidates);
 
         processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
         return new Result(query, processedHits);

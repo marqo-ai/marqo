@@ -2291,6 +2291,7 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
 
         # We make expected ids a set as the lexical score can vary in different runs
         self.assertEqual(1, result["_relevantCandidates"])
+        self.assertEqual(9, result["_postProcessCandidates"])
         self.assertEqual(expected_ids, returned_ids)
 
         self.assertIn(
@@ -2407,22 +2408,6 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
         }
         self.assertEqual(expected_facets, result["facets"])
 
-    def test_apply_in_lexical_is_not_supported(self):
-        """applyInRetrieval='lexical' is currently blocked because it would require
-        a very large tensor targetHits on the unrestricted tensor leg."""
-        with self.assertRaises(Exception):
-            self._search(
-                query='ocean species',
-                lexical_operand="and",
-                relevance_cutoff={
-                    "method": "relative_max_score",
-                    "probeDepth": 1000,
-                    "parameters": {"relativeScoreFactor": 0.9},
-                    "lexicalOperand": "or",
-                    "applyInRetrieval": "lexical",
-                },
-            )
-
     def test_apply_in_both_blocks_irrelevant_documents_in_both_retrievals(self):
         """With applyInRetrieval='both', the relevance cutoff is applied to both retrievals
         """
@@ -2443,6 +2428,7 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
 
         # We make expected ids a set as the lexical score can vary in different runs
         self.assertEqual(1, result["_relevantCandidates"])
+        self.assertEqual(1, result["_postProcessCandidates"])
         self.assertEqual(expected_ids, returned_ids)
 
         self.assertIn(
@@ -2471,6 +2457,7 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
                     "parameters": {"relativeScoreFactor": 0.9},
                     "lexicalOperand": "or",
                     "applyInRetrieval": "tensor",
+                    "overrideTotalHitsWithPostProcessCandidates": True,
                 },
                 sort_by={"fields": [{"fieldName": "price", "order": "asc"}]},
                 limit = limit,
@@ -2482,4 +2469,6 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
             self.assertEqual(expected_returned_ids, returned_ids)
             # relevantCandidates still reflects the strict cutoff
             self.assertEqual(1, result["_relevantCandidates"])
+            self.assertEqual(9, result["_postProcessCandidates"])
             self.assertEqual(9, result["_sortCandidates"])
+            self.assertEqual(9, result["totalHits"])
