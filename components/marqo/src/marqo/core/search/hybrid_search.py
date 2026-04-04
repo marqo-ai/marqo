@@ -593,6 +593,11 @@ class HybridSearch:
             gathered_results["_relevantCandidates"] = responses.root.fields.marqo_fields.relevant_candidates
             gathered_results["_probeCandidates"] = responses.root.fields.marqo_fields.probe_candidates
 
+            if relevance_cutoff.override_total_hits_with_post_process_candidates and \
+                responses.root.fields.marqo_fields.post_process_candidates is not None:
+                gathered_results["totalHits"] = responses.root.fields.marqo_fields.post_process_candidates
+
+
         return gathered_results
 
     def _max_value_check_for_total_hits(self, gathered_results: Dict) -> Dict:

@@ -10,7 +10,7 @@ class MarqoFields(BaseModel):
     sort_candidates: Optional[int] = Field(None, alias='sortCandidates')
     relevant_candidates: Optional[int] = Field(None, alias='relevantCandidates')
     probe_candidates: Optional[int] = Field(None, alias='probeCandidates')
-    post_process_size: Optional[int] = Field(None, alias='postProcessSize')
+    post_process_candidates: Optional[int] = Field(None, alias='postProcessCandidates')
 
 
 # See https://docs.vespa.ai/en/reference/default-result-format.html

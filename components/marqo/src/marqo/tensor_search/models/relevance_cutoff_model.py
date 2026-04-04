@@ -54,6 +54,9 @@ class RelevanceCutoffModel(StrictBaseModel):
     )
     lexical_operand: Optional[LexicalOperand] = Field(None, alias="lexicalOperand")
     apply_in_retrieval: Optional[ApplyInRetrieval] = Field(None, alias="applyInRetrieval")
+    override_total_hits_with_post_process_candidates: bool = Field(
+        False, alias="overrideTotalHitsWithPostProcessCandidates"
+    )
 
     @root_validator(pre=False, skip_on_failure=True)
     def _validate_apply_in_retrieval_lexical_not_supported(cls, values):

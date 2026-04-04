@@ -1195,7 +1195,7 @@ class SortByTest {
             assertThat(jsonString).contains("\"sortCandidates\":8");
             assertThat(jsonString).contains("\"probeCandidates\":12");
             assertThat(jsonString).contains("\"relevantCandidates\":6");
-            assertThat(jsonString).contains("\"postProcessSize\":20");
+            assertThat(jsonString).contains("\"postProcessCandidates\":20");
 
             // Should not contain null
             assertThat(jsonString).doesNotContain("null");
