@@ -341,10 +341,13 @@ public class HybridSearcher extends Searcher {
         Query cutoffQuery;
         if (isSelectiveCutoff) {
             cutoffQuery = query.clone();
-            // Prepare the original for the non-target leg and final Result
+            // Prepare the original for the non-target leg: use probeDepth for a stable
+            // retrieval pool independent of pagination (limit+offset would grow with offset).
+            // The final Result also uses this query, so hits must be >= limit+offset.
+            int nonTargetHits = Math.max(relevanceCutoffProbeDepth, limit + offset);
             query.setOffset(0);
-            query.setHits(limit + offset);
-            query.properties().set(QUERY_RERANK_COUNT, limit + offset);
+            query.setHits(nonTargetHits);
+            query.properties().set(QUERY_RERANK_COUNT, nonTargetHits);
         } else {
             cutoffQuery = query;
         }
@@ -370,21 +373,45 @@ public class HybridSearcher extends Searcher {
             if (isSelectiveCutoff) {
                 // Target from cutoffQuery (reduced), non-target from original (unreduced)
                 if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
-                    queryLexical = createSubQuery(cutoffQuery,
-                            MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
-                    queryTensor = createSubQuery(query,
-                            MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+                    queryLexical =
+                            createSubQuery(
+                                    cutoffQuery,
+                                    MARQO_SEARCH_METHOD_LEXICAL,
+                                    MARQO_SEARCH_METHOD_LEXICAL,
+                                    verbose);
+                    queryTensor =
+                            createSubQuery(
+                                    query,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    verbose);
                 } else {
-                    queryLexical = createSubQuery(query,
-                            MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
-                    queryTensor = createSubQuery(cutoffQuery,
-                            MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+                    queryLexical =
+                            createSubQuery(
+                                    query,
+                                    MARQO_SEARCH_METHOD_LEXICAL,
+                                    MARQO_SEARCH_METHOD_LEXICAL,
+                                    verbose);
+                    queryTensor =
+                            createSubQuery(
+                                    cutoffQuery,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    MARQO_SEARCH_METHOD_TENSOR,
+                                    verbose);
                 }
             } else {
-                queryLexical = createSubQuery(cutoffQuery,
-                        MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
-                queryTensor = createSubQuery(cutoffQuery,
-                        MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+                queryLexical =
+                        createSubQuery(
+                                cutoffQuery,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                verbose);
+                queryTensor =
+                        createSubQuery(
+                                cutoffQuery,
+                                MARQO_SEARCH_METHOD_TENSOR,
+                                MARQO_SEARCH_METHOD_TENSOR,
+                                verbose);
             }
 
             // Execute both lexical and tensor queries asynchronously.
