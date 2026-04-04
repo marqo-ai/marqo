@@ -2207,16 +2207,17 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
 
         # 1 short doc (highest lexical score — the cutoff anchor)
         # 8 longer docs (all contain "ocean" and "species" but diluted by extra text)
+        # category: "deep" for 5 docs, "surface" for 4 docs
         cls.test_docs = [
-            {"_id": "anchor", "text": "ocean species", "price": 50.00},
-            {"_id": "long_1", "text": "The deep ocean is teeming with diverse species of fish and coral in tropical waters.", "price": 10.00},
-            {"_id": "long_2", "text": "Ocean currents transport species across vast marine distances around the globe.", "price": 20.00},
-            {"_id": "long_3", "text": "Protecting ocean habitats is essential for preserving endangered species worldwide.", "price": 30.00},
-            {"_id": "long_4", "text": "Scientists discovered new ocean species living near hydrothermal vents on the seabed.", "price": 40.00},
-            {"_id": "long_5", "text": "The Arctic ocean supports species adapted to extreme cold temperatures and ice.", "price": 15.00},
-            {"_id": "long_6", "text": "Pollution threatens ocean species that depend on clean water for survival and growth.", "price": 25.00},
-            {"_id": "long_7", "text": "Mapping the ocean floor revealed species previously unknown to marine biology researchers.", "price": 35.00},
-            {"_id": "long_8", "text": "Climate change alters ocean temperatures affecting species migration patterns and habitats.", "price": 45.00},
+            {"_id": "anchor", "text": "ocean species", "price": 50.00, "category": "deep"},
+            {"_id": "long_1", "text": "The deep ocean is teeming with diverse species of fish and coral in tropical waters.", "price": 10.00, "category": "deep"},
+            {"_id": "long_2", "text": "Ocean currents transport species across vast marine distances around the globe.", "price": 20.00, "category": "surface"},
+            {"_id": "long_3", "text": "Protecting ocean habitats is essential for preserving endangered species worldwide.", "price": 30.00, "category": "deep"},
+            {"_id": "long_4", "text": "Scientists discovered new ocean species living near hydrothermal vents on the seabed.", "price": 40.00, "category": "deep"},
+            {"_id": "long_5", "text": "The Arctic ocean supports species adapted to extreme cold temperatures and ice.", "price": 15.00, "category": "surface"},
+            {"_id": "long_6", "text": "Pollution threatens ocean species that depend on clean water for survival and growth.", "price": 25.00, "category": "surface"},
+            {"_id": "long_7", "text": "Mapping the ocean floor revealed species previously unknown to marine biology researchers.", "price": 35.00, "category": "deep"},
+            {"_id": "long_8", "text": "Climate change alters ocean temperatures affecting species migration patterns and habitats.", "price": 45.00, "category": "surface"},
         ]
 
         cls.add_documents(
@@ -2321,7 +2322,7 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
                 "lexicalOperand": "or",
                 "applyInRetrieval": "tensor",
             },
-            sort_by={"fields": [{"fieldName": "price"}]},
+            sort_by={"fields": [{"fieldName": "price", "order": "asc"}]},
         )
 
         returned_ids = [hit["_id"] for hit in result["hits"]]
@@ -2339,4 +2340,70 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
 
         # relevantCandidates still reflects the strict cutoff
         self.assertEqual(1, result["_relevantCandidates"])
-        self.assertIn("_sortCandidates", result)
+        self.assertEqual(9, result["_sortCandidates"])
+
+    def test_apply_in_tensor_with_affect_facets_false(self):
+        """With affectFacets=False (default), facets count all matching documents
+        regardless of cutoff. All 9 docs match, so facets should reflect all 9.
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+                "affectFacets": False,
+            },
+            facets={"fields": {"category": {"type": "string"}}},
+            track_total_hits=True,
+        )
+
+        # All 9 docs returned
+        self.assertEqual(9, len(result["hits"]))
+        self.assertEqual(1, result["_relevantCandidates"])
+
+        # Facets count all matching docs (not limited by cutoff)
+        expected_facets = {
+            "category": {"deep": {"count": 5}, "surface": {"count": 4}},
+        }
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(9, result["totalHits"])
+
+    def test_apply_in_tensor_with_affect_facets_true(self):
+        """With affectFacets=True, facets and totalHits only count docs that pass
+        the cutoff. Since relevantCandidates=1 (only the anchor passes the strict
+        cutoff), facets reflect just that 1 doc — even though 9 docs are returned.
+
+        This is the expected "conservative" behavior: facets are smaller than the
+        actual result set because cutoff controls only one retrieval leg.
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+                "affectFacets": True,
+            },
+            facets={"fields": {"category": {"type": "string"}}},
+            track_total_hits=True,
+        )
+
+        # All 9 docs still returned (lexical leg unrestricted)
+        self.assertEqual(9, len(result["hits"]))
+        self.assertEqual(1, result["_relevantCandidates"])
+
+        # Facets only count the 1 doc that passes cutoff (the anchor, category="deep")
+        # This is conservative: fewer facet counts than actual results
+        self.assertEqual(1, result["totalHits"])
+        self.assertIn("facets", result)
+        total_facet_count = sum(
+            v["count"] for v in result["facets"]["category"].values()
+        )
+        self.assertLessEqual(total_facet_count, result["_relevantCandidates"])
