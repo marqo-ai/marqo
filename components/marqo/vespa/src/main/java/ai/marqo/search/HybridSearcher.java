@@ -329,26 +329,29 @@ public class HybridSearcher extends Searcher {
         boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;
         boolean isSortByEnabled = sortByFields != null;
 
-        // When applyInRetrieval targets a specific retrieval leg, we let
-        // updateQueryHitsOffsetsAndTargetHits run with cutoff enabled (so it correctly
-        // sets offset=0, facets, tensor YQL, etc.), then restore the main query's hits
-        // back to limit+offset. Sub-queries inherit the restored values, and cutoff is
-        // applied only to the target sub-query afterward.
+        // When applyInRetrieval targets a specific leg, we clone the query and let
+        // the clone receive all cutoff modifications (hits, offset, tensor YQL, facets).
+        // The original query stays untouched so its hits won't truncate the final Result.
+        // Target sub-query is created from the clone; non-target from the original.
         boolean isSelectiveCutoff =
                 isRelevanceCutoffMethodEnabled
                         && applyInRetrieval != null
                         && applyInRetrieval != ApplyInRetrieval.BOTH;
 
-        // Save the original tensor YQL before cutoff adjustments may reduce targetHits.
-        String originalTensorYQL =
-                isSelectiveCutoff
-                        ? query.properties()
-                                .getString("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, "")
-                        : null;
+        Query cutoffQuery;
+        if (isSelectiveCutoff) {
+            cutoffQuery = query.clone();
+            // Prepare the original for the non-target leg and final Result
+            query.setOffset(0);
+            query.setHits(limit + offset);
+            query.properties().set(QUERY_RERANK_COUNT, limit + offset);
+        } else {
+            cutoffQuery = query;
+        }
 
-        query =
+        cutoffQuery =
                 updateQueryHitsOffsetsAndTargetHits(
-                        query,
+                        cutoffQuery,
                         relevantCandidates,
                         sortByMinSortCandidates,
                         isRelevanceCutoffMethodEnabled,
@@ -356,61 +359,32 @@ public class HybridSearcher extends Searcher {
                         relevanceCutoffAffectFacets,
                         verbose);
 
-        // For selective cutoff: save the cutoff-reduced tensor YQL (for the target tensor
-        // sub-query), then restore the main query so sub-queries and the final Result
-        // aren't artificially truncated by the cutoff hits.
-        String reducedTensorYQL = null;
-        if (isSelectiveCutoff) {
-            reducedTensorYQL =
-                    query.properties()
-                            .getString("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, "");
-
-            // Restore main query hits so downstream code and Result aren't truncated
-            query.setHits(limit + offset);
-            query.properties().set(QUERY_RERANK_COUNT, limit + offset);
-
-            // Restore original tensor YQL on main query
-            if (originalTensorYQL != null && !originalTensorYQL.isEmpty()) {
-                query.properties()
-                        .set("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, originalTensorYQL);
-            }
-        }
-
         List<Future<Result>> futureFacets =
-                getFacetsFutureList(query, execution, verbose, collapse);
+                getFacetsFutureList(cutoffQuery, execution, verbose, collapse);
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
-            Query queryLexical =
-                    createSubQuery(
-                            query,
-                            MARQO_SEARCH_METHOD_LEXICAL,
-                            MARQO_SEARCH_METHOD_LEXICAL,
-                            verbose);
-            Query queryTensor =
-                    createSubQuery(
-                            query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+            Query queryLexical, queryTensor;
 
-            // Apply cutoff only to the target sub-query. The non-target inherits
-            // limit+offset from the restored main query — no separate restoration needed.
-            if (isSelectiveCutoff && relevantCandidates != null) {
-                int cutoffHits = Math.min(relevantCandidates, limit + offset);
+            if (isSelectiveCutoff) {
+                // Target from cutoffQuery (reduced), non-target from original (unreduced)
                 if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
-                    logIfVerbose(String.format(
-                            "Selective cutoff on lexical: hits=%d", cutoffHits), verbose);
-                    queryLexical.setHits(cutoffHits);
-                    queryLexical.properties().set(QUERY_RERANK_COUNT, cutoffHits);
-                } else if (applyInRetrieval == ApplyInRetrieval.TENSOR) {
-                    logIfVerbose(String.format(
-                            "Selective cutoff on tensor: hits=%d", cutoffHits), verbose);
-                    queryTensor.setHits(cutoffHits);
-                    queryTensor.properties().set(QUERY_RERANK_COUNT, cutoffHits);
-                    // Apply the cutoff-reduced tensor YQL (with reduced targetHits)
-                    if (reducedTensorYQL != null && !reducedTensorYQL.isEmpty()) {
-                        queryTensor.properties().set("yql", reducedTensorYQL);
-                    }
+                    queryLexical = createSubQuery(cutoffQuery,
+                            MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+                    queryTensor = createSubQuery(query,
+                            MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+                } else {
+                    queryLexical = createSubQuery(query,
+                            MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+                    queryTensor = createSubQuery(cutoffQuery,
+                            MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
                 }
+            } else {
+                queryLexical = createSubQuery(cutoffQuery,
+                        MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+                queryTensor = createSubQuery(cutoffQuery,
+                        MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
             }
 
             // Execute both lexical and tensor queries asynchronously.
@@ -461,7 +435,7 @@ public class HybridSearcher extends Searcher {
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
             if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
                 Query combinedQuery =
-                        createSubQuery(query, retrievalMethod, rankingMethod, verbose);
+                        createSubQuery(cutoffQuery, retrievalMethod, rankingMethod, verbose);
                 Result result = execution.search(combinedQuery);
                 hitsForPostProcessing = result.hits();
                 logIfVerbose("Unprocessed results: ", verbose);
