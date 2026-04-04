@@ -334,15 +334,18 @@ public class HybridSearcher extends Searcher {
         // sets offset=0, rerank count, facets, tensor YQL, etc.), but afterward we
         // restore the non-target sub-query's hits back to limit+offset to undo the
         // cutoff reduction on that leg only.
-        boolean isSelectiveCutoff = isRelevanceCutoffMethodEnabled
-                && applyInRetrieval != null
-                && applyInRetrieval != ApplyInRetrieval.BOTH;
+        boolean isSelectiveCutoff =
+                isRelevanceCutoffMethodEnabled
+                        && applyInRetrieval != null
+                        && applyInRetrieval != ApplyInRetrieval.BOTH;
 
         // Save the original tensor YQL before cutoff adjustments modify it.
         // Needed to restore the non-target tensor sub-query's targetHits.
-        String originalTensorYQL = isSelectiveCutoff
-                ? query.properties().getString("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, "")
-                : null;
+        String originalTensorYQL =
+                isSelectiveCutoff
+                        ? query.properties()
+                                .getString("marqo__yql." + MARQO_SEARCH_METHOD_TENSOR, "")
+                        : null;
 
         query =
                 updateQueryHitsOffsetsAndTargetHits(
@@ -372,14 +375,18 @@ public class HybridSearcher extends Searcher {
 
             // For selective cutoff: both sub-queries inherited the cutoff-adjusted
             // hits/offset/targetHits from the main query. Now restore the NON-TARGET
-            // sub-query back to limit+offset so cutoff only affects the target leg.
+            // sub-query to probeDepth so it has a stable retrieval pool independent of
+            // pagination (limit+offset would grow with offset, making results unstable).
             if (isSelectiveCutoff && relevantCandidates != null) {
-                int restoredHits = limit + offset;
+                int restoredHits = relevanceCutoffProbeDepth;
                 if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
                     // Lexical is the target (keeps cutoff), restore tensor
-                    logIfVerbose(String.format(
-                            "Selective cutoff on lexical: restoring tensor sub-query hits to %d",
-                            restoredHits), verbose);
+                    logIfVerbose(
+                            String.format(
+                                    "Selective cutoff on lexical: restoring tensor sub-query hits"
+                                            + " to probeDepth=%d",
+                                    restoredHits),
+                            verbose);
                     queryTensor.setHits(restoredHits);
                     // Restore original tensor YQL targetHits
                     if (originalTensorYQL != null && !originalTensorYQL.isEmpty()) {
@@ -387,9 +394,12 @@ public class HybridSearcher extends Searcher {
                     }
                 } else if (applyInRetrieval == ApplyInRetrieval.TENSOR) {
                     // Tensor is the target (keeps cutoff), restore lexical
-                    logIfVerbose(String.format(
-                            "Selective cutoff on tensor: restoring lexical sub-query hits to %d",
-                            restoredHits), verbose);
+                    logIfVerbose(
+                            String.format(
+                                    "Selective cutoff on tensor: restoring lexical sub-query hits"
+                                            + " to probeDepth=%d",
+                                    restoredHits),
+                            verbose);
                     queryLexical.setHits(restoredHits);
                 }
             }
