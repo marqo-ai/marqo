@@ -1425,7 +1425,8 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(2, result["_relevantCandidates"])
         self.assertEqual(2, result["_probeCandidates"])
-        self.assertEqual({'0', '1'}, set(ids))
+        self.assertEqual(3, result["_postProcessCandidates"])
+        self.assertEqual({'0', '1', "4"}, set(ids))
 
     def test_relevance_cut_off_with_incorrect_lexical_searchable_fields(self):
         """It is expected that the relevance cutoff will return 0 results
@@ -1501,7 +1502,7 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(1, result["_relevantCandidates"])
         self.assertEqual(6, result["_probeCandidates"])
-        self.assertEqual(['4'], ids)
+        self.assertEqual(['4', '17'], ids)
 
     def test_attributes_to_retrieve_works_as_expected(self):
         """Test that attributes_to_retrieve works as expected with relevance cutoff."""
@@ -1561,7 +1562,8 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(6, result["_relevantCandidates"])
         self.assertEqual(6, result["_probeCandidates"])
-        self.assertEqual(['13', '20', '10', '17', '1', '14'], ids)
+        self.assertEqual(9, result["_postProcessCandidates"])
+        self.assertEqual(['13', '20', '10', '17', '1', '14', '4', '0', '16'], ids)
 
 
 @pytest.mark.skip_for_multinode(
@@ -1686,7 +1688,9 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_facets, result["facets"])
 
     def test_affect_facets_true_facets_and_total_hits_reflect_relevant_candidates(self):
-        """With sortBy + affectFacets=True, facets and totalHits only count relevant documents."""
+        """With sortBy + affectFacets=True, facets and totalHits only count relevant documents.
+        However, we return more results as _sortCandidates is larger.
+        """
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
@@ -1702,7 +1706,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(5, result["_relevantCandidates"])
         self.assertEqual(6, result["_sortCandidates"])
 
-        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5"]
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5", "doc6"]
         expected_facets = {
             "color": {"blue": {"count": 3}, "red": {"count": 2}},
         }
