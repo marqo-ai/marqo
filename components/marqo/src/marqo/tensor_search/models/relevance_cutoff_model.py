@@ -56,6 +56,21 @@ class RelevanceCutoffModel(StrictBaseModel):
     apply_in_retrieval: Optional[ApplyInRetrieval] = Field(None, alias="applyInRetrieval")
 
     @root_validator(pre=False, skip_on_failure=True)
+    def _validate_apply_in_retrieval_incompatible_with_override_sort_candidates(cls, values):
+        apply_in_retrieval = values.get('apply_in_retrieval')
+        override_sort = values.get('override_sort_candidates_with_relevant_candidates')
+        if (apply_in_retrieval is not None
+                and apply_in_retrieval != ApplyInRetrieval.Both
+                and override_sort):
+            raise ValueError(
+                "applyInRetrieval cannot be used together with "
+                "overrideSortCandidatesWithRelevantCandidates when targeting a specific "
+                "retrieval leg. relevantCandidates only reflects one leg's cutoff and "
+                "would incorrectly trim the combined sort pool."
+            )
+        return values
+
+    @root_validator(pre=False, skip_on_failure=True)
     def _validate_method_and_parameters(cls, values):
         """
         Validates that the parameters provided match the method selected for relevance cutoff.

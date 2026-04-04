@@ -232,3 +232,35 @@ class TestRelevanceCutoffModel(TestCase):
             )
         )
         self.assertIsNone(sq.relevance_cutoff.apply_in_retrieval)
+
+    def test_apply_in_retrieval_incompatible_with_override_sort_candidates(self):
+        """applyInRetrieval targeting a specific leg cannot be combined with
+        overrideSortCandidatesWithRelevantCandidates."""
+        for value in ['lexical', 'tensor']:
+            with self.subTest(applyInRetrieval=value):
+                with self.assertRaises(ValidationError) as cm:
+                    RelevanceCutoffModel(
+                        method=RelevanceCutoffMethod.GapDetection,
+                        applyInRetrieval=value,
+                        overrideSortCandidatesWithRelevantCandidates=True
+                    )
+                self.assertIn("applyInRetrieval", str(cm.exception))
+
+    def test_apply_in_retrieval_both_allowed_with_override_sort_candidates(self):
+        """applyInRetrieval='both' is compatible with overrideSortCandidatesWithRelevantCandidates."""
+        m = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.GapDetection,
+            applyInRetrieval='both',
+            overrideSortCandidatesWithRelevantCandidates=True
+        )
+        self.assertEqual(m.apply_in_retrieval, 'both')
+        self.assertTrue(m.override_sort_candidates_with_relevant_candidates)
+
+    def test_apply_in_retrieval_none_allowed_with_override_sort_candidates(self):
+        """applyInRetrieval=None (default) is compatible with overrideSortCandidatesWithRelevantCandidates."""
+        m = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.GapDetection,
+            overrideSortCandidatesWithRelevantCandidates=True
+        )
+        self.assertIsNone(m.apply_in_retrieval)
+        self.assertTrue(m.override_sort_candidates_with_relevant_candidates)
