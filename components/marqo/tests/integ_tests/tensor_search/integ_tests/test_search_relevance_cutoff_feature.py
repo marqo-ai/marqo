@@ -2449,3 +2449,37 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
             "_lexical_score", result["hits"][0]
         )
         self.assertIn("_tensor_score", result["hits"][0])
+
+    def test_apply_in_tensor_with_sort_by_preserves_all_lexical_and_matches_pagination(self):
+        """Test the pagination behaviour of 'applyInRetrieval'
+        """
+
+        limit = 2
+
+        expected_order = [
+            "long_1", "long_5", "long_2", "long_6", "long_3",
+            "long_7", "long_4", "long_8", "anchor"
+        ]
+
+        for offset in range(0, len(expected_order), limit):
+            result = self._search(
+                query='ocean species',
+                lexical_operand="and",
+                relevance_cutoff={
+                    "method": "relative_max_score",
+                    "probeDepth": 1000,
+                    "parameters": {"relativeScoreFactor": 0.9},
+                    "lexicalOperand": "or",
+                    "applyInRetrieval": "tensor",
+                },
+                sort_by={"fields": [{"fieldName": "price", "order": "asc"}]},
+                limit = limit,
+                offset=offset,
+            )
+            returned_ids = [r["_id"] for r in result['hits']]
+            expected_returned_ids = expected_order[offset: offset + limit]
+
+            self.assertEqual(expected_returned_ids, returned_ids)
+            # relevantCandidates still reflects the strict cutoff
+            self.assertEqual(1, result["_relevantCandidates"])
+            self.assertEqual(9, result["_sortCandidates"])

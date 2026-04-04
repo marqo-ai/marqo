@@ -338,25 +338,11 @@ public class HybridSearcher extends Searcher {
                         && applyInRetrieval != null
                         && applyInRetrieval != ApplyInRetrieval.BOTH;
 
-        Query cutoffQuery;
-        if (isSelectiveCutoff) {
-            cutoffQuery = query.clone();
-            // Prepare the original for the non-target leg and final Result.
-            // With sort_by: use probeDepth for a stable sort pool independent of pagination.
-            // Without sort_by: limit+offset is sufficient (consistent with normal RRF behavior).
-            int nonTargetHits = isSortByEnabled
-                    ? Math.max(relevanceCutoffProbeDepth, limit + offset)
-                    : limit + offset;
-            query.setOffset(0);
-            query.setHits(nonTargetHits);
-            query.properties().set(QUERY_RERANK_COUNT, nonTargetHits);
-        } else {
-            cutoffQuery = query;
-        }
-
-        cutoffQuery =
+        // Clone the query for relevance cutoff & sortBy manipulation
+        Query cutoffSortByQuery = query.clone();
+        cutoffSortByQuery =
                 updateQueryHitsOffsetsAndTargetHits(
-                        cutoffQuery,
+                        cutoffSortByQuery,
                         relevantCandidates,
                         sortByMinSortCandidates,
                         isRelevanceCutoffMethodEnabled,
@@ -364,8 +350,11 @@ public class HybridSearcher extends Searcher {
                         relevanceCutoffAffectFacets,
                         verbose);
 
+        // Facet results will always be generated from a cutoff query to produce a conservative
+        // count until we fix the
+        // implementation in the future
         List<Future<Result>> futureFacets =
-                getFacetsFutureList(cutoffQuery, execution, verbose, collapse);
+                getFacetsFutureList(cutoffSortByQuery, execution, verbose, collapse);
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
@@ -375,9 +364,10 @@ public class HybridSearcher extends Searcher {
             if (isSelectiveCutoff) {
                 // Target from cutoffQuery (reduced), non-target from original (unreduced)
                 if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
+                    // This is not happening as this is blocked by the Python API
                     queryLexical =
                             createSubQuery(
-                                    cutoffQuery,
+                                    cutoffSortByQuery,
                                     MARQO_SEARCH_METHOD_LEXICAL,
                                     MARQO_SEARCH_METHOD_LEXICAL,
                                     verbose);
@@ -394,9 +384,11 @@ public class HybridSearcher extends Searcher {
                                     MARQO_SEARCH_METHOD_LEXICAL,
                                     MARQO_SEARCH_METHOD_LEXICAL,
                                     verbose);
+                    queryLexical.setOffset(0);
+                    queryLexical.setHits(relevanceCutoffProbeDepth);
                     queryTensor =
                             createSubQuery(
-                                    cutoffQuery,
+                                    cutoffSortByQuery,
                                     MARQO_SEARCH_METHOD_TENSOR,
                                     MARQO_SEARCH_METHOD_TENSOR,
                                     verbose);
@@ -404,13 +396,13 @@ public class HybridSearcher extends Searcher {
             } else {
                 queryLexical =
                         createSubQuery(
-                                cutoffQuery,
+                                cutoffSortByQuery,
                                 MARQO_SEARCH_METHOD_LEXICAL,
                                 MARQO_SEARCH_METHOD_LEXICAL,
                                 verbose);
                 queryTensor =
                         createSubQuery(
-                                cutoffQuery,
+                                cutoffSortByQuery,
                                 MARQO_SEARCH_METHOD_TENSOR,
                                 MARQO_SEARCH_METHOD_TENSOR,
                                 verbose);
@@ -464,7 +456,7 @@ public class HybridSearcher extends Searcher {
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
             if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
                 Query combinedQuery =
-                        createSubQuery(cutoffQuery, retrievalMethod, rankingMethod, verbose);
+                        createSubQuery(cutoffSortByQuery, retrievalMethod, rankingMethod, verbose);
                 Result result = execution.search(combinedQuery);
                 hitsForPostProcessing = result.hits();
                 logIfVerbose("Unprocessed results: ", verbose);
