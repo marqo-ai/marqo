@@ -790,7 +790,7 @@ public class HybridSearcher extends Searcher {
             if (overrideLimitPlusOffset) {
                 // Override mode: expand retrieval to max(relevantCandidates, limit+offset)
                 // so all relevant documents are fetched even if they exceed limit+offset.
-                newHits = Math.max(relevantCandidates, (currentLimit + currentOffset));
+                newHits = relevantCandidates;
                 if (currentTensorTargetHits != null) {
                     newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
                 }
