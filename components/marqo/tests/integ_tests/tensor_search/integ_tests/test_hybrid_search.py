@@ -2148,7 +2148,7 @@ class TestHybridSearch(MarqoTestCase):
                 vespa_query_kwargs = call_args[0][1]
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
-                self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.5)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.2)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 60)
 
                 # Make sure results are retrieved
