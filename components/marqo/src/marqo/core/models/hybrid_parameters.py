@@ -74,7 +74,7 @@ class HybridParameters(StrictBaseModel):
         fusion_ranking_methods = [RankingMethod.RRF]
         if values.get('alpha') is None:
             if values.get('rankingMethod') in fusion_ranking_methods:
-                values['alpha'] = 0.5
+                values['alpha'] = 0.2
         else:
             if values.get('rankingMethod') not in fusion_ranking_methods:
                 raise ValueError(

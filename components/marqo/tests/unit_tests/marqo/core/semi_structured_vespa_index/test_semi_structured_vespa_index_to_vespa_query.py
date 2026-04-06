@@ -1613,7 +1613,7 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
         self.assertEqual(10, vespa_query['ranking.rerankCount'])
         self.assertEqual(RetrievalMethod.Disjunction, vespa_query['marqo__hybrid.retrievalMethod'])
         self.assertEqual(RankingMethod.RRF, vespa_query['marqo__hybrid.rankingMethod'])
-        self.assertEqual(0.5, vespa_query['marqo__hybrid.alpha'])
+        self.assertEqual(0.2, vespa_query['marqo__hybrid.alpha'])
         self.assertEqual(60, vespa_query['marqo__hybrid.rrf_k'])
 
         # Assert hasRankingLexical and hasRankingVector flags are set
