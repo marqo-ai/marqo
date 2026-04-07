@@ -798,7 +798,7 @@ public class HybridSearcher extends Searcher {
                 // so all relevant documents are fetched even if they exceed limit+offset.
                 newHits = relevantCandidates;
                 if (currentTensorTargetHits != null) {
-                    newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
+                    newTensorTargetHits = relevantCandidates;
                 }
             } else {
                 // Default: reduce to min(relevantCandidates, limit+offset)
