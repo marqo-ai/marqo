@@ -374,48 +374,16 @@ public class HybridSearcher extends Searcher {
             Result resultLexical, resultTensor;
             Query queryLexical, queryTensor;
 
-            if (isSelectiveCutoff) {
-                // Target from cutoffQuery (reduced), non-target from original (unreduced)
-                if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
-                    throw new RuntimeException(
-                            "applyInRetrieval='lexical' is not supported. This value is blocked at"
-                                    + " the API layer and should never reach this point.");
-                } else {
-                    // Must be tensor cutoff
-                    queryLexical =
-                            createSubQuery(
-                                    query,
-                                    MARQO_SEARCH_METHOD_LEXICAL,
-                                    MARQO_SEARCH_METHOD_LEXICAL,
-                                    verbose);
-                    queryLexical.setOffset(0);
-                    // The lexical leg is not subject to relevance cut-off here; expand its hits to
-                    // probeDepth so the post-process/sort pool remains stable regardless of
-                    // limit/offset.
-                    queryLexical.setHits(relevanceCutoffProbeDepth);
-                    queryTensor =
-                            createSubQuery(
-                                    cutoffSortByQuery,
-                                    MARQO_SEARCH_METHOD_TENSOR,
-                                    MARQO_SEARCH_METHOD_TENSOR,
-                                    verbose);
-                }
-            } else {
-                // No matter there is cut-off or not, we can use cutoffSortByQuery to build the sub-query
-                // as the sub-query is unchanged if there is no cutoff, to simplify the logic here
-                queryLexical =
-                        createSubQuery(
-                                cutoffSortByQuery,
-                                MARQO_SEARCH_METHOD_LEXICAL,
-                                MARQO_SEARCH_METHOD_LEXICAL,
-                                verbose);
-                queryTensor =
-                        createSubQuery(
-                                cutoffSortByQuery,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                MARQO_SEARCH_METHOD_TENSOR,
-                                verbose);
-            }
+            Query[] subQueries =
+                    buildDisjunctionSubQueries(
+                            isSelectiveCutoff,
+                            applyInRetrieval,
+                            query,
+                            cutoffSortByQuery,
+                            relevanceCutoffProbeDepth,
+                            verbose);
+            queryLexical = subQueries[0];
+            queryTensor = subQueries[1];
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -618,6 +586,65 @@ public class HybridSearcher extends Searcher {
             }
         }
         return futureFacets;
+    }
+
+    /**
+     * Builds lexical and tensor sub-queries for disjunction retrieval.
+     *
+     * @return a two-element array {@code [queryLexical, queryTensor]}
+     */
+    Query[] buildDisjunctionSubQueries(
+            boolean isSelectiveCutoff,
+            ApplyInRetrieval applyInRetrieval,
+            Query originalQuery,
+            Query cutoffQuery,
+            Integer probeDepth,
+            boolean verbose) {
+        Query queryLexical, queryTensor;
+        if (isSelectiveCutoff) {
+            // Target from cutoffQuery (reduced), non-target from original (unreduced)
+            if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
+                throw new RuntimeException(
+                        "applyInRetrieval='lexical' is not supported. This value is blocked at"
+                                + " the API layer and should never reach this point.");
+            } else {
+                // Must be tensor cutoff
+                queryLexical =
+                        createSubQuery(
+                                originalQuery,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                verbose);
+                queryLexical.setOffset(0);
+                // The lexical leg is not subject to relevance cut-off here; expand its hits to
+                // probeDepth so the post-process/sort pool remains stable regardless of
+                // limit/offset.
+                queryLexical.setHits(probeDepth);
+                queryTensor =
+                        createSubQuery(
+                                cutoffQuery,
+                                MARQO_SEARCH_METHOD_TENSOR,
+                                MARQO_SEARCH_METHOD_TENSOR,
+                                verbose);
+            }
+        } else {
+            // No matter there is cut-off or not, we can use cutoffSortByQuery to build the
+            // sub-query
+            // as the sub-query is unchanged if there is no cutoff, to simplify the logic here
+            queryLexical =
+                    createSubQuery(
+                            cutoffQuery,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            verbose);
+            queryTensor =
+                    createSubQuery(
+                            cutoffQuery,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            verbose);
+        }
+        return new Query[] {queryLexical, queryTensor};
     }
 
     /**
