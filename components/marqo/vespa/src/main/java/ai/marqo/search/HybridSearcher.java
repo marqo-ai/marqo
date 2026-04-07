@@ -388,8 +388,8 @@ public class HybridSearcher extends Searcher {
                                     MARQO_SEARCH_METHOD_LEXICAL,
                                     verbose);
                     queryLexical.setOffset(0);
-                    // Since this is retrieval is not cut-offed and we always aim for a static sorting/ranking
-                    // pool, we increase the hits to probeDepth.
+                    // The lexical leg is not subject to cutoff here; expand its hits to probeDepth
+                    // so the post-process pool remains stable regardless of limit/offset.
                     queryLexical.setHits(relevanceCutoffProbeDepth);
                     queryTensor =
                             createSubQuery(
