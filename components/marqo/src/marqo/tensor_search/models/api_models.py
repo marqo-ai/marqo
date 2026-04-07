@@ -392,12 +392,15 @@ class SearchQuery(BaseMarqoModel):
         hybrid_parameters = values.get('hybridParameters')
         if relevance_cutoff is None:
             return values
+        is_disjunction = (
+                hybrid_parameters is not None
+                and hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction
+        )
         if relevance_cutoff.apply_in_retrieval is None:
-            # apply_in_retrieval defaults to None on the model; set the concrete default here
-            # so all downstream code (Vespa query builder, Java searcher) sees a resolved value.
-            relevance_cutoff.apply_in_retrieval = ApplyInRetrieval.Both
-        elif (hybrid_parameters is None
-              or hybrid_parameters.retrievalMethod != RetrievalMethod.Disjunction):
+            # Resolve the default only for disjunction, where the concept of legs applies.
+            if is_disjunction:
+                relevance_cutoff.apply_in_retrieval = ApplyInRetrieval.Both
+        elif not is_disjunction:
             raise ValueError(
                 "relevanceCutoff.applyInRetrieval can only be set when "
                 "hybridParameters.retrievalMethod is 'disjunction'"

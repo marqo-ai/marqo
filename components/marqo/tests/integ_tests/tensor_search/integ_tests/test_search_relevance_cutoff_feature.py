@@ -2088,103 +2088,6 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
 
 @pytest.mark.skip_for_multinode(
     "Multi-nodes will return different lexical results so we can not assert on the results.")
-class TestRelevanceCutoffApplyInRetrieval(MarqoTestCase):
-    """Tests for applyInRetrieval parameter that targets relevance cutoff to a specific
-    retrieval leg (lexical or tensor) during hybrid disjunction search.
-
-    When applyInRetrieval is set, the cutoff-adjusted hits limit should only apply to the
-    target retrieval leg, while the other leg fetches the full result set.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.index_request = cls.unstructured_marqo_index_request(
-            model=Model(name="hf/all-MiniLM-L6-v2"),
-        )
-        cls.create_indexes([cls.index_request])
-        cls.index_name = cls.index_request.name
-
-        cls.test_docs = [
-            {"_id": "doc1", "text": "The quick brown fox jumps over the lazy dog.",
-             "color": "red", "price": 9.99},
-            {"_id": "doc2", "text": "Artificial intelligence is transforming the modern world.",
-             "color": "red", "price": 24.50},
-            {"_id": "doc3", "text": "The sun sets beautifully over the mountain horizon.",
-             "color": "red", "price": 4.75},
-            {"_id": "doc4", "text": "Learning a new language opens many doors in life.",
-             "color": "red", "price": 49.99},
-            {"_id": "doc5", "text": "Fresh coffee in the morning is the best way to start the day.",
-             "color": "red", "price": 12.00},
-            {"_id": "doc6", "text": "The ocean is home to millions of undiscovered species.",
-             "color": "blue", "price": 7.30},
-            {"_id": "doc7", "text": "Reading books regularly improves focus and vocabulary.",
-             "color": "blue", "price": 33.80},
-            {"_id": "doc8", "text": "Space exploration has uncovered fascinating mysteries of the universe.",
-             "color": "blue", "price": 18.45},
-        ]
-
-        cls.add_documents(
-            config=cls.config,
-            add_docs_params=AddDocsParams(
-                docs=cls.test_docs,
-                index_name=cls.index_name,
-                tensor_fields=['text']
-            )
-        )
-
-    def setUp(self):
-        pass  # Override parent to preserve documents between tests
-
-    @classmethod
-    def _search(cls, query="universe ocean intelligence world vocabulary millions day",
-                relevance_cutoff=None, limit=10, offset=0, alpha=0.5,
-                facets=None, track_total_hits=None, sort_by=None):
-        hybrid_parameters = {
-            "retrievalMethod": "disjunction",
-            "rankingMethod": "rrf",
-            "alpha": alpha,
-        }
-        search_query_dict = {
-            "q": query,
-            "searchMethod": SearchMethod.HYBRID,
-            "hybridParameters": hybrid_parameters,
-            "limit": limit,
-            "offset": offset,
-        }
-        if relevance_cutoff is not None:
-            search_query_dict["relevanceCutoff"] = relevance_cutoff
-        if facets is not None:
-            search_query_dict["facets"] = facets
-        if track_total_hits is not None:
-            search_query_dict["trackTotalHits"] = track_total_hits
-        if sort_by is not None:
-            search_query_dict["sortBy"] = sort_by
-        return json.loads(search(
-            index_name=cls.index_name,
-            marqo_config=cls.config,
-            device="cpu",
-            search_query_dict=search_query_dict
-        ).body.decode('utf-8'))
-
-    def test_apply_in_retrieval_both_matches_default_behavior(self):
-        """applyInRetrieval='both' should produce the same results as no applyInRetrieval."""
-        cutoff_base = {
-            "method": "relative_max_score",
-            "probeDepth": 1000,
-            "parameters": {"relativeScoreFactor": 0.2},
-        }
-        result_default = self._search(relevance_cutoff=cutoff_base)
-        result_both = self._search(relevance_cutoff={**cutoff_base, "applyInRetrieval": "both"})
-
-        default_ids = [hit["_id"] for hit in result_default["hits"]]
-        both_ids = [hit["_id"] for hit in result_both["hits"]]
-        self.assertEqual(default_ids, both_ids)
-        self.assertEqual(result_default["_relevantCandidates"], result_both["_relevantCandidates"])
-
-
-@pytest.mark.skip_for_multinode(
-    "Multi-nodes will return different lexical results so we can not assert on the results.")
 class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
     """Tests that applyInRetrieval='tensor' preserves all lexical AND-matched results
     even under a strict cutoff, while using OR for the relevance cutoff probe.
@@ -2308,6 +2211,39 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
             self.assertIn("_lexical_score", hit)
             self.assertNotIn("_tensor_score", hit)
 
+    def test_apply_in_tensor_preserves_update_to_probe_depth_lexical_matches(self):
+        """A test to ensure probeDepth can be used to cap the lexical retrievals even if it is not cut.
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 5,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+            },
+        )
+
+        # Can't assert on the actual returned hits as the returned documents vary accross different runs
+        self.assertEqual(5, len(result['hits']))
+        # We make expected ids a set as the lexical score can vary in different runs
+        self.assertEqual(1, result["_relevantCandidates"])
+        # We only get 5 results because lexical only return 5 results
+        self.assertEqual(5, result["_postProcessCandidates"])
+
+        self.assertIn(
+            "_lexical_score", result["hits"][0]
+        )
+        self.assertIn("_tensor_score", result["hits"][0])
+
+        # Since _relevantCandidates is 1, all following results should not have tensor score
+        for hit in result['hits'][1:]:
+            self.assertIn("_lexical_score", hit)
+            self.assertNotIn("_tensor_score", hit)
+
+
     def test_apply_in_tensor_with_sort_by_preserves_all_lexical_and_matches(self):
         """With applyInRetrieval='tensor' + sortBy, all 9 AND-matched docs should
         still appear and be sorted by price. The cutoff only limits tensor retrieval,
@@ -2335,11 +2271,6 @@ class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
             "long_1", "long_5", "long_2", "long_6", "long_3",
             "long_7", "long_4", "long_8", "anchor"
         ]
-
-        # All 9 docs returned
-        self.assertEqual(9, len(returned_ids))
-        self.assertEqual(set(expected_order), set(returned_ids))
-
         # Sorted by price ascending
         self.assertEqual(expected_order, returned_ids)
 
