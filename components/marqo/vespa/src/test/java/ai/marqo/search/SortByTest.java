@@ -1218,14 +1218,14 @@ class SortByTest {
                     searcher.updateQueryHitsOffsetsAndTargetHits(
                             query, 200, null, true, false, false, true, false);
 
-            // overrideLimitPlusOffset=true: newHits=200, newTensorTargetHits=max(200,50)=200
+            // overrideLimitPlusOffset=true: newHits=200, newTensorTargetHits=relevantCandidates=200
             assertThat(result.getHits()).isEqualTo(200);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 200");
         }
 
         @Test
-        void shouldKeepLargerExistingTensorTargetHitsWhenOverrideEnabled() {
+        void shouldSetTensorTargetHitsToRelevantCandidatesEvenWhenExistingIsLarger() {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=0");
             query.properties()
@@ -1238,11 +1238,11 @@ class SortByTest {
                     searcher.updateQueryHitsOffsetsAndTargetHits(
                             query, 100, null, true, false, false, true, false);
 
-            // overrideLimitPlusOffset=true: newHits=100, newTensorTargetHits=max(100,500)=500
-            // (tensor YQL unchanged since max keeps the existing value)
+            // overrideLimitPlusOffset=true: newHits=100, newTensorTargetHits=relevantCandidates=100
+            // (always set to relevantCandidates, even when existing tensor targetHits is larger)
             assertThat(result.getHits()).isEqualTo(100);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
-            assertThat(updatedYql).contains("targetHits: 500");
+            assertThat(updatedYql).contains("targetHits: 100");
         }
 
         @Test
