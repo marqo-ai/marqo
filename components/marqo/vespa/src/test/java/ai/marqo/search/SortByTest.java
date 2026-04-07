@@ -1294,21 +1294,19 @@ class SortByTest {
 
         @Test
         void shouldExcludeNullValuesFromJsonSerialization() {
-            // Create metadata with some null values
+            // Realistic case: sortBy disabled (sortCandidates=null) and cutoff disabled
+            // (probeCandidates=null, relevantCandidates=null); postProcessCandidates is always set
             HybridSearcher.MarqoMetadataFields metadataWithNulls =
-                    new HybridSearcher.MarqoMetadataFields(5, null, 10, null);
+                    new HybridSearcher.MarqoMetadataFields(null, null, null, 10);
 
-            // Test JSON serialization excludes nulls
             StringBuilder json = new StringBuilder();
             metadataWithNulls.writeJson(json);
             String jsonString = json.toString();
 
-            // Should contain non-null values
-            assertThat(jsonString).contains("\"sortCandidates\":5");
-            assertThat(jsonString).contains("\"relevantCandidates\":10");
-
-            // Should not contain null field
+            assertThat(jsonString).contains("\"postProcessCandidates\":10");
+            assertThat(jsonString).doesNotContain("sortCandidates");
             assertThat(jsonString).doesNotContain("probeCandidates");
+            assertThat(jsonString).doesNotContain("relevantCandidates");
             assertThat(jsonString).doesNotContain("null");
         }
 
@@ -1331,22 +1329,6 @@ class SortByTest {
 
             // Should not contain null
             assertThat(jsonString).doesNotContain("null");
-        }
-
-        @Test
-        void shouldHandleAllNullValuesInJsonSerialization() {
-            // Create metadata with all null values
-            HybridSearcher.MarqoMetadataFields metadataAllNulls =
-                    new HybridSearcher.MarqoMetadataFields(null, null, null, null);
-
-            // Test JSON serialization with all nulls
-            StringBuilder json = new StringBuilder();
-            metadataAllNulls.writeJson(json);
-            String jsonString = json.toString();
-
-            // Should be empty JSON object (no fields included due to
-            // @JsonInclude(Include.NON_NULL))
-            assertThat(jsonString).isEqualTo("{}");
         }
     }
 }
