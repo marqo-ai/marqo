@@ -1158,6 +1158,129 @@ class SortByTest {
     }
 
     @Nested
+    class OverrideLimitPlusOffsetTest {
+
+        @Test
+        void shouldExpandHitsToRelevantCandidatesWhenOverrideEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 200, null, true, false, false, true, false);
+
+            // overrideLimitPlusOffset=true: newHits = relevantCandidates = 200
+            // (expands beyond limit+offset=10)
+            assertThat(result.getHits()).isEqualTo(200);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldReduceHitsBelowLimitWhenRelevantCandidatesSmall() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 3, null, true, false, false, true, false);
+
+            // overrideLimitPlusOffset=true: newHits = relevantCandidates = 3
+            // (can also reduce below limit+offset)
+            assertThat(result.getHits()).isEqualTo(3);
+        }
+
+        @Test
+        void shouldExpandHitsWithNonZeroOffset() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=5");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 20, null, true, false, false, true, false);
+
+            // overrideLimitPlusOffset=true: newHits = relevantCandidates = 20
+            // (limit+offset=15, but we ignore that and use 20)
+            assertThat(result.getHits()).isEqualTo(20);
+            assertThat(result.getOffset()).isEqualTo(0);
+        }
+
+        @Test
+        void shouldSetTensorTargetHitsToMaxWhenOverrideEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where ({targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950}nearestNeighbor(f, q))");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 200, null, true, false, false, true, false);
+
+            // overrideLimitPlusOffset=true: newHits=200, newTensorTargetHits=max(200,50)=200
+            assertThat(result.getHits()).isEqualTo(200);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql).contains("targetHits: 200");
+        }
+
+        @Test
+        void shouldKeepLargerExistingTensorTargetHitsWhenOverrideEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where ({targetHits: 500,"
+                                    + " hnsw.exploreAdditionalHits: 1500}nearestNeighbor(f, q))");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 100, null, true, false, false, true, false);
+
+            // overrideLimitPlusOffset=true: newHits=100, newTensorTargetHits=max(100,500)=500
+            // (tensor YQL unchanged since max keeps the existing value)
+            assertThat(result.getHits()).isEqualTo(100);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql).contains("targetHits: 500");
+        }
+
+        @Test
+        void shouldUseLimitPlusOffsetMinBehaviourWhenOverrideDisabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 200, null, true, false, false, false, false);
+
+            // overrideLimitPlusOffset=false: newHits = min(200, 10) = 10
+            assertThat(result.getHits()).isEqualTo(10);
+        }
+
+        @Test
+        void shouldSetTensorTargetHitsToMinWhenOverrideDisabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where ({targetHits: 50,"
+                                    + " hnsw.exploreAdditionalHits: 1950}nearestNeighbor(f, q))");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 200, null, true, false, false, false, false);
+
+            // overrideLimitPlusOffset=false: newHits=min(200,10)=10,
+            // newTensorTargetHits=min(10,50)=10
+            assertThat(result.getHits()).isEqualTo(10);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql).contains("targetHits: 10");
+        }
+    }
+
+    @Nested
     class MarqoMetadataFieldsTest {
 
         @Test
