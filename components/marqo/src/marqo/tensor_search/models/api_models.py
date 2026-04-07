@@ -21,7 +21,7 @@ from marqo.tensor_search.models.recency_parameters import RecencyParameters, App
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+from marqo.tensor_search.models.relevance_cutoff_model import ApplyInRetrieval, RelevanceCutoffModel
 from marqo.tensor_search.models.collapse_model import CollapseModel
 
 class BaseMarqoModel(BaseModel):
@@ -390,7 +390,7 @@ class SearchQuery(BaseMarqoModel):
         relevance_cutoff = values.get('relevance_cutoff')
         hybrid_parameters = values.get('hybridParameters')
         if (relevance_cutoff is not None
-                and relevance_cutoff.apply_in_retrieval is not None
+                and relevance_cutoff.apply_in_retrieval != ApplyInRetrieval.Both
                 and (hybrid_parameters is None
                      or hybrid_parameters.retrievalMethod != RetrievalMethod.Disjunction)):
             raise ValueError(
