@@ -166,10 +166,10 @@ class TestRelevanceCutoffModel(TestCase):
                 )
                 self.assertEqual(m.apply_in_retrieval, value)
 
-    def test_apply_in_retrieval_none_by_default(self):
-        """Test that applyInRetrieval defaults to None."""
+    def test_apply_in_retrieval_both_by_default(self):
+        """Test that applyInRetrieval defaults to 'both'."""
         m = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
-        self.assertIsNone(m.apply_in_retrieval)
+        self.assertEqual(m.apply_in_retrieval, ApplyInRetrieval.Both)
 
     def test_apply_in_retrieval_invalid_value(self):
         """Test that invalid applyInRetrieval values are rejected."""
@@ -226,8 +226,8 @@ class TestRelevanceCutoffModel(TestCase):
         )
         self.assertEqual(sq.relevance_cutoff.apply_in_retrieval, 'tensor')
 
-    def test_apply_in_retrieval_none_accepted_with_any_retrieval_method(self):
-        """Test that applyInRetrieval=None works with any retrieval method."""
+    def test_apply_in_retrieval_both_default_accepted_with_any_retrieval_method(self):
+        """Test that applyInRetrieval defaults to 'both' and works with any retrieval method."""
         relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.GapDetection
         )
@@ -240,7 +240,7 @@ class TestRelevanceCutoffModel(TestCase):
                 rankingMethod='rrf'
             )
         )
-        self.assertIsNone(sq.relevance_cutoff.apply_in_retrieval)
+        self.assertEqual(sq.relevance_cutoff.apply_in_retrieval, ApplyInRetrieval.Both)
 
     def test_apply_in_retrieval_incompatible_with_override_sort_candidates(self):
         """applyInRetrieval='tensor' cannot be combined with
@@ -263,11 +263,11 @@ class TestRelevanceCutoffModel(TestCase):
         self.assertEqual(m.apply_in_retrieval, 'both')
         self.assertTrue(m.override_sort_candidates_with_relevant_candidates)
 
-    def test_apply_in_retrieval_none_allowed_with_override_sort_candidates(self):
-        """applyInRetrieval=None (default) is compatible with overrideSortCandidatesWithRelevantCandidates."""
+    def test_apply_in_retrieval_both_default_allowed_with_override_sort_candidates(self):
+        """applyInRetrieval='both' (default) is compatible with overrideSortCandidatesWithRelevantCandidates."""
         m = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.GapDetection,
             overrideSortCandidatesWithRelevantCandidates=True
         )
-        self.assertIsNone(m.apply_in_retrieval)
+        self.assertEqual(m.apply_in_retrieval, ApplyInRetrieval.Both)
         self.assertTrue(m.override_sort_candidates_with_relevant_candidates)
