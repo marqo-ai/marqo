@@ -884,14 +884,6 @@ class StructuredVespaIndex(VespaIndex):
 
         terms = [self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases]
 
-        # Explicit lexicalOperand overrides automatic logic
-        lexical_operand = lexical_operand_override or (
-            marqo_query.hybrid_parameters.lexicalOperand if isinstance(marqo_query, MarqoHybridQuery) else None
-        )
-        if lexical_operand is not None:
-            return self._apply_lexical_operand(lexical_operand, terms, rerank_depth_lexical)
-
-
         # Facets always use OR
         if is_facets_term:
             return ' OR '.join(terms)
