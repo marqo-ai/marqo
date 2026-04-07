@@ -628,9 +628,11 @@ public class HybridSearcher extends Searcher {
                                 verbose);
             }
         } else {
-            // No matter there is cut-off or not, we can use cutoffSortByQuery to build the
-            // sub-query
-            // as the sub-query is unchanged if there is no cutoff, to simplify the logic here
+            // Two cases both handled correctly by using cutoffQuery:
+            // 1. No relevance cutoff: cutoffQuery is a plain clone of the original, so both legs
+            //    are unmodified.
+            // 2. applyInRetrieval=both: cutoffQuery is reduced and both legs should use the same
+            //    reduced query.
             queryLexical =
                     createSubQuery(
                             cutoffQuery,
