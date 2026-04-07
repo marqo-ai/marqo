@@ -346,22 +346,28 @@ public class HybridSearcher extends Searcher {
 
         // Clone the query for relevance cutoff & sortBy manipulation
         Query cutoffSortByQuery = query.clone();
-        cutoffSortByQuery =
-                updateQueryHitsOffsetsAndTargetHits(
-                        cutoffSortByQuery,
-                        relevantCandidates,
-                        sortByMinSortCandidates,
-                        isRelevanceCutoffMethodEnabled,
-                        isSortByEnabled,
-                        relevanceCutoffAffectFacets,
-                        relevanceCutoffOverrideLimitPlusOffset,
-                        verbose);
+        if (isRelevanceCutoffMethodEnabled || isSortByEnabled) {
+            cutoffSortByQuery =
+                    updateQueryHitsOffsetsAndTargetHits(
+                            cutoffSortByQuery,
+                            relevantCandidates,
+                            sortByMinSortCandidates,
+                            isRelevanceCutoffMethodEnabled,
+                            isSortByEnabled,
+                            relevanceCutoffAffectFacets,
+                            relevanceCutoffOverrideLimitPlusOffset,
+                            verbose);
+        }
 
         // Facet results will always be generated from a cutoff query to produce a conservative
         // count until we fix the
         // implementation in the future
-        List<Future<Result>> futureFacets =
-                getFacetsFutureList(cutoffSortByQuery, execution, verbose, collapse);
+        List<Future<Result>> futureFacets;
+        if (isRelevanceCutoffMethodEnabled || isSortByEnabled) {
+            futureFacets = getFacetsFutureList(cutoffSortByQuery, execution, verbose, collapse);
+        } else {
+            futureFacets = getFacetsFutureList(query, execution, verbose, collapse);
+        }
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
