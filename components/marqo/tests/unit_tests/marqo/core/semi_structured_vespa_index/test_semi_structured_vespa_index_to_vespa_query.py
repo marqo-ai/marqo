@@ -2639,6 +2639,75 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
                 lexical_yql = vespa_query.get('marqo__yql.lexical', '')
                 self.assertEqual(expected, lexical_yql)
 
+    # --- Facets + lexicalOperand tests ---
+
+    def test_generate_or_terms_facets_no_lexical_operand_uses_or(self):
+        """Unquoted query with no lexicalOperand and is_facets_term=True uses OR (default facets behaviour)."""
+        q = self._make_hybrid_query(or_phrases=['apple', 'banana'])
+        result = self.vespa_index._generate_or_terms(q, is_facets_term=True)
+        self.assertEqual('default contains "apple" OR default contains "banana"', result)
+
+    def test_generate_or_terms_facets_lexical_operand_or_uses_or(self):
+        """Unquoted query with lexicalOperand='or' and is_facets_term=True still uses OR."""
+        q = self._make_hybrid_query(lexical_operand='or', or_phrases=['apple', 'banana'])
+        result = self.vespa_index._generate_or_terms(q, is_facets_term=True)
+        self.assertEqual('default contains "apple" OR default contains "banana"', result)
+
+    def test_generate_or_terms_facets_lexical_operand_and_overrides_to_and(self):
+        """lexicalOperand='and' takes priority over is_facets_term, so facets use AND instead of default OR."""
+        q = self._make_hybrid_query(lexical_operand='and', or_phrases=['apple', 'banana'])
+        result = self.vespa_index._generate_or_terms(q, is_facets_term=True)
+        self.assertEqual('default contains "apple" AND default contains "banana"', result)
+
+    def test_generate_or_terms_facets_lexical_operand_weakand_overrides_to_weakand(self):
+        """lexicalOperand='weakAnd' takes priority over is_facets_term, so facets use weakAnd instead of default OR."""
+        q = self._make_hybrid_query(lexical_operand='weakAnd', or_phrases=['apple', 'banana'])
+        result = self.vespa_index._generate_or_terms(q, is_facets_term=True)
+        self.assertEqual('weakAnd(default contains "apple", default contains "banana")', result)
+
+    def test_facets_yql_no_lexical_operand_uses_or(self):
+        """End-to-end: unquoted query with no lexicalOperand produces an OR-based facets YQL."""
+        q = self._make_hybrid_query(
+            or_phrases=['hello', 'world'],
+        )
+        q.facets = FacetsParameters(fields={"title": FieldFacetsConfiguration(type="string")})
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        facets_yql = vespa_query.get('marqo__yql.facets', '')
+        self.assertIn('default contains "hello" OR default contains "world"', facets_yql)
+
+    def test_facets_yql_lexical_operand_or_uses_or(self):
+        """End-to-end: unquoted query with lexicalOperand='or' produces an OR-based facets YQL."""
+        q = self._make_hybrid_query(
+            lexical_operand='or',
+            or_phrases=['hello', 'world'],
+        )
+        q.facets = FacetsParameters(fields={"title": FieldFacetsConfiguration(type="string")})
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        facets_yql = vespa_query.get('marqo__yql.facets', '')
+        self.assertIn('default contains "hello" OR default contains "world"', facets_yql)
+
+    def test_facets_yql_lexical_operand_and_uses_and(self):
+        """End-to-end: unquoted query with lexicalOperand='and' produces an AND-based facets YQL."""
+        q = self._make_hybrid_query(
+            lexical_operand='and',
+            or_phrases=['hello', 'world'],
+        )
+        q.facets = FacetsParameters(fields={"title": FieldFacetsConfiguration(type="string")})
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        facets_yql = vespa_query.get('marqo__yql.facets', '')
+        self.assertIn('default contains "hello" AND default contains "world"', facets_yql)
+
+    def test_facets_yql_lexical_operand_weakand_uses_weakand(self):
+        """End-to-end: unquoted query with lexicalOperand='weakAnd' produces a weakAnd-based facets YQL."""
+        q = self._make_hybrid_query(
+            lexical_operand='weakAnd',
+            or_phrases=['hello', 'world'],
+        )
+        q.facets = FacetsParameters(fields={"title": FieldFacetsConfiguration(type="string")})
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        facets_yql = vespa_query.get('marqo__yql.facets', '')
+        self.assertIn('weakAnd(default contains "hello", default contains "world")', facets_yql)
+
 
 if __name__ == '__main__':
     unittest.main()
