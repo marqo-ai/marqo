@@ -12,8 +12,6 @@
 - Fix a crash when updating documents whose IDs contain special characters such as `#` or non-printable ASCII characters ([#1407](https://github.com/marqo-ai/marqo/pull/1407)).
 - Fix `min_sort_candidates` not being applied when trimming sort results ([#1406](https://github.com/marqo-ai/marqo/pull/1406)).
 - Fix bfloat16 indexes generating incorrect Vespa schema definitions by parameterizing the tensor numeric type ([#1390](https://github.com/marqo-ai/marqo/pull/1390)).
-- Fix relevance cut-off probe query logic for more accurate cutoff behavior.
-- Conditionally expose `pre_rerank_score` to avoid rollback incompatibility ([#1403](https://github.com/marqo-ai/marqo/pull/1403)).
 - Fix documentation URLs for the restructured docs site ([#1400](https://github.com/marqo-ai/marqo/pull/1400)).
 
 ## Other changes
