@@ -388,7 +388,6 @@ class SearchQuery(BaseMarqoModel):
     def _validate_apply_in_retrieval_only_works_for_disjunction(cls, values):
         """Validate that applyInRetrieval requires retrievalMethod=disjunction.
         Also sets the default value of applyInRetrieval to 'both' when not provided."""
-        from marqo.tensor_search.models.relevance_cutoff_model import ApplyInRetrieval
         relevance_cutoff = values.get('relevance_cutoff')
         hybrid_parameters = values.get('hybridParameters')
         if relevance_cutoff is None:
