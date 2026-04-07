@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from pydantic.v1 import ValidationError
 
-from marqo.core.models.hybrid_parameters import LexicalOperand, HybridParameters, RetrievalMethod
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod
 from marqo.tensor_search.models.relevance_cutoff_model import (
     RelevanceCutoffMethod,
     RelativeMaxScoreParameters,
@@ -64,7 +64,6 @@ class TestRelevanceCutoffModel(TestCase):
         self.assertIn("stdDevFactor", str(cm.exception))
 
     def test_gap_detection_valid(self):
-        # no parameters required
         m = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
         self.assertEqual(m.method, RelevanceCutoffMethod.GapDetection)
         self.assertIsNone(m.parameters)
@@ -81,7 +80,6 @@ class TestRelevanceCutoffModel(TestCase):
     def test_probe_depth_validation(self):
         params = RelativeMaxScoreParameters(relativeScoreFactor=0.5)
         with self.assertRaises(ValidationError):
-            # probeDepth must be >= 1
             RelevanceCutoffModel(
                 method=RelevanceCutoffMethod.RelativeMaxScore,
                 parameters=params,
@@ -89,52 +87,30 @@ class TestRelevanceCutoffModel(TestCase):
             )
 
     def test_relative_score_parameter_constraints(self):
-        # relativeScoreFactor must be >=0 and <=1
         with self.assertRaises(ValidationError):
             RelativeMaxScoreParameters(relativeScoreFactor=-1)
         with self.assertRaises(ValidationError):
             RelativeMaxScoreParameters(relativeScoreFactor=1.5)
 
     def test_std_dev_parameter_constraints(self):
-        # stdDevFactor must be a numeric value
         with self.assertRaises(ValidationError):
             MeanStdParameters(stdDevFactor="test")
 
-    def test_relevance_cutoff_with_tensor_search_fails(self):
-        """Test that relevance cutoff fails with TENSOR search method"""
-        relevance_cutoff = RelevanceCutoffModel(
-            method=RelevanceCutoffMethod.RelativeMaxScore,
-            parameters=RelativeMaxScoreParameters(relativeScoreFactor=0.75)
-        )
-        
-        with self.assertRaises(ValidationError) as cm:
-            SearchQuery(
-                q="test query",
-                searchMethod=SearchMethod.TENSOR,
-                relevanceCutoff=relevance_cutoff
-            )
-        
-        self.assertIn("relevanceCutoff can only be provided for 'HYBRID' search", str(cm.exception))
-        self.assertIn("TENSOR", str(cm.exception))
-
-    def test_relevance_cutoff_with_lexical_search_fails(self):
-        """Test that relevance cutoff fails with LEXICAL search method"""
-        relevance_cutoff = RelevanceCutoffModel(
-            method=RelevanceCutoffMethod.GapDetection
-        )
-        
-        with self.assertRaises(ValidationError) as cm:
-            SearchQuery(
-                q="test query",
-                searchMethod=SearchMethod.LEXICAL,
-                relevanceCutoff=relevance_cutoff
-            )
-        
-        self.assertIn("relevanceCutoff can only be provided for 'HYBRID' search", str(cm.exception))
-        self.assertIn("LEXICAL", str(cm.exception))
+    def test_relevance_cutoff_rejected_for_non_hybrid_search_methods(self):
+        """relevanceCutoff is only valid for HYBRID search."""
+        relevance_cutoff = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
+        for search_method in [SearchMethod.TENSOR, SearchMethod.LEXICAL]:
+            with self.subTest(searchMethod=search_method):
+                with self.assertRaises(ValidationError) as cm:
+                    SearchQuery(
+                        q="test query",
+                        searchMethod=search_method,
+                        relevanceCutoff=relevance_cutoff
+                    )
+                self.assertIn("relevanceCutoff can only be provided for 'HYBRID' search", str(cm.exception))
+                self.assertIn(search_method, str(cm.exception))
 
     def test_lexical_operand_valid_values(self):
-        """Test that valid lexicalOperand values are accepted."""
         for operand in ['or', 'and', 'weakAnd']:
             with self.subTest(operand=operand):
                 m = RelevanceCutoffModel(
@@ -144,12 +120,10 @@ class TestRelevanceCutoffModel(TestCase):
                 self.assertEqual(m.lexical_operand, operand)
 
     def test_lexical_operand_none_by_default(self):
-        """Test that lexicalOperand defaults to None."""
         m = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
         self.assertIsNone(m.lexical_operand)
 
     def test_lexical_operand_invalid_value(self):
-        """Test that invalid lexicalOperand values are rejected."""
         with self.assertRaises(ValidationError):
             RelevanceCutoffModel(
                 method=RelevanceCutoffMethod.GapDetection,
@@ -157,7 +131,6 @@ class TestRelevanceCutoffModel(TestCase):
             )
 
     def test_apply_in_retrieval_valid_values(self):
-        """Test that valid applyInRetrieval values are accepted."""
         for value in ['tensor', 'both']:
             with self.subTest(value=value):
                 m = RelevanceCutoffModel(
@@ -167,12 +140,10 @@ class TestRelevanceCutoffModel(TestCase):
                 self.assertEqual(m.apply_in_retrieval, value)
 
     def test_apply_in_retrieval_both_by_default(self):
-        """Test that applyInRetrieval defaults to 'both'."""
         m = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
         self.assertEqual(m.apply_in_retrieval, ApplyInRetrieval.Both)
 
     def test_apply_in_retrieval_invalid_value(self):
-        """Test that invalid applyInRetrieval values are rejected."""
         with self.assertRaises(ValidationError):
             RelevanceCutoffModel(
                 method=RelevanceCutoffMethod.GapDetection,
@@ -180,7 +151,6 @@ class TestRelevanceCutoffModel(TestCase):
             )
 
     def test_apply_in_retrieval_lexical_not_supported(self):
-        """Test that applyInRetrieval='lexical' is currently blocked."""
         with self.assertRaises(ValidationError) as cm:
             RelevanceCutoffModel(
                 method=RelevanceCutoffMethod.GapDetection,
@@ -188,13 +158,12 @@ class TestRelevanceCutoffModel(TestCase):
             )
         self.assertIn("not currently supported", str(cm.exception))
 
-    def test_apply_in_retrieval_requires_disjunction_retrieval_method(self):
-        """Test that applyInRetrieval is rejected when retrievalMethod is not disjunction."""
+    def test_apply_in_retrieval_tensor_requires_disjunction_retrieval_method(self):
+        """applyInRetrieval='tensor' is rejected when retrievalMethod is not disjunction."""
         relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.GapDetection,
             applyInRetrieval='tensor'
         )
-
         for retrieval_method in [RetrievalMethod.Tensor, RetrievalMethod.Lexical]:
             with self.subTest(retrievalMethod=retrieval_method):
                 with self.assertRaises(ValidationError) as cm:
@@ -209,8 +178,8 @@ class TestRelevanceCutoffModel(TestCase):
                     )
                 self.assertIn("applyInRetrieval", str(cm.exception))
 
-    def test_apply_in_retrieval_accepted_with_disjunction(self):
-        """Test that applyInRetrieval='tensor' is accepted when retrievalMethod is disjunction."""
+    def test_apply_in_retrieval_tensor_accepted_with_disjunction(self):
+        """applyInRetrieval='tensor' is accepted when retrievalMethod is disjunction."""
         relevance_cutoff = RelevanceCutoffModel(
             method=RelevanceCutoffMethod.GapDetection,
             applyInRetrieval='tensor'
@@ -227,24 +196,28 @@ class TestRelevanceCutoffModel(TestCase):
         self.assertEqual(sq.relevance_cutoff.apply_in_retrieval, 'tensor')
 
     def test_apply_in_retrieval_both_default_accepted_with_any_retrieval_method(self):
-        """Test that applyInRetrieval defaults to 'both' and works with any retrieval method."""
-        relevance_cutoff = RelevanceCutoffModel(
-            method=RelevanceCutoffMethod.GapDetection
-        )
-        sq = SearchQuery(
-            q="test query",
-            searchMethod=SearchMethod.HYBRID,
-            relevanceCutoff=relevance_cutoff,
-            hybridParameters=HybridParameters(
-                retrievalMethod='disjunction',
-                rankingMethod='rrf'
-            )
-        )
-        self.assertEqual(sq.relevance_cutoff.apply_in_retrieval, ApplyInRetrieval.Both)
+        """applyInRetrieval defaults to 'both', which is accepted for any retrievalMethod."""
+        relevance_cutoff = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
+        cases = [
+            (RetrievalMethod.Disjunction, 'rrf'),
+            (RetrievalMethod.Tensor, 'tensor'),
+            (RetrievalMethod.Lexical, 'lexical'),
+        ]
+        for retrieval_method, ranking_method in cases:
+            with self.subTest(retrievalMethod=retrieval_method):
+                sq = SearchQuery(
+                    q="test query",
+                    searchMethod=SearchMethod.HYBRID,
+                    relevanceCutoff=relevance_cutoff,
+                    hybridParameters=HybridParameters(
+                        retrievalMethod=retrieval_method,
+                        rankingMethod=ranking_method
+                    )
+                )
+                self.assertEqual(sq.relevance_cutoff.apply_in_retrieval, ApplyInRetrieval.Both)
 
     def test_apply_in_retrieval_incompatible_with_override_sort_candidates(self):
-        """applyInRetrieval='tensor' cannot be combined with
-        overrideSortCandidatesWithRelevantCandidates."""
+        """applyInRetrieval='tensor' cannot be combined with overrideSortCandidatesWithRelevantCandidates."""
         with self.assertRaises(ValidationError) as cm:
             RelevanceCutoffModel(
                 method=RelevanceCutoffMethod.GapDetection,
@@ -253,21 +226,16 @@ class TestRelevanceCutoffModel(TestCase):
             )
         self.assertIn("applyInRetrieval", str(cm.exception))
 
-    def test_apply_in_retrieval_both_allowed_with_override_sort_candidates(self):
-        """applyInRetrieval='both' is compatible with overrideSortCandidatesWithRelevantCandidates."""
-        m = RelevanceCutoffModel(
-            method=RelevanceCutoffMethod.GapDetection,
-            applyInRetrieval='both',
-            overrideSortCandidatesWithRelevantCandidates=True
-        )
-        self.assertEqual(m.apply_in_retrieval, 'both')
-        self.assertTrue(m.override_sort_candidates_with_relevant_candidates)
-
-    def test_apply_in_retrieval_both_default_allowed_with_override_sort_candidates(self):
-        """applyInRetrieval='both' (default) is compatible with overrideSortCandidatesWithRelevantCandidates."""
-        m = RelevanceCutoffModel(
-            method=RelevanceCutoffMethod.GapDetection,
-            overrideSortCandidatesWithRelevantCandidates=True
-        )
-        self.assertEqual(m.apply_in_retrieval, ApplyInRetrieval.Both)
-        self.assertTrue(m.override_sort_candidates_with_relevant_candidates)
+    def test_apply_in_retrieval_both_compatible_with_override_sort_candidates(self):
+        """applyInRetrieval='both' (explicit or default) is compatible with overrideSortCandidatesWithRelevantCandidates."""
+        for apply_in_retrieval in ['both', None]:
+            with self.subTest(applyInRetrieval=apply_in_retrieval):
+                kwargs = dict(
+                    method=RelevanceCutoffMethod.GapDetection,
+                    overrideSortCandidatesWithRelevantCandidates=True
+                )
+                if apply_in_retrieval is not None:
+                    kwargs['applyInRetrieval'] = apply_in_retrieval
+                m = RelevanceCutoffModel(**kwargs)
+                self.assertEqual(m.apply_in_retrieval, ApplyInRetrieval.Both)
+                self.assertTrue(m.override_sort_candidates_with_relevant_candidates)
