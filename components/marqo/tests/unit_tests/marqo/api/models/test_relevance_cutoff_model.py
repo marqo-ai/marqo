@@ -139,9 +139,9 @@ class TestRelevanceCutoffModel(TestCase):
                 )
                 self.assertEqual(m.apply_in_retrieval, value)
 
-    def test_apply_in_retrieval_both_by_default(self):
+    def test_apply_in_retrieval_none_by_default(self):
         m = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
-        self.assertEqual(m.apply_in_retrieval, ApplyInRetrieval.Both)
+        self.assertIsNone(m.apply_in_retrieval)
 
     def test_apply_in_retrieval_invalid_value(self):
         with self.assertRaises(ValidationError):
@@ -158,52 +158,57 @@ class TestRelevanceCutoffModel(TestCase):
             )
         self.assertIn("not currently supported", str(cm.exception))
 
-    def test_apply_in_retrieval_tensor_requires_disjunction_retrieval_method(self):
-        """applyInRetrieval='tensor' is rejected when retrievalMethod is not disjunction."""
-        relevance_cutoff = RelevanceCutoffModel(
-            method=RelevanceCutoffMethod.GapDetection,
-            applyInRetrieval='tensor'
-        )
-        for retrieval_method in [RetrievalMethod.Tensor, RetrievalMethod.Lexical]:
-            with self.subTest(retrievalMethod=retrieval_method):
+    def test_apply_in_retrieval_requires_disjunction_when_set(self):
+        """applyInRetrieval is rejected when explicitly set and retrievalMethod is not disjunction."""
+        for value, retrieval_method, ranking_method in [
+            ('tensor', RetrievalMethod.Tensor, 'tensor'),
+            ('tensor', RetrievalMethod.Lexical, 'lexical'),
+            ('both', RetrievalMethod.Tensor, 'tensor'),
+            ('both', RetrievalMethod.Lexical, 'lexical'),
+        ]:
+            with self.subTest(applyInRetrieval=value, retrievalMethod=retrieval_method):
                 with self.assertRaises(ValidationError) as cm:
                     SearchQuery(
                         q="test query",
                         searchMethod=SearchMethod.HYBRID,
-                        relevanceCutoff=relevance_cutoff,
+                        relevanceCutoff=RelevanceCutoffModel(
+                            method=RelevanceCutoffMethod.GapDetection,
+                            applyInRetrieval=value
+                        ),
                         hybridParameters=HybridParameters(
                             retrievalMethod=retrieval_method,
-                            rankingMethod='tensor'
+                            rankingMethod=ranking_method
                         )
                     )
                 self.assertIn("applyInRetrieval", str(cm.exception))
 
-    def test_apply_in_retrieval_tensor_accepted_with_disjunction(self):
-        """applyInRetrieval='tensor' is accepted when retrievalMethod is disjunction."""
-        relevance_cutoff = RelevanceCutoffModel(
-            method=RelevanceCutoffMethod.GapDetection,
-            applyInRetrieval='tensor'
-        )
-        sq = SearchQuery(
-            q="test query",
-            searchMethod=SearchMethod.HYBRID,
-            relevanceCutoff=relevance_cutoff,
-            hybridParameters=HybridParameters(
-                retrievalMethod='disjunction',
-                rankingMethod='rrf'
-            )
-        )
-        self.assertEqual(sq.relevance_cutoff.apply_in_retrieval, 'tensor')
+    def test_apply_in_retrieval_accepted_with_disjunction(self):
+        """applyInRetrieval is accepted when retrievalMethod is disjunction."""
+        for value in ['tensor', 'both']:
+            with self.subTest(applyInRetrieval=value):
+                sq = SearchQuery(
+                    q="test query",
+                    searchMethod=SearchMethod.HYBRID,
+                    relevanceCutoff=RelevanceCutoffModel(
+                        method=RelevanceCutoffMethod.GapDetection,
+                        applyInRetrieval=value
+                    ),
+                    hybridParameters=HybridParameters(
+                        retrievalMethod='disjunction',
+                        rankingMethod='rrf'
+                    )
+                )
+                self.assertEqual(sq.relevance_cutoff.apply_in_retrieval, value)
 
-    def test_apply_in_retrieval_both_default_accepted_with_any_retrieval_method(self):
-        """applyInRetrieval defaults to 'both', which is accepted for any retrievalMethod."""
+    def test_apply_in_retrieval_default_none_accepted_with_any_retrieval_method(self):
+        """When applyInRetrieval is not set, relevanceCutoff works with any retrievalMethod
+        and SearchQuery resolves the default to 'both'."""
         relevance_cutoff = RelevanceCutoffModel(method=RelevanceCutoffMethod.GapDetection)
-        cases = [
+        for retrieval_method, ranking_method in [
             (RetrievalMethod.Disjunction, 'rrf'),
             (RetrievalMethod.Tensor, 'tensor'),
             (RetrievalMethod.Lexical, 'lexical'),
-        ]
-        for retrieval_method, ranking_method in cases:
+        ]:
             with self.subTest(retrievalMethod=retrieval_method):
                 sq = SearchQuery(
                     q="test query",
@@ -227,7 +232,7 @@ class TestRelevanceCutoffModel(TestCase):
         self.assertIn("applyInRetrieval", str(cm.exception))
 
     def test_apply_in_retrieval_both_compatible_with_override_sort_candidates(self):
-        """applyInRetrieval='both' (explicit or default) is compatible with overrideSortCandidatesWithRelevantCandidates."""
+        """applyInRetrieval='both' (explicit or default None) is compatible with overrideSortCandidatesWithRelevantCandidates."""
         for apply_in_retrieval in ['both', None]:
             with self.subTest(applyInRetrieval=apply_in_retrieval):
                 kwargs = dict(
@@ -237,5 +242,4 @@ class TestRelevanceCutoffModel(TestCase):
                 if apply_in_retrieval is not None:
                     kwargs['applyInRetrieval'] = apply_in_retrieval
                 m = RelevanceCutoffModel(**kwargs)
-                self.assertEqual(m.apply_in_retrieval, ApplyInRetrieval.Both)
                 self.assertTrue(m.override_sort_candidates_with_relevant_candidates)

@@ -386,17 +386,24 @@ class SearchQuery(BaseMarqoModel):
 
     @root_validator(pre=False)
     def _validate_apply_in_retrieval_only_works_for_disjunction(cls, values):
-        """Validate that applyInRetrieval requires retrievalMethod=disjunction"""
+        """Validate that applyInRetrieval requires retrievalMethod=disjunction.
+        Also sets the default value of applyInRetrieval to 'both' when not provided."""
+        from marqo.tensor_search.models.relevance_cutoff_model import ApplyInRetrieval
         relevance_cutoff = values.get('relevance_cutoff')
         hybrid_parameters = values.get('hybridParameters')
-        if (relevance_cutoff is not None
-                and relevance_cutoff.apply_in_retrieval != ApplyInRetrieval.Both
-                and (hybrid_parameters is None
-                     or hybrid_parameters.retrievalMethod != RetrievalMethod.Disjunction)):
-            raise ValueError(
-                "relevanceCutoff.applyInRetrieval can only be set when "
-                "hybridParameters.retrievalMethod is 'disjunction'"
-            )
+        if relevance_cutoff is None:
+            return values
+        if relevance_cutoff.apply_in_retrieval is not None:
+            if (hybrid_parameters is None
+                    or hybrid_parameters.retrievalMethod != RetrievalMethod.Disjunction):
+                raise ValueError(
+                    "relevanceCutoff.applyInRetrieval can only be set when "
+                    "hybridParameters.retrievalMethod is 'disjunction'"
+                )
+        else:
+            # apply_in_retrieval defaults to None on the model; set the concrete default here
+            # so all downstream code (Vespa query builder, Java searcher) sees a resolved value.
+            relevance_cutoff.apply_in_retrieval = ApplyInRetrieval.Both
         return values
 
     @root_validator(pre=False)

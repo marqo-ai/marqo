@@ -935,9 +935,10 @@ class TestSemiStructuredIndexToVespaQueryRelevanceCutoff(TestCase):
                 self.assertEqual(value, r["marqo__hybrid.relevanceCutoff.applyInRetrieval"])
 
     def test_apply_in_retrieval_both_by_default_in_vespa_query(self):
-        """applyInRetrieval should default to 'both' and always appear in the Vespa query."""
+        """SearchQuery resolves applyInRetrieval=None to 'both'; the Vespa query receives 'both'."""
         self.hybrid_query.relevance_cutoff = RelevanceCutoffModel(
-            method=RelevanceCutoffMethod.GapDetection
+            method=RelevanceCutoffMethod.GapDetection,
+            applyInRetrieval=ApplyInRetrieval.Both  # as resolved by SearchQuery validator
         )
         r = self.index.to_vespa_query(self.hybrid_query)
         self.assertEqual(ApplyInRetrieval.Both, r["marqo__hybrid.relevanceCutoff.applyInRetrieval"])

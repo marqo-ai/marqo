@@ -53,7 +53,7 @@ class RelevanceCutoffModel(StrictBaseModel):
         False, alias="overrideSortCandidatesWithRelevantCandidates"
     )
     lexical_operand: Optional[LexicalOperand] = Field(None, alias="lexicalOperand")
-    apply_in_retrieval: ApplyInRetrieval = Field(ApplyInRetrieval.Both, alias="applyInRetrieval")
+    apply_in_retrieval: Optional[ApplyInRetrieval] = Field(None, alias="applyInRetrieval")
     override_total_hits_with_post_process_candidates: bool = Field(
         False, alias="overrideTotalHitsWithPostProcessCandidates"
     )
@@ -75,7 +75,8 @@ class RelevanceCutoffModel(StrictBaseModel):
     def _validate_apply_in_retrieval_incompatible_with_override_sort_candidates(cls, values):
         apply_in_retrieval = values.get('apply_in_retrieval')
         override_sort = values.get('override_sort_candidates_with_relevant_candidates')
-        if (apply_in_retrieval != ApplyInRetrieval.Both
+        if (apply_in_retrieval is not None
+                and apply_in_retrieval != ApplyInRetrieval.Both
                 and override_sort):
             raise ValueError(
                 "applyInRetrieval cannot be used together with "
