@@ -221,7 +221,7 @@ public class HybridSearcher extends Searcher {
         }
     }
 
-    private enum ApplyInRetrieval {
+    enum ApplyInRetrieval {
         LEXICAL,
         TENSOR,
         BOTH;
@@ -377,19 +377,9 @@ public class HybridSearcher extends Searcher {
             if (isSelectiveCutoff) {
                 // Target from cutoffQuery (reduced), non-target from original (unreduced)
                 if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
-                    // This is not happening as this is blocked by the Python API
-                    queryLexical =
-                            createSubQuery(
-                                    cutoffSortByQuery,
-                                    MARQO_SEARCH_METHOD_LEXICAL,
-                                    MARQO_SEARCH_METHOD_LEXICAL,
-                                    verbose);
-                    queryTensor =
-                            createSubQuery(
-                                    query,
-                                    MARQO_SEARCH_METHOD_TENSOR,
-                                    MARQO_SEARCH_METHOD_TENSOR,
-                                    verbose);
+                    throw new RuntimeException(
+                            "applyInRetrieval='lexical' is not supported. This value is blocked at"
+                                    + " the API layer and should never reach this point.");
                 } else {
                     queryLexical =
                             createSubQuery(
@@ -398,6 +388,8 @@ public class HybridSearcher extends Searcher {
                                     MARQO_SEARCH_METHOD_LEXICAL,
                                     verbose);
                     queryLexical.setOffset(0);
+                    // Since this is retrieval is not cut-offed and we always aim for a static sorting/ranking
+                    // pool, we increase the hits to probeDepth.
                     queryLexical.setHits(relevanceCutoffProbeDepth);
                     queryTensor =
                             createSubQuery(

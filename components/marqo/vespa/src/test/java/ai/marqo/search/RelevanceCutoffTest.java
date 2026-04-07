@@ -699,4 +699,38 @@ class RelevanceCutoffTest {
                     .hasValue(0.0);
         }
     }
+
+    @Nested
+    class ApplyInRetrievalFromStringTest {
+
+        @Test
+        void shouldParseLexical() {
+            assertThat(HybridSearcher.ApplyInRetrieval.fromString("lexical"))
+                    .isEqualTo(HybridSearcher.ApplyInRetrieval.LEXICAL);
+        }
+
+        @Test
+        void shouldParseTensor() {
+            assertThat(HybridSearcher.ApplyInRetrieval.fromString("tensor"))
+                    .isEqualTo(HybridSearcher.ApplyInRetrieval.TENSOR);
+        }
+
+        @Test
+        void shouldParseBoth() {
+            assertThat(HybridSearcher.ApplyInRetrieval.fromString("both"))
+                    .isEqualTo(HybridSearcher.ApplyInRetrieval.BOTH);
+        }
+
+        @Test
+        void shouldReturnNullForNullInput() {
+            assertThat(HybridSearcher.ApplyInRetrieval.fromString(null)).isNull();
+        }
+
+        @Test
+        void shouldThrowForUnknownValue() {
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> HybridSearcher.ApplyInRetrieval.fromString("invalid"));
+        }
+    }
 }
