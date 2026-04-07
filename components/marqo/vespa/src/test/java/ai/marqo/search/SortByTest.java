@@ -1222,6 +1222,8 @@ class SortByTest {
             assertThat(result.getHits()).isEqualTo(200);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 200");
+            // efSearch=50+1950=2000; newExploreAdditionalHits=2000-200=1800
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1800");
         }
 
         @Test
@@ -1243,6 +1245,8 @@ class SortByTest {
             assertThat(result.getHits()).isEqualTo(100);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 100");
+            // efSearch=500+1500=2000; newExploreAdditionalHits=2000-100=1900
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1900");
         }
 
         @Test
@@ -1277,6 +1281,8 @@ class SortByTest {
             assertThat(result.getHits()).isEqualTo(10);
             String updatedYql = result.properties().getString("marqo__yql.tensor");
             assertThat(updatedYql).contains("targetHits: 10");
+            // efSearch=50+1950=2000; newExploreAdditionalHits=2000-10=1990
+            assertThat(updatedYql).contains("hnsw.exploreAdditionalHits: 1990");
         }
     }
 
