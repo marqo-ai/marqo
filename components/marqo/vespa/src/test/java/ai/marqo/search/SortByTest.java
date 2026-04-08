@@ -928,6 +928,55 @@ class SortByTest {
         }
 
         @Test
+        void shouldSetTensorTargetHitsToNewHitsWhenBothFeaturesEnabledAndOverrideEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where ({targetHits: 20,"
+                                    + " hnsw.exploreAdditionalHits: 1980}nearestNeighbor(f, q))");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 30, 25, true, true, false, true, false);
+
+            // newHits = Math.max(relevantCandidates=30, sortByMinSortCandidates=25) = 30
+            // overrideLimitPlusOffset=true: newTensorTargetHits = newHits = 30 (not max with 20)
+            assertThat(result.getHits()).isEqualTo(30);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql)
+                    .isEqualTo(
+                            "select * from sources * where ({targetHits: 30,"
+                                    + " hnsw.exploreAdditionalHits: 1970}nearestNeighbor(f, q))");
+        }
+
+        @Test
+        void shouldReduceTensorTargetHitsWhenBothFeaturesEnabledAndOverrideEnabled() {
+            HybridSearcher searcher = new HybridSearcher();
+            Query query = new Query("?q=test&hits=10&offset=0");
+            query.properties()
+                    .set(
+                            "marqo__yql.tensor",
+                            "select * from sources * where ({targetHits: 500,"
+                                    + " hnsw.exploreAdditionalHits: 1500}nearestNeighbor(f, q))");
+
+            Query result =
+                    searcher.updateQueryHitsOffsetsAndTargetHits(
+                            query, 30, 25, true, true, false, true, false);
+
+            // newHits = Math.max(relevantCandidates=30, sortByMinSortCandidates=25) = 30
+            // overrideLimitPlusOffset=true: newTensorTargetHits = newHits = 30
+            // (NOT Math.max(30, 500) = 500, which would be the old behaviour)
+            assertThat(result.getHits()).isEqualTo(30);
+            String updatedYql = result.properties().getString("marqo__yql.tensor");
+            assertThat(updatedYql)
+                    .isEqualTo(
+                            "select * from sources * where ({targetHits: 30,"
+                                    + " hnsw.exploreAdditionalHits: 1970}nearestNeighbor(f, q))");
+        }
+
+        @Test
         void shouldThrowExceptionWhenTensorTargetHitsLowerThanLimitOffset() {
             HybridSearcher searcher = new HybridSearcher();
             Query query = new Query("?q=test&hits=10&offset=5");

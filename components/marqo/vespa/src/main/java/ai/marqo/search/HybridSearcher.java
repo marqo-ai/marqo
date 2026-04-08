@@ -815,7 +815,11 @@ public class HybridSearcher extends Searcher {
             // check is required
             newHits = Math.max(relevantCandidates, sortByMinSortCandidates);
             if (currentTensorTargetHits != null) {
-                newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
+                if (overrideLimitPlusOffset) {
+                    newTensorTargetHits = newHits;
+                } else {
+                    newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
+                }
             }
         } else if (isRelevanceCutoffEnabled) {
             if (overrideLimitPlusOffset) {
