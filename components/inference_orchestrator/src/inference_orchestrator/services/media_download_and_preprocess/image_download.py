@@ -1,7 +1,11 @@
 import base64
+import logging
 import os
+import socket
+import time
 from io import BytesIO
 from typing import Optional
+from urllib.parse import quote, urlparse
 
 import certifi
 import pycurl
@@ -19,9 +23,76 @@ from inference_orchestrator.services.errors import (
 
 # TODO Merge this with the one in clip_utils in the future refactoring
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
 
 DEFAULT_HEADERS = {"User-Agent": "Marqobot/1.0"}
+
+_PROXY_FALLBACK_CURL_CODES = frozenset({
+    pycurl.E_COULDNT_CONNECT,
+    pycurl.E_COULDNT_RESOLVE_HOST,
+    pycurl.E_OPERATION_TIMEDOUT,
+})
+
+_PROXY_FALLBACK_HTTP_CODES = frozenset({502, 503, 504})
+
+_AAAA_CACHE: dict[str, tuple[bool, float]] = {}
+_AAAA_CACHE_TTL = 3600  # 1 hour
+
+
+def _origin_has_ipv6(hostname: str) -> bool:
+    """Check if hostname has AAAA records (supports IPv6).
+    Results are cached in-memory with a 1-hour TTL."""
+    now = time.monotonic()
+    cached = _AAAA_CACHE.get(hostname)
+    if cached and (now - cached[1]) < _AAAA_CACHE_TTL:
+        return cached[0]
+    try:
+        results = socket.getaddrinfo(
+            hostname, 443, socket.AF_INET6, socket.SOCK_STREAM,
+        )
+        has_ipv6 = len(results) > 0
+    except socket.gaierror:
+        has_ipv6 = False
+    _AAAA_CACHE[hostname] = (has_ipv6, now)
+    return has_ipv6
+
+
+def _maybe_proxy_url(image_path: str) -> str:
+    """Construct the proxy URL for a given image path.
+    Returns the original path unchanged if the proxy is not configured."""
+    proxy_url = settings.marqo_media_proxy_url
+    if not proxy_url:
+        return image_path
+    return f"{proxy_url}?url={quote(image_path, safe='')}"
+
+
+def _get_proxy_headers() -> dict:
+    """Return Cloudflare Access service token headers if configured."""
+    if settings.cf_access_client_id and settings.cf_access_client_secret:
+        return {
+            "CF-Access-Client-Id": settings.cf_access_client_id,
+            "CF-Access-Client-Secret": settings.cf_access_client_secret,
+        }
+    return {}
+
+
+def _is_proxy_failure(exc: ImageDownloadError) -> bool:
+    """Return True if the failure is due to the proxy being down,
+    not the origin. We only fallback for connectivity/timeout
+    errors and 502/503/504 from the proxy itself."""
+    # Check for pycurl connection-level errors via the cause chain
+    cause = exc.__cause__
+    if isinstance(cause, pycurl.error) and len(cause.args) > 0:
+        if cause.args[0] in _PROXY_FALLBACK_CURL_CODES:
+            return True
+    # Check for HTTP gateway errors in the message
+    msg = str(exc)
+    for code in _PROXY_FALLBACK_HTTP_CODES:
+        if f"returned {code}" in msg:
+            return True
+    return False
 
 
 def get_allowed_image_types():
@@ -136,58 +207,63 @@ def load_image_from_path(
     return img
 
 
-def download_image_from_url(
+def _do_download(
     image_path: str,
     media_download_headers: dict,
-    timeout_ms: int = 3000,
+    timeout_ms: int,
     modality: Optional[str] = None,
+    proxy_headers: Optional[dict] = None,
+    force_ipv6: bool = False,
+    fetch_url: Optional[str] = None,
 ) -> BytesIO:
-    """Download an image from a URL and return a PIL image using pycurl.
-
-    For video/audio files, we check the file size during download rather than making a separate HEAD request upfront.
-    While checking Content-Length beforehand is possible, it would add latency to every request. Since most files
-    are expected to be under the size limit, we optimize for the common case by checking size during download.
+    """Low-level pycurl download.
 
     Args:
-        image_path (str): URL to the image.
-        media_download_headers (dict): Headers for the image download.
-        timeout_ms (int): Timeout in milliseconds, for the whole request.
-        modality (Optional[str]): Type of media being downloaded ('video', 'audio', or None)
+        image_path: Original media URL (used in error messages, never mutated).
+        media_download_headers: Caller-provided headers for the download.
+        timeout_ms: Timeout in milliseconds for the whole request.
+        modality: Type of media being downloaded ('video', 'audio', or None).
+        proxy_headers: Optional Cloudflare Access headers to include.
+        force_ipv6: If True, force pycurl to resolve and connect over IPv6.
+        fetch_url: If provided, the actual URL to fetch (e.g. proxy URL).
+            Defaults to image_path when not set.
 
     Returns:
-        buffer (BytesIO): The image as a BytesIO object.
+        buffer: The downloaded content as a BytesIO object.
 
     Raises:
-        ImageDownloadError: If the image download fails or exceeds size limit for video/audio.
+        ImageDownloadError: If the download fails or exceeds size limit.
     """
-
-    if not isinstance(timeout_ms, int):
-        raise InternalServerError(
-            f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}"
-        )
+    actual_url = fetch_url if fetch_url is not None else image_path
 
     try:
-        encoded_url = encode_url(image_path)
+        encoded_url = encode_url(actual_url)
     except UnicodeEncodeError as e:
         raise ImageDownloadError(
             f"Marqo encountered an error when downloading the media url {image_path}. "
             f"The url could not be encoded properly. Original error: {e}"
         )
+
     buffer = BytesIO()
     c = pycurl.Curl()
-    c.setopt(pycurl.CAINFO, certifi.where())
-    c.setopt(pycurl.URL, encoded_url)
-    c.setopt(pycurl.WRITEDATA, buffer)
-    c.setopt(pycurl.TIMEOUT_MS, timeout_ms)
-    c.setopt(pycurl.FOLLOWLOCATION, 1)
-
-    headers = DEFAULT_HEADERS.copy()
-    if media_download_headers is None:
-        media_download_headers = dict()
-    headers.update(media_download_headers)
-    c.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
-
     try:
+        c.setopt(pycurl.CAINFO, certifi.where())
+        c.setopt(pycurl.URL, encoded_url)
+        c.setopt(pycurl.WRITEDATA, buffer)
+        c.setopt(pycurl.TIMEOUT_MS, timeout_ms)
+        c.setopt(pycurl.FOLLOWLOCATION, 1)
+
+        if force_ipv6:
+            c.setopt(pycurl.IPRESOLVE, pycurl.IPRESOLVE_V6)
+
+        headers = DEFAULT_HEADERS.copy()
+        if media_download_headers is None:
+            media_download_headers = dict()
+        headers.update(media_download_headers)
+        if proxy_headers:
+            headers.update(proxy_headers)
+        c.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
+
         c.perform()
         if c.getinfo(pycurl.RESPONSE_CODE) != 200:
             raise ImageDownloadError(
@@ -202,13 +278,82 @@ def download_image_from_url(
         raise ImageDownloadError(
             f"Marqo encountered an error when downloading the media url {image_path}. "
             f"The original error is: {error_message}"
-        )
-
+        ) from e
     finally:
         c.close()
 
     buffer.seek(0)
     return buffer
+
+
+def download_image_from_url(
+    image_path: str,
+    media_download_headers: dict,
+    timeout_ms: int = 3000,
+    modality: Optional[str] = None,
+) -> BytesIO:
+    """Download an image from a URL using a three-tier strategy:
+
+    1. Direct IPv6 if origin has AAAA records (free via EIGW)
+    2. Route through Cloudflare Worker proxy over IPv6 if origin is IPv4-only
+    3. Fall back to direct IPv4 through NAT Gateway if proxy is unreachable
+
+    When MARQO_MEDIA_PROXY_URL is not set, downloads directly over IPv4,
+    preserving existing behaviour exactly.
+
+    Args:
+        image_path (str): URL to the image.
+        media_download_headers (dict): Headers for the image download.
+        timeout_ms (int): Timeout in milliseconds, for the whole request.
+        modality (Optional[str]): Type of media being downloaded ('video', 'audio', or None)
+
+    Returns:
+        buffer (BytesIO): The image as a BytesIO object.
+
+    Raises:
+        ImageDownloadError: If the image download fails or exceeds size limit for video/audio.
+    """
+    if not isinstance(timeout_ms, int):
+        raise InternalServerError(
+            f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}"
+        )
+
+    if not settings.marqo_media_proxy_url:
+        # Feature disabled -- behave identically to before.
+        return _do_download(image_path, media_download_headers, timeout_ms, modality)
+
+    origin_host = urlparse(image_path).hostname
+
+    # --- Tier 1: Direct IPv6 (if origin supports it) ---
+    if origin_host and _origin_has_ipv6(origin_host):
+        try:
+            return _do_download(
+                image_path, media_download_headers, timeout_ms, modality,
+                force_ipv6=True,
+            )
+        except ImageDownloadError:
+            logger.warning(
+                "Direct IPv6 download failed for %s, falling through to proxy",
+                origin_host,
+            )
+
+    # --- Tier 2: Proxy over IPv6 ---
+    proxy_url = _maybe_proxy_url(image_path)
+    try:
+        return _do_download(
+            image_path, media_download_headers, timeout_ms, modality,
+            proxy_headers=_get_proxy_headers(),
+            fetch_url=proxy_url,
+        )
+    except ImageDownloadError as exc:
+        if _is_proxy_failure(exc):
+            logger.warning(
+                "Proxy download failed for %s, falling back to direct IPv4: %s",
+                image_path, exc,
+            )
+            # --- Tier 3: Direct IPv4 (last resort) ---
+            return _do_download(image_path, media_download_headers, timeout_ms, modality)
+        raise
 
 
 def encode_url(url: str) -> str:

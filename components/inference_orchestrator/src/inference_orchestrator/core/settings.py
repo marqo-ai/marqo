@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     marqo_default_models_s3_bucket: str = Field(
         "s3://marqo-default-models-os", alias="MARQO_DEFAULT_MODELS_S3_BUCKET"
     )
+
+    marqo_media_proxy_url: Optional[str] = Field(default=None, alias="MARQO_MEDIA_PROXY_URL")
+    cf_access_client_id: Optional[str] = Field(default=None, alias="CF_ACCESS_CLIENT_ID")
+    cf_access_client_secret: Optional[str] = Field(default=None, alias="CF_ACCESS_CLIENT_SECRET")
 
     @field_validator("marqo_default_models_s3_bucket")
     def validate_marqo_default_models_s3_bucket(cls, value):
