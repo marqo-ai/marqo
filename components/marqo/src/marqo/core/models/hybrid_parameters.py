@@ -161,6 +161,19 @@ class HybridParameters(StrictBaseModel):
         return values
 
     @root_validator(pre=False)
+    def validate_lexical_operand_with_rerank_depth(cls, values):
+        lexical_operand = values.get('lexicalOperand')
+        rerank_depth_lexical = values.get('rerankDepthLexical')
+
+        if rerank_depth_lexical is not None and lexical_operand in [LexicalOperand.And, LexicalOperand.Or]:
+            raise ValueError(
+                f"'rerankDepthLexical' cannot be used with lexicalOperand='{lexical_operand}'. "
+                f"'rerankDepthLexical' only has an effect with weakAnd. "
+                f"Either remove 'rerankDepthLexical' or set lexicalOperand to 'weakAnd' (or omit it)."
+            )
+        return values
+
+    @root_validator(pre=False)
     def validate_weakand_parameters(cls, values):
         rerank_depth_lexical = values.get('rerankDepthLexical')
         weak_and_parameters = values.get('weakAndParameters')

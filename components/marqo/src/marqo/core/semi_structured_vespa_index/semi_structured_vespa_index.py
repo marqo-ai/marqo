@@ -109,10 +109,28 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         elif isinstance(marqo_query, MarqoTensorQuery):
             return StructuredVespaIndex._to_vespa_tensor_query(self, marqo_query)
         elif isinstance(marqo_query, MarqoLexicalQuery):
-            return StructuredVespaIndex._to_vespa_lexical_query(self, marqo_query)
+            return self._to_vespa_lexical_query(marqo_query)
 
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
+
+    def _to_vespa_lexical_query(self, marqo_query: MarqoLexicalQuery) -> Dict[str, Any]:
+        """Override to apply _optimize_yql_query to the lexical term."""
+        query = StructuredVespaIndex._to_vespa_lexical_query(self, marqo_query)
+        # Re-build the YQL with the optimized lexical term
+        fields_to_search = self._get_lexical_fields_to_search(marqo_query)
+        if fields_to_search:
+            from marqo.core.structured_vespa_index import common as structured_common
+            lexical_term = self._get_lexical_search_term(marqo_query)
+            optimized_lexical_term = self._optimize_yql_query(lexical_term)
+            filter_term = self._get_filter_term(marqo_query)
+            if filter_term:
+                search_term = f'({optimized_lexical_term}) AND ({filter_term})'
+            else:
+                search_term = f'({optimized_lexical_term})'
+            select_attributes = self._get_select_attributes(marqo_query)
+            query['yql'] = f'select {select_attributes} from {self._marqo_index.schema_name} where {search_term}'
+        return query
 
     # --- Custom score rerank support: duplicated from structured (to be deprecated) ---
 
@@ -178,6 +196,148 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return f'weakAnd({", ".join(terms)})'
         else:
             raise InternalError(f'Unknown lexical operand: {lexical_operand}')
+
+    @staticmethod
+    def _combine_lexical_or_and_terms(or_terms: str, and_terms: str, use_rank: bool = True) -> str:
+        """Combine OR (optional) and AND (required) lexical terms.
+
+        When use_rank=True (default): uses rank() so optional terms contribute to BM25
+        scoring but don't affect recall. When use_rank=False (lexicalOperand='and'):
+        uses AND so all terms are required.
+        """
+        if not or_terms and not and_terms:
+            return 'false'
+        if not and_terms:
+            return or_terms
+        if not or_terms:
+            return and_terms
+
+        if use_rank:
+            # rank(required, optional_terms_blob)
+            # or_terms passed as single arg here; flattening happens in _optimize_yql_query()
+            return f'rank({and_terms}, {or_terms})'
+        else:
+            # All terms required — old AND behavior
+            return f'({or_terms}) AND ({and_terms})'
+
+    @staticmethod
+    def _optimize_yql_query(term: str) -> str:
+        """Flatten nested rank() and unwrap OR/weakAnd in non-first rank positions.
+
+        Transforms:
+            rank(rank(a, b), c)  →  rank(a, b, c)
+            rank(a, weakAnd(b, c), d)  →  rank(a, b, c, d)
+            rank(a, b OR c)  →  rank(a, b, c)
+
+        First position is preserved as-is (it controls retrieval).
+        """
+        if not term.startswith('rank('):
+            return term
+
+        cls = SemiStructuredVespaIndex
+        parts = cls._split_rank_args(term)
+        if len(parts) < 2:
+            return term
+
+        result = []
+
+        # Flatten first arg: if it's rank(), merge its children into this level
+        first = parts[0].strip()
+        if first.startswith('rank('):
+            first_nested = cls._split_rank_args(first)
+            # Recurse on the nested first arg's retrieval term
+            result.append(cls._optimize_yql_query(first_nested[0]))
+            # Rest of nested first arg's terms become scoring terms
+            result.extend(first_nested[1:])
+        else:
+            result.append(first)
+
+        for part in parts[1:]:
+            part = part.strip()
+            # Recursively flatten nested rank()
+            if part.startswith('rank('):
+                nested = cls._split_rank_args(part)
+                result.extend(nested)
+            else:
+                # Unwrap weakAnd, OR, and bare parens in non-first positions
+                unwrapped = cls._unwrap_non_retrieval_term(part)
+                result.extend(unwrapped)
+
+        return f'rank({", ".join(result)})'
+
+    @staticmethod
+    def _unwrap_non_retrieval_term(term: str) -> List[str]:
+        """Unwrap weakAnd(a, b), (a OR b), or {targetHits:N}weakAnd(a, b) into [a, b].
+
+        For terms not wrapped in these operators, returns [term].
+        """
+        stripped = term.strip()
+
+        # Strip outer parens: (something) -> something, if balanced
+        if stripped.startswith('(') and stripped.endswith(')'):
+            inner = stripped[1:-1].strip()
+            if SemiStructuredVespaIndex._parens_balanced(inner):
+                stripped = inner
+
+        # {targetHits:N}weakAnd(a, b, ...) or weakAnd(a, b, ...) -> [a, b, ...]
+        if 'weakAnd(' in stripped:
+            wa_start = stripped.index('weakAnd(')
+            inner = stripped[wa_start + len('weakAnd('):-1]
+            return SemiStructuredVespaIndex._split_top_level(inner, ',')
+
+        # a OR b OR c -> [a, b, c]
+        or_parts = SemiStructuredVespaIndex._split_top_level(stripped, ' OR ')
+        if len(or_parts) > 1:
+            return [p.strip() for p in or_parts]
+
+        return [stripped]
+
+    @staticmethod
+    def _split_rank_args(term: str) -> List[str]:
+        """Split rank(a, b, c) into [a, b, c], respecting nested parens."""
+        if not term.startswith('rank(') or not term.endswith(')'):
+            return [term]
+        inner = term[5:-1]  # strip rank( and )
+        return SemiStructuredVespaIndex._split_top_level(inner, ',')
+
+    @staticmethod
+    def _split_top_level(s: str, delimiter: str) -> List[str]:
+        """Split string by delimiter, only at the top level (not inside parens)."""
+        parts = []
+        depth = 0
+        current = []
+        i = 0
+        while i < len(s):
+            if s[i] == '(':
+                depth += 1
+                current.append(s[i])
+            elif s[i] == ')':
+                depth -= 1
+                current.append(s[i])
+            elif depth == 0 and s[i:i+len(delimiter)] == delimiter:
+                parts.append(''.join(current).strip())
+                current = []
+                i += len(delimiter)
+                continue
+            else:
+                current.append(s[i])
+            i += 1
+        if current:
+            parts.append(''.join(current).strip())
+        return parts
+
+    @staticmethod
+    def _parens_balanced(s: str) -> bool:
+        """Check if parentheses in the string are balanced."""
+        depth = 0
+        for c in s:
+            if c == '(':
+                depth += 1
+            elif c == ')':
+                depth -= 1
+            if depth < 0:
+                return False
+        return depth == 0
 
     def _generate_or_terms(
         self,
@@ -295,12 +455,17 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 )
                 for phrase in marqo_query.and_phrases
             ])
-            if or_terms:
-                or_terms = f'({or_terms})'
-                and_terms = f' AND ({and_terms})'
         else:
             and_terms = ''
-        return f'{or_terms}{and_terms}'
+
+        # Determine the effective lexical operand for this specific query
+        effective_operand = lexical_operand_override or (
+            marqo_query.hybrid_parameters.lexicalOperand if isinstance(marqo_query, MarqoHybridQuery) else None
+        )
+        # Use rank() unless the effective operand is explicitly AND
+        use_rank = (effective_operand != LexicalOperand.And)
+
+        return self._combine_lexical_or_and_terms(or_terms, and_terms, use_rank=use_rank)
 
     def _get_lexical_contains_term(
         self,
@@ -543,17 +708,20 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if getattr(marqo_query, "relevance_cutoff", None) is not None:
             if not marqo_query.relevance_cutoff.lexical_operand:
                 # If the relevance_cutoff has no lexical_operand, it uses whatever is used in the main lexical query
+                optimized_probe_lexical_term = self._optimize_yql_query(lexical_term)
                 lexical_yql_for_probe = (
-                    f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
+                    f'select {select_attributes} from {self._marqo_index.schema_name} '
+                    f'where ({optimized_probe_lexical_term}){filter_term}'
                 )
 
             else:
                 probe_lexical_term = self._get_lexical_search_term(
-                    marqo_query, lexical_operand_override=marqo_query.relevance_cutoff.lexical_operand \
+                    marqo_query, lexical_operand_override=marqo_query.relevance_cutoff.lexical_operand
                 ) if fields_to_search_lexical else "False"
+                optimized_probe_lexical_term = self._optimize_yql_query(probe_lexical_term)
                 lexical_yql_for_probe = (
                     f'select {select_attributes} from {self._marqo_index.schema_name} '
-                    f'where ({probe_lexical_term}){filter_term}'
+                    f'where ({optimized_probe_lexical_term}){filter_term}'
                 )
 
         # Assign parameters to query
@@ -626,8 +794,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if applicable_custom_score_keys and marqo_query.attributes_to_retrieve is not None:
             select_for_hybrid_yql = select_attributes + ', summaryfeatures'
 
-        tensor_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}'
-        lexical_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
+        # Flatten nested rank() and unwrap OR/weakAnd in non-first rank positions
+        optimized_lexical_term = self._optimize_yql_query(lexical_term)
+        optimized_tensor_term = self._optimize_yql_query(tensor_term)
+
+        tensor_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where {optimized_tensor_term}{filter_term}'
+        lexical_yql = f'select {select_for_hybrid_yql} from {self._marqo_index.schema_name} where ({optimized_lexical_term}){filter_term}'
 
         query = {
             'searchChain': 'marqo',
@@ -860,7 +1032,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             marqo_query.rerank_depth_tensor = marqo_query.hybrid_parameters.rerankDepthTensor
             tensor_term = self._get_tensor_search_term(marqo_query)
 
-        facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
+        raw_facets_lexical_term = self._get_lexical_search_term(marqo_query, is_facets_term=True)
+        facets_lexical_term = self._optimize_yql_query(raw_facets_lexical_term)
         base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term})'
         if marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction:
             base_yql = f'select {select_attributes} from {self._marqo_index.schema_name} where ({facets_lexical_term} OR {tensor_term})'
