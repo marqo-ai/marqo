@@ -2641,6 +2641,14 @@ class TestOptimizeYqlQuery(unittest.TestCase):
         result = SemiStructuredVespaIndex._optimize_yql_query('rank(rank(a, b), rank(c, d))')
         self.assertEqual('rank(a, b, c, d)', result)
 
+    def test_unwrap_nested_rank_children_from_first_arg(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(rank(a, weakAnd(b, c)), d)')
+        self.assertEqual('rank(a, b, c, d)', result)
+
+    def test_unwrap_nested_rank_children_in_non_first_arg(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(a, rank(b, weakAnd(c, d)))')
+        self.assertEqual('rank(a, b, c, d)', result)
+
     def test_unwrap_weakand_in_non_first(self):
         result = SemiStructuredVespaIndex._optimize_yql_query('rank(a, weakAnd(b, c))')
         self.assertEqual('rank(a, b, c)', result)
@@ -2672,6 +2680,15 @@ class TestOptimizeYqlQuery(unittest.TestCase):
             'rank(a, (field1 contains "x" OR field2 contains "x"))'
         )
         self.assertEqual('rank(a, field1 contains "x", field2 contains "x")', result)
+
+    def test_rank_phrase_with_comma_is_preserved(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query(
+            'rank(default contains "San Francisco, CA", weakAnd(default contains "x", default contains "y"))'
+        )
+        self.assertEqual(
+            'rank(default contains "San Francisco, CA", default contains "x", default contains "y")',
+            result
+        )
 
 
 class TestCombineLexicalOrAndTerms(unittest.TestCase):
@@ -2724,6 +2741,13 @@ class TestSplitTopLevel(unittest.TestCase):
     def test_nested_or_preserved(self):
         result = SemiStructuredVespaIndex._split_top_level('(a OR b) AND c', ' OR ')
         self.assertEqual(['(a OR b) AND c'], result)
+
+    def test_comma_inside_quotes_preserved(self):
+        result = SemiStructuredVespaIndex._split_top_level(
+            'default contains "San Francisco, CA", weakAnd(a, b)',
+            ','
+        )
+        self.assertEqual(['default contains "San Francisco, CA"', 'weakAnd(a, b)'], result)
 
 
 class TestLexicalRankBehavior(unittest.TestCase):

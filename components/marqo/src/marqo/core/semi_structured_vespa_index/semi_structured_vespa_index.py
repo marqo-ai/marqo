@@ -248,7 +248,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # Recurse on the nested first arg's retrieval term
             result.append(cls._optimize_yql_query(first_nested[0]))
             # Rest of nested first arg's terms become scoring terms
-            result.extend(first_nested[1:])
+            for nested_part in first_nested[1:]:
+                result.extend(cls._unwrap_non_retrieval_term(nested_part.strip()))
         else:
             result.append(first)
 
@@ -257,7 +258,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # Recursively flatten nested rank()
             if part.startswith('rank('):
                 nested = cls._split_rank_args(part)
-                result.extend(nested)
+                for nested_part in nested:
+                    result.extend(cls._unwrap_non_retrieval_term(nested_part.strip()))
             else:
                 # Unwrap weakAnd, OR, and bare parens in non-first positions
                 unwrapped = cls._unwrap_non_retrieval_term(part)
@@ -302,13 +304,26 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     @staticmethod
     def _split_top_level(s: str, delimiter: str) -> List[str]:
-        """Split string by delimiter, only at the top level (not inside parens)."""
+        """Split string by delimiter at top level, outside parens and quoted strings."""
         parts = []
         depth = 0
+        in_quote = None
+        escaped = False
         current = []
         i = 0
         while i < len(s):
-            if s[i] == '(':
+            if in_quote is not None:
+                current.append(s[i])
+                if escaped:
+                    escaped = False
+                elif s[i] == '\\':
+                    escaped = True
+                elif s[i] == in_quote:
+                    in_quote = None
+            elif s[i] in ('"', "'"):
+                in_quote = s[i]
+                current.append(s[i])
+            elif s[i] == '(':
                 depth += 1
                 current.append(s[i])
             elif s[i] == ')':
