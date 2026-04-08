@@ -36,6 +36,7 @@ class TestSearchSortByFeature(MarqoTestCase):
                 search(
                     index_name=mock_index.name,
                     marqo_config=self.config,
+                    device="cpu",
                     search_query_dict={
                         "q": "test",
                         "searchMethod": SearchMethod.HYBRID,
@@ -75,6 +76,7 @@ class TestSearchSortByFeature(MarqoTestCase):
                 search(
                     index_name=mock_index.name,
                     marqo_config=self.config,
+                    device="cpu",
                     search_query_dict={
                         "q": "test",
                         "searchMethod": SearchMethod.HYBRID,
@@ -114,6 +116,7 @@ class TestSearchSortByFeature(MarqoTestCase):
                 search(
                     index_name=mock_index.name,
                     marqo_config=self.config,
+                    device="cpu",
                     search_query_dict={
                         "q": "test",
                         "searchMethod": SearchMethod.HYBRID,
@@ -231,6 +234,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
         return json.loads(search(
             index_name=cls.index_name,
             marqo_config=cls.config,
+            device="cpu",
             search_query_dict={
                 "q": query,
                 "searchMethod": SearchMethod.HYBRID,
@@ -246,6 +250,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             _ = search(
                 index_name=self.index_name,
                 marqo_config=self.config,
+                device="cpu",
                 search_query_dict={
                     "q": "machine learning artificial intelligence algorithms",
                     "searchMethod": SearchMethod.TENSOR,
@@ -261,6 +266,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             _ = search(
                 index_name=self.index_name,
                 marqo_config=self.config,
+                device="cpu",
                 search_query_dict={
                     "q": "machine learning artificial intelligence algorithms",
                     "searchMethod": SearchMethod.LEXICAL,
@@ -277,6 +283,7 @@ class TestSearchSortByFeatureSort1Field(MarqoTestCase):
             _ = search(
                 index_name=self.index_name,
                 marqo_config=self.config,
+                device="cpu",
                 search_query_dict={
                     "q": "machine learning artificial intelligence algorithms",
                     "searchMethod": SearchMethod.HYBRID,
@@ -753,6 +760,7 @@ class TestSearchSortByFeatureSort2Fields(MarqoTestCase):
         return json.loads(search(
             index_name=cls.index_name,
             marqo_config=cls.config,
+            device="cpu",
             search_query_dict={
                 "q": query,
                 "searchMethod": SearchMethod.HYBRID,
@@ -951,6 +959,7 @@ class TestSearchSortByFeatureSort3Fields(MarqoTestCase):
         return json.loads(search(
             index_name=cls.index_name,
             marqo_config=cls.config,
+            device="cpu",
             search_query_dict={
                 "q": query,
                 "searchMethod": SearchMethod.HYBRID,
