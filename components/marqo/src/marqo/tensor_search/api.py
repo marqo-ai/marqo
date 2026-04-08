@@ -447,6 +447,8 @@ def search(index_name: str, search_query_dict: dict, device: str = Depends(api_v
     """
     # TODO this a temporary fix due to the mixed use of pydantic v1 and v2.
     #  SearchQuery can be injected after migrated to v2
+
+    # TODO remove the existence of parameter 'device' in the codebase
     search_query = parse_request_object(SearchQuery, search_query_dict)
 
     query_logger = QueryLogger(search_query)

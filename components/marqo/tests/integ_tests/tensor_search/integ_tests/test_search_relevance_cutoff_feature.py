@@ -1425,7 +1425,8 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(2, result["_relevantCandidates"])
         self.assertEqual(2, result["_probeCandidates"])
-        self.assertEqual({'0', '1'}, set(ids))
+        self.assertEqual(3, result["_postProcessCandidates"])
+        self.assertEqual({'0', '1', "4"}, set(ids))
 
     def test_relevance_cut_off_with_incorrect_lexical_searchable_fields(self):
         """It is expected that the relevance cutoff will return 0 results
@@ -1501,7 +1502,7 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(1, result["_relevantCandidates"])
         self.assertEqual(6, result["_probeCandidates"])
-        self.assertEqual(['4'], ids)
+        self.assertEqual(['4', '17'], ids)
 
     def test_attributes_to_retrieve_works_as_expected(self):
         """Test that attributes_to_retrieve works as expected with relevance cutoff."""
@@ -1561,7 +1562,8 @@ class TestRelevanceCutoffAndSortByWithMoreComplicatedDocumentsAndQueries(MarqoTe
         ids = [hit["_id"] for hit in result["hits"]]
         self.assertEqual(6, result["_relevantCandidates"])
         self.assertEqual(6, result["_probeCandidates"])
-        self.assertEqual(['13', '20', '10', '17', '1', '14'], ids)
+        self.assertEqual(9, result["_postProcessCandidates"])
+        self.assertEqual(['13', '20', '10', '17', '1', '14', '4', '0', '16'], ids)
 
 
 @pytest.mark.skip_for_multinode(
@@ -1686,7 +1688,9 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(expected_facets, result["facets"])
 
     def test_affect_facets_true_facets_and_total_hits_reflect_relevant_candidates(self):
-        """With sortBy + affectFacets=True, facets and totalHits only count relevant documents."""
+        """With sortBy + affectFacets=True, facets and totalHits only count relevant documents.
+        However, we return more results as _sortCandidates is larger.
+        """
         result = self._search(
             relevance_cutoff={
                 "method": "relative_max_score",
@@ -1702,7 +1706,7 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         self.assertEqual(5, result["_relevantCandidates"])
         self.assertEqual(6, result["_sortCandidates"])
 
-        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5"]
+        expected_hits = ["doc4", "doc7", "doc2", "doc8", "doc5", "doc6"]
         expected_facets = {
             "color": {"blue": {"count": 3}, "red": {"count": 2}},
         }
@@ -2080,3 +2084,326 @@ class TestRelevanceCutoffWithFacetsAndTotalHits(MarqoTestCase):
         for hit in result["hits"]:
             self.assertNotIn("_lexical_score", hit)
             self.assertIn("_tensor_score", hit)
+
+
+@pytest.mark.skip_for_multinode(
+    "Multi-nodes will return different lexical results so we can not assert on the results.")
+class TestRelevanceCutoffApplyInRetrievalWithLexicalOperand(MarqoTestCase):
+    """Tests that applyInRetrieval='tensor' preserves all lexical AND-matched results
+    even under a strict cutoff, while using OR for the relevance cutoff probe.
+
+    Documents are crafted so that:
+    - 1 doc has ONLY "ocean species" (short text, highest lexical score — the anchor)
+    - 8 docs contain "ocean species" plus additional text (longer, lower lexical scores)
+
+    All 9 docs match the AND lexical query for "ocean" AND "species".
+    With a strict relativeScoreFactor (0.9), only the short anchor doc (and possibly 1-2
+    others) pass the cutoff threshold. With applyInRetrieval='tensor', the lexical leg is
+    unrestricted (uses probeDepth), so all 9 AND-matched docs are returned regardless of
+    the cutoff count.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.index_request = cls.unstructured_marqo_index_request(
+            model=Model(name="hf/all-MiniLM-L6-v2"),
+        )
+        cls.create_indexes([cls.index_request])
+        cls.index_name = cls.index_request.name
+
+        # 1 short doc (highest lexical score — the cutoff anchor)
+        # 8 longer docs (all contain "ocean" and "species" but diluted by extra text)
+        # category: "deep" for 5 docs, "surface" for 4 docs
+        cls.test_docs = [
+            {"_id": "anchor", "text": "ocean species", "price": 50.00, "category": "deep"},
+            {"_id": "long_1", "text": "The deep ocean is teeming with diverse species of fish and coral in tropical waters.", "price": 10.00, "category": "deep"},
+            {"_id": "long_2", "text": "Ocean currents transport species across vast marine distances around the globe.", "price": 20.00, "category": "surface"},
+            {"_id": "long_3", "text": "Protecting ocean habitats is essential for preserving endangered species worldwide.", "price": 30.00, "category": "deep"},
+            {"_id": "long_4", "text": "Scientists discovered new ocean species living near hydrothermal vents on the seabed.", "price": 40.00, "category": "deep"},
+            {"_id": "long_5", "text": "The Arctic ocean supports species adapted to extreme cold temperatures and ice.", "price": 15.00, "category": "surface"},
+            {"_id": "long_6", "text": "Pollution threatens ocean species that depend on clean water for survival and growth.", "price": 25.00, "category": "surface"},
+            {"_id": "long_7", "text": "Mapping the ocean floor revealed species previously unknown to marine biology researchers.", "price": 35.00, "category": "deep"},
+            {"_id": "long_8", "text": "Climate change alters ocean temperatures affecting species migration patterns and habitats.", "price": 45.00, "category": "surface"},
+        ]
+
+        cls.add_documents(
+            config=cls.config,
+            add_docs_params=AddDocsParams(
+                docs=cls.test_docs,
+                index_name=cls.index_name,
+                tensor_fields=['text']
+            )
+        )
+
+    def setUp(self):
+        pass
+
+    @classmethod
+    def _search(cls, query, relevance_cutoff=None, lexical_operand=None,
+                limit=10, offset=0, alpha=0.5, sort_by=None, facets=None,
+                track_total_hits=None):
+        hybrid_parameters = {
+            "retrievalMethod": "disjunction",
+            "rankingMethod": "rrf",
+            "alpha": alpha,
+        }
+        if lexical_operand is not None:
+            hybrid_parameters["lexicalOperand"] = lexical_operand
+        search_query_dict = {
+            "q": query,
+            "searchMethod": SearchMethod.HYBRID,
+            "hybridParameters": hybrid_parameters,
+            "limit": limit,
+            "offset": offset,
+        }
+        if relevance_cutoff is not None:
+            search_query_dict["relevanceCutoff"] = relevance_cutoff
+        if sort_by is not None:
+            search_query_dict["sortBy"] = sort_by
+        if facets is not None:
+            search_query_dict["facets"] = facets
+        if track_total_hits is not None:
+            search_query_dict["trackTotalHits"] = track_total_hits
+        return json.loads(search(
+            index_name=cls.index_name,
+            marqo_config=cls.config,
+            device="cpu",
+            search_query_dict=search_query_dict
+        ).body.decode('utf-8'))
+
+    def test_apply_in_tensor_preserves_all_lexical_and_matches(self):
+        """With applyInRetrieval='tensor', a strict cutoff limits tensor retrieval but
+        leaves lexical unrestricted. All 9 documents matching the AND lexical query
+        ("ocean" AND "species") must appear in results with _lexical_score.
+
+        The anchor doc ("ocean species") scores highest in lexical, so with
+        relativeScoreFactor=0.9 the threshold is very high and most longer docs
+        fall below it — but that only affects the tensor leg.
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+            },
+        )
+
+        expected_ids = {'long_3', 'long_2', 'long_5', 'long_4', 'long_7', 'anchor', 'long_8', 'long_1', 'long_6'}
+        returned_ids = {r['_id'] for r in result['hits']}
+
+        # We make expected ids a set as the lexical score can vary in different runs
+        self.assertEqual(1, result["_relevantCandidates"])
+        self.assertEqual(9, result["_postProcessCandidates"])
+        self.assertEqual(expected_ids, returned_ids)
+
+        self.assertIn(
+            "_lexical_score", result["hits"][0]
+        )
+        self.assertIn("_tensor_score", result["hits"][0])
+
+        # Since _relevantCandidates is 1, all following results should not have tensor score
+        for hit in result['hits'][1:]:
+            self.assertIn("_lexical_score", hit)
+            self.assertNotIn("_tensor_score", hit)
+
+    def test_apply_in_tensor_preserves_update_to_probe_depth_lexical_matches(self):
+        """A test to ensure probeDepth can be used to cap the lexical retrievals even if it is not cut.
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 5,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+            },
+        )
+
+        # Can't assert on the actual returned hits as the returned documents vary accross different runs
+        self.assertEqual(5, len(result['hits']))
+        # We make expected ids a set as the lexical score can vary in different runs
+        self.assertEqual(1, result["_relevantCandidates"])
+        # We only get 5 results because lexical only return 5 results
+        self.assertEqual(5, result["_postProcessCandidates"])
+
+        self.assertIn(
+            "_lexical_score", result["hits"][0]
+        )
+        self.assertIn("_tensor_score", result["hits"][0])
+
+        # Since _relevantCandidates is 1, all following results should not have tensor score
+        for hit in result['hits'][1:]:
+            self.assertIn("_lexical_score", hit)
+            self.assertNotIn("_tensor_score", hit)
+
+
+    def test_apply_in_tensor_with_sort_by_preserves_all_lexical_and_matches(self):
+        """With applyInRetrieval='tensor' + sortBy, all 9 AND-matched docs should
+        still appear and be sorted by price. The cutoff only limits tensor retrieval,
+        so lexical returns all matches unrestricted. Sort ordering uses all candidates.
+
+        Expected order by price ascending:
+        long_1(10) < long_5(15) < long_2(20) < long_6(25) < long_3(30)
+        < long_7(35) < long_4(40) < long_8(45) < anchor(50)
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+            },
+            sort_by={"fields": [{"fieldName": "price", "order": "asc"}]},
+        )
+
+        returned_ids = [hit["_id"] for hit in result["hits"]]
+        expected_order = [
+            "long_1", "long_5", "long_2", "long_6", "long_3",
+            "long_7", "long_4", "long_8", "anchor"
+        ]
+        # Sorted by price ascending
+        self.assertEqual(expected_order, returned_ids)
+
+        # relevantCandidates still reflects the strict cutoff
+        self.assertEqual(1, result["_relevantCandidates"])
+        self.assertEqual(9, result["_sortCandidates"])
+
+    def test_apply_in_tensor_with_affect_facets_false(self):
+        """With affectFacets=False (default), facets count all matching documents
+        regardless of cutoff. All 9 docs match, so facets should reflect all 9.
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+                "affectFacets": False,
+            },
+            facets={"fields": {"category": {"type": "string"}}},
+            track_total_hits=True,
+        )
+
+        # All 9 docs returned
+        self.assertEqual(9, len(result["hits"]))
+        self.assertEqual(1, result["_relevantCandidates"])
+
+        # Facets count all matching docs (not limited by cutoff)
+        # While this is correct in this example, it is not generally correct in the real case as facets
+        # results might match more result. A reimplementation is needed to solve this problem
+        expected_facets = {
+            "category": {"deep": {"count": 5}, "surface": {"count": 4}},
+        }
+        self.assertEqual(expected_facets, result["facets"])
+        self.assertEqual(9, result["totalHits"])
+
+    def test_apply_in_tensor_with_affect_facets_true(self):
+        """With affectFacets=True, facets and totalHits only count docs that pass
+        the cutoff. Since relevantCandidates=1 (only the anchor passes the strict
+        cutoff), facets reflect just that 1 doc — even though 9 docs are returned.
+
+        This is the expected "conservative" behavior: facets are smaller than the
+        actual result set because cutoff controls only one retrieval leg.
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "tensor",
+                "affectFacets": True,
+            },
+            facets={"fields": {"category": {"type": "string"}}},
+            track_total_hits=True,
+        )
+
+        # All 9 docs still returned (lexical leg unrestricted)
+        self.assertEqual(9, len(result["hits"]))
+        self.assertEqual(1, result["_relevantCandidates"])
+
+        # Facets is only applied to _relevantCandidates
+        expected_facets = {
+            "category": {"deep": {"count": 1}},
+        }
+        self.assertEqual(expected_facets, result["facets"])
+
+    def test_apply_in_both_blocks_irrelevant_documents_in_both_retrievals(self):
+        """With applyInRetrieval='both', the relevance cutoff is applied to both retrievals
+        """
+        result = self._search(
+            query='ocean species',
+            lexical_operand="and",
+            relevance_cutoff={
+                "method": "relative_max_score",
+                "probeDepth": 1000,
+                "parameters": {"relativeScoreFactor": 0.9},
+                "lexicalOperand": "or",
+                "applyInRetrieval": "both",
+            },
+        )
+
+        expected_ids = {'anchor',}
+        returned_ids = {r['_id'] for r in result['hits']}
+
+        # We make expected ids a set as the lexical score can vary in different runs
+        self.assertEqual(1, result["_relevantCandidates"])
+        self.assertEqual(1, result["_postProcessCandidates"])
+        self.assertEqual(expected_ids, returned_ids)
+
+        self.assertIn(
+            "_lexical_score", result["hits"][0]
+        )
+        self.assertIn("_tensor_score", result["hits"][0])
+
+    def test_apply_in_tensor_with_sort_by_preserves_all_lexical_and_matches_pagination(self):
+        """Test the pagination behaviour of 'applyInRetrieval'
+        """
+
+        limit = 2
+
+        expected_order = [
+            "long_1", "long_5", "long_2", "long_6", "long_3",
+            "long_7", "long_4", "long_8", "anchor"
+        ]
+
+        for offset in range(0, len(expected_order), limit):
+            result = self._search(
+                query='ocean species',
+                lexical_operand="and",
+                relevance_cutoff={
+                    "method": "relative_max_score",
+                    "probeDepth": 1000,
+                    "parameters": {"relativeScoreFactor": 0.9},
+                    "lexicalOperand": "or",
+                    "applyInRetrieval": "tensor",
+                    "overrideTotalHitsWithPostProcessCandidates": True,
+                },
+                sort_by={"fields": [{"fieldName": "price", "order": "asc"}]},
+                limit = limit,
+                offset=offset,
+            )
+            returned_ids = [r["_id"] for r in result['hits']]
+            expected_returned_ids = expected_order[offset: offset + limit]
+
+            self.assertEqual(expected_returned_ids, returned_ids)
+            # relevantCandidates still reflects the strict cutoff
+            self.assertEqual(1, result["_relevantCandidates"])
+            self.assertEqual(9, result["_postProcessCandidates"])
+            self.assertEqual(9, result["_sortCandidates"])
+            self.assertEqual(9, result["totalHits"])
