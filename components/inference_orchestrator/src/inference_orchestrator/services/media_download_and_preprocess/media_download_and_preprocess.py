@@ -56,6 +56,11 @@ def threaded_download_and_preprocess_content(
     """
     modality = preprocessing_config.modality
 
+    logger.debug(
+        "Thread %s: downloading %d %s item(s)",
+        threading.get_ident(), len(allocated_content), modality,
+    )
+
     if modality == Modality.IMAGE:
         return _threaded_download_and_preprocess_image(
             allocated_content,
@@ -90,7 +95,8 @@ def _threaded_download_and_preprocess_image(
     _id = f"media_download.{preprocessing_config.modality}.{threading.get_ident()}"
     thread_results: list[Union[InferenceErrorModel, list[Tuple[str, Tensor]]]] = []
     with metric_obj.time(f"{_id}.thread_time"):
-        for url in allocated_content:
+        for i, url in enumerate(allocated_content):
+            logger.debug("Thread %s: downloading image %d/%d: %s", threading.get_ident(), i + 1, len(allocated_content), url)
             try:
                 image = load_image_from_path(
                     url,
@@ -99,6 +105,7 @@ def _threaded_download_and_preprocess_image(
                     metrics_obj=metric_obj,
                 )
             except PIL.UnidentifiedImageError as e:
+                logger.warning("Thread %s: failed to download image %s: %s", threading.get_ident(), url, e)
                 metric_obj.increment_counter(f"{url}.UnidentifiedImageError")
                 if return_individual_error:
                     thread_results.append(InferenceErrorModel(error_message=str(e)))
@@ -112,6 +119,7 @@ def _threaded_download_and_preprocess_image(
                     )
                 except OSError as e:
                     if "image file is truncated" in str(e):
+                        logger.warning("Thread %s: truncated image file: %s", threading.get_ident(), url)
                         if return_individual_error:
                             thread_results.append(
                                 InferenceErrorModel(
@@ -123,8 +131,13 @@ def _threaded_download_and_preprocess_image(
                         continue
                     else:
                         raise e
+                logger.debug("Thread %s: successfully preprocessed image: %s", threading.get_ident(), url)
                 thread_results.append([(url, preprocessed_image[0])])
             else:
+                logger.warning(
+                    "Thread %s: unexpected image type %s for %s",
+                    threading.get_ident(), type(image), url,
+                )
                 if return_individual_error:
                     thread_results.append(
                         InferenceErrorModel(
@@ -158,6 +171,12 @@ def process_batch(
         for i in range(0, len(content), content_per_thread)
     ]
 
+    logger.info(
+        "Processing batch of %d media items across %d threads (%d items/thread, modality=%s, timeout=%dms)",
+        len(content), len(thread_allocated_docs), content_per_thread,
+        preprocessing_config.modality, preprocessing_config.download_timeout_ms,
+    )
+
     # Using the map function to ensure the results are in the same order as the input
     with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
         results_nested = list(
@@ -178,6 +197,13 @@ def process_batch(
 
     for partial_result in results_nested:
         results.extend(partial_result)
+
+    error_count = sum(1 for r in results if isinstance(r, InferenceErrorModel))
+    success_count = len(results) - error_count
+    logger.info(
+        "Batch processing complete: %d/%d succeeded, %d/%d failed",
+        success_count, len(results), error_count, len(results),
+    )
 
     # Fix up metric_obj to make it not mention thread-ids
     metric_obj = RequestMetricsStore.for_request()

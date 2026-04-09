@@ -47,6 +47,7 @@ def _origin_has_ipv6(hostname: str) -> bool:
     now = time.monotonic()
     cached = _AAAA_CACHE.get(hostname)
     if cached and (now - cached[1]) < _AAAA_CACHE_TTL:
+        logger.debug("IPv6 lookup cache hit for %s: has_ipv6=%s", hostname, cached[0])
         return cached[0]
     try:
         results = socket.getaddrinfo(
@@ -56,6 +57,7 @@ def _origin_has_ipv6(hostname: str) -> bool:
     except socket.gaierror:
         has_ipv6 = False
     _AAAA_CACHE[hostname] = (has_ipv6, now)
+    logger.debug("IPv6 lookup for %s: has_ipv6=%s (cached for %ds)", hostname, has_ipv6, _AAAA_CACHE_TTL)
     return has_ipv6
 
 
@@ -65,7 +67,9 @@ def _maybe_proxy_url(image_path: str) -> str:
     proxy_url = settings.marqo_media_proxy_url
     if not proxy_url:
         return image_path
-    return f"{proxy_url}?url={quote(image_path, safe='')}"
+    proxied = f"{proxy_url}?url={quote(image_path, safe='')}"
+    logger.debug("Constructed proxy URL for %s -> %s", image_path, proxied)
+    return proxied
 
 
 def _get_proxy_headers() -> dict:
@@ -86,11 +90,13 @@ def _is_proxy_failure(exc: ImageDownloadError) -> bool:
     cause = exc.__cause__
     if isinstance(cause, pycurl.error) and len(cause.args) > 0:
         if cause.args[0] in _PROXY_FALLBACK_CURL_CODES:
+            logger.debug("Proxy failure detected: curl error code %d", cause.args[0])
             return True
     # Check for HTTP gateway errors in the message
     msg = str(exc)
     for code in _PROXY_FALLBACK_HTTP_CODES:
         if f"returned {code}" in msg:
+            logger.debug("Proxy failure detected: HTTP %d in error message", code)
             return True
     return False
 
@@ -235,6 +241,7 @@ def _do_download(
         ImageDownloadError: If the download fails or exceeds size limit.
     """
     actual_url = fetch_url if fetch_url is not None else image_path
+    is_proxied = fetch_url is not None and fetch_url != image_path
 
     try:
         encoded_url = encode_url(actual_url)
@@ -244,8 +251,15 @@ def _do_download(
             f"The url could not be encoded properly. Original error: {e}"
         )
 
+    download_mode = "proxied" if is_proxied else ("direct-ipv6" if force_ipv6 else "direct-ipv4")
+    logger.info(
+        "Starting %s download for %s (timeout=%dms, modality=%s)",
+        download_mode, image_path, timeout_ms, modality,
+    )
+
     buffer = BytesIO()
     c = pycurl.Curl()
+    start_time = time.monotonic()
     try:
         c.setopt(pycurl.CAINFO, certifi.where())
         c.setopt(pycurl.URL, encoded_url)
@@ -265,16 +279,31 @@ def _do_download(
         c.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
 
         c.perform()
-        if c.getinfo(pycurl.RESPONSE_CODE) != 200:
-            raise ImageDownloadError(
-                f"media url `{image_path}` returned {c.getinfo(pycurl.RESPONSE_CODE)}"
+        status_code = c.getinfo(pycurl.RESPONSE_CODE)
+        elapsed_ms = (time.monotonic() - start_time) * 1000
+        if status_code != 200:
+            logger.warning(
+                "%s download failed for %s: HTTP %d (%.1fms)",
+                download_mode, image_path, status_code, elapsed_ms,
             )
+            raise ImageDownloadError(
+                f"media url `{image_path}` returned {status_code}"
+            )
+        content_length = buffer.tell()
+        logger.info(
+            "%s download succeeded for %s: HTTP %d, %d bytes (%.1fms)",
+            download_mode, image_path, status_code, content_length, elapsed_ms,
+        )
     except pycurl.error as e:
+        elapsed_ms = (time.monotonic() - start_time) * 1000
         error_message = str(e)
-        if len(e.args) > 0:
-            error_code = e.args[0]
-            if error_code == pycurl.E_ABORTED_BY_CALLBACK:
-                error_message = f"Media file `{image_path}` exceeds the maximum allowed size for {modality}."
+        error_code = e.args[0] if len(e.args) > 0 else None
+        logger.warning(
+            "%s download failed for %s: curl error %s - %s (%.1fms)",
+            download_mode, image_path, error_code, error_message, elapsed_ms,
+        )
+        if error_code == pycurl.E_ABORTED_BY_CALLBACK:
+            error_message = f"Media file `{image_path}` exceeds the maximum allowed size for {modality}."
         raise ImageDownloadError(
             f"Marqo encountered an error when downloading the media url {image_path}. "
             f"The original error is: {error_message}"
@@ -319,40 +348,62 @@ def download_image_from_url(
         )
 
     if not settings.marqo_media_proxy_url:
-        # Feature disabled -- behave identically to before.
+        logger.debug("Media proxy not configured, downloading directly: %s", image_path)
         return _do_download(image_path, media_download_headers, timeout_ms, modality)
 
     origin_host = urlparse(image_path).hostname
+    logger.info(
+        "Media proxy enabled (proxy=%s), resolving download tier for %s (host=%s)",
+        settings.marqo_media_proxy_url, image_path, origin_host,
+    )
 
     # --- Tier 1: Direct IPv6 (if origin supports it) ---
     if origin_host and _origin_has_ipv6(origin_host):
+        logger.info("Tier 1: Attempting direct IPv6 download for %s", image_path)
         try:
-            return _do_download(
+            result = _do_download(
                 image_path, media_download_headers, timeout_ms, modality,
                 force_ipv6=True,
             )
-        except ImageDownloadError:
+            logger.info("Tier 1 succeeded for %s", image_path)
+            return result
+        except ImageDownloadError as e:
             logger.warning(
-                "Direct IPv6 download failed for %s, falling through to proxy",
-                origin_host,
+                "Tier 1 (direct IPv6) failed for %s, falling through to Tier 2 (proxy): %s",
+                origin_host, e,
             )
+    else:
+        logger.info(
+            "Tier 1 skipped for %s: origin %s does not have IPv6 (AAAA records)",
+            image_path, origin_host,
+        )
 
     # --- Tier 2: Proxy over IPv6 ---
     proxy_url = _maybe_proxy_url(image_path)
+    logger.info("Tier 2: Attempting proxy download for %s", image_path)
     try:
-        return _do_download(
+        result = _do_download(
             image_path, media_download_headers, timeout_ms, modality,
             proxy_headers=_get_proxy_headers(),
             fetch_url=proxy_url,
         )
+        logger.info("Tier 2 (proxy) succeeded for %s", image_path)
+        return result
     except ImageDownloadError as exc:
         if _is_proxy_failure(exc):
             logger.warning(
-                "Proxy download failed for %s, falling back to direct IPv4: %s",
+                "Tier 2 (proxy) failed for %s, falling back to Tier 3 (direct IPv4): %s",
                 image_path, exc,
             )
             # --- Tier 3: Direct IPv4 (last resort) ---
-            return _do_download(image_path, media_download_headers, timeout_ms, modality)
+            logger.info("Tier 3: Attempting direct IPv4 download for %s", image_path)
+            result = _do_download(image_path, media_download_headers, timeout_ms, modality)
+            logger.info("Tier 3 (direct IPv4) succeeded for %s", image_path)
+            return result
+        logger.warning(
+            "Tier 2 (proxy) failed for %s with non-proxy error (not falling back): %s",
+            image_path, exc,
+        )
         raise
 
 
