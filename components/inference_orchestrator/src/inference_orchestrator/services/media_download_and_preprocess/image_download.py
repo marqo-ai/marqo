@@ -290,9 +290,18 @@ def _do_download(
                 f"media url `{image_path}` returned {status_code}"
             )
         content_length = buffer.tell()
+        content_type = c.getinfo(pycurl.CONTENT_TYPE)
         logger.info(
-            "%s download succeeded for %s: HTTP %d, %d bytes (%.1fms)",
-            download_mode, image_path, status_code, content_length, elapsed_ms,
+            "%s download succeeded for %s: HTTP %d, %d bytes, content-type=%s (%.1fms)",
+            download_mode, image_path, status_code, content_length, content_type, elapsed_ms,
+        )
+        # Log first bytes to help diagnose proxy returning non-image content
+        buffer.seek(0)
+        head = buffer.read(64)
+        buffer.seek(0)
+        logger.debug(
+            "%s response head for %s: %r",
+            download_mode, image_path, head,
         )
     except pycurl.error as e:
         elapsed_ms = (time.monotonic() - start_time) * 1000

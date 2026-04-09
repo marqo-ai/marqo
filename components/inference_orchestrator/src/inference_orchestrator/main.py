@@ -113,6 +113,13 @@ def vectorise(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
+    logger.info(
+        "Vectorise request: modality=%s, num_contents=%d, model=%s",
+        inference_request.modality,
+        len(inference_request.contents),
+        inference_request.embedding_model_config.model_name,
+    )
+
     # Generate embeddings
     try:
         result = config.inference.vectorise(inference_request)
