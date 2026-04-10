@@ -200,7 +200,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     'language': 'en'
                 },
                 'expected_query': {
-                    'yql': 'select * from test_index where ((weakAnd(default contains "machine learning", default contains "artificial intelligence")) AND (default contains "deep"))',
+                    'yql': 'select * from test_index where (rank(default contains "deep", default contains "machine learning", default contains "artificial intelligence"))',
                     'model_restrict': 'test_index',
                     'hits': 20,
                     'offset': 5,
@@ -307,7 +307,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     'marqo__ranking.lexical.tensor': 'hybrid_bm25_then_embedding_similarity',
                     'marqo__ranking.tensor.lexical': 'hybrid_embedding_similarity_then_bm25',
                     'marqo__ranking.tensor.tensor': 'embedding_similarity',
-                    'marqo__yql.lexical': 'select * from test_index where ((weakAnd(default contains "neural networks", default contains "deep learning")) AND (default contains "transformer"))',
+                    'marqo__yql.lexical': 'select * from test_index where (rank(default contains "transformer", default contains "neural networks", default contains "deep learning"))',
                     'marqo__yql.tensor': 'select * from test_index where (({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))',
                     'model_restrict': 'test_index',
                     'offset': 10,
@@ -442,13 +442,12 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                     "ranking.matching.weakand.adjustTarget": 0.3,
                     "ranking.matching.weakand.allowDropAll": True,
                     "ranking.matching.filterThreshold": 0.4,
-                    # Facets should still use the OR query structure
-                    'marqo__yql.facets': 'select * from test_index where ((default contains "neural networks" OR default contains "deep learning") '
-                                         'AND (default contains "transformer") OR '
+                    # Facets use rank() with OR-joined optional terms
+                    'marqo__yql.facets': 'select * from test_index where (rank(default contains "transformer", default contains "neural networks", default contains "deep learning") OR '
                                          '(({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) '
                                          'OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))) '
                                          'limit 0 | all(group(1.1) each(output(count())))',
-                    'marqo__yql.lexical': 'select * from test_index where (({targetHits:111}weakAnd(default contains "neural networks", default contains "deep learning")) AND (default contains "transformer"))',
+                    'marqo__yql.lexical': 'select * from test_index where (rank(default contains "transformer", default contains "neural networks", default contains "deep learning"))',
                     'marqo__yql.tensor': 'select * from test_index where (({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR ({targetHits:40, approximate:True, hnsw.exploreAdditionalHits:1960}nearestNeighbor(marqo__embeddings_description, marqo__query_embedding)))',
                     'model_restrict': 'test_index',
                     'offset': 10,
@@ -1596,12 +1595,12 @@ class TestSemiStructuredCustomScoreRerankToVespaQuery(unittest.TestCase):
             'select * from test_index where (weakAnd(default contains "search"))',
             vespa_query['marqo__yql.lexical'],
         )
-        # Assert tensor yql has the extra weakAnd (for bm25 sum)
+        # Assert tensor yql has the extra bm25 term (weakAnd unwrapped by _optimize_yql_query)
         self.assertEqual(
             'select * from test_index where rank((({targetHits:10, approximate:True, '
             'hnsw.exploreAdditionalHits:1990}nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR '
             '({targetHits:10, approximate:True, hnsw.exploreAdditionalHits:1990}nearestNeighbor('
-            'marqo__embeddings_description, marqo__query_embedding))), weakAnd(default contains "search"))',
+            'marqo__embeddings_description, marqo__query_embedding))), default contains "search")',
             vespa_query['marqo__yql.tensor'],
         )
 
@@ -2301,12 +2300,11 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
         result = self.vespa_index._generate_or_terms(q)
         self.assertEqual(result, 'weakAnd(default contains "search")')
 
-    def test_lexical_operand_or_with_rerank_depth(self):
-        """When lexicalOperand='or' with rerankDepthLexical, should use OR (no targetHits wrapping)."""
-        q = self._make_hybrid_query(lexical_operand='or', rerank_depth_lexical=100,
+    def test_lexical_operand_or_with_rerank_depth_raises(self):
+        """When lexicalOperand='or' with rerankDepthLexical, validation should reject this combination."""
+        with self.assertRaises(Exception):
+            self._make_hybrid_query(lexical_operand='or', rerank_depth_lexical=100,
                                     or_phrases=['term1', 'term2'])
-        result = self.vespa_index._generate_or_terms(q)
-        self.assertEqual(result, 'default contains "term1" OR default contains "term2"')
 
     def test_lexical_operand_weakand_with_rerank_depth(self):
         """When lexicalOperand='weakAnd' with rerankDepthLexical, should use weakAnd with targetHits."""
@@ -2448,8 +2446,8 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
 
         lexical_yql = vespa_query.get('marqo__yql.lexical', '')
         expected = ('select * from test_index where '
-                    '((default contains "hello" OR default contains "world") '
-                    'AND (default contains "exact phrase"))')
+                    '(rank(default contains "exact phrase", '
+                    'default contains "hello", default contains "world"))')
         self.assertEqual(expected, lexical_yql)
 
     def test_all_quoted_terms_with_lexical_operand_or_and_relevance_cutoff(self):
@@ -2502,7 +2500,7 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
 
     def test_custom_score_ranking_term_weakand_with_lexical_operand_or_full_query(self):
         """End-to-end: with lexicalOperand='or' and BM25 custom score, the main retrieval uses OR
-        but the extra rank() term must use weakAnd."""
+        and the extra rank() term's weakAnd is unwrapped by _optimize_yql_query."""
         q = self._make_hybrid_query(
             lexical_operand='or',
             or_phrases=['hello', 'world'],
@@ -2521,12 +2519,12 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
             'select * from test_index where '
             '(rank('
             '(marqo__lexical_description contains "hello") OR (marqo__lexical_description contains "world"), '
-            'weakAnd((marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world"))))')
+            '(marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world")))')
         self.assertEqual(expected_lexical, lexical_yql)
 
     def test_custom_score_ranking_term_weakand_with_lexical_operand_and_full_query(self):
         """End-to-end: with lexicalOperand='and' and BM25 custom score, the main retrieval uses AND
-        but the extra rank() term must use weakAnd."""
+        and the extra rank() term's weakAnd is unwrapped by _optimize_yql_query."""
         q = self._make_hybrid_query(
             lexical_operand='and',
             or_phrases=['hello', 'world'],
@@ -2545,12 +2543,12 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
             'select * from test_index where '
             '(rank('
             '(marqo__lexical_description contains "hello") AND (marqo__lexical_description contains "world"), '
-            'weakAnd((marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world"))))')
+            '(marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world")))')
         self.assertEqual(expected_lexical, lexical_yql)
 
     def test_custom_score_ranking_term_weakand_with_lexical_operand_weakand_full_query(self):
         """End-to-end: with lexicalOperand='weakAnd' and BM25 custom score, both the main retrieval
-        and the extra rank() term use weakAnd."""
+        and the extra rank() term use weakAnd, with non-first weakAnd unwrapped."""
         q = self._make_hybrid_query(
             lexical_operand='weakAnd',
             or_phrases=['hello', 'world'],
@@ -2569,12 +2567,12 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
             'select * from test_index where '
             '(rank('
             'weakAnd((marqo__lexical_description contains "hello"), (marqo__lexical_description contains "world")), '
-            'weakAnd((marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world"))))')
+            '(marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world")))')
         self.assertEqual(expected_lexical, lexical_yql)
 
     def test_custom_score_tensor_ranking_term_always_weakand_with_lexical_operand(self):
-        """Tensor YQL's extra BM25 ranking term must use weakAnd regardless of lexicalOperand.
-        The tensor YQL is identical across all lexicalOtest_no_lexical_fields_returns_false_regardless_of_lexical_operandperand values since it only affects lexical retrieval."""
+        """Tensor YQL's extra BM25 ranking term's weakAnd is unwrapped by _optimize_yql_query.
+        The tensor YQL is identical across all lexicalOperand values since it only affects lexical retrieval."""
         expected_tensor = (
             'select * from test_index where '
             'rank(('
@@ -2582,7 +2580,7 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
             'nearestNeighbor(marqo__embeddings_title, marqo__query_embedding)) OR '
             '({targetHits:10, approximate:True, hnsw.exploreAdditionalHits:1990}'
             'nearestNeighbor(marqo__embeddings_description, marqo__query_embedding))), '
-            'weakAnd((marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world")))')
+            '(marqo__lexical_title contains "hello"), (marqo__lexical_title contains "world"))')
         for lexical_operand in ['or', 'and', 'weakAnd']:
             with self.subTest(lexical_operand=lexical_operand):
                 q = self._make_hybrid_query(
@@ -2618,6 +2616,374 @@ class TestLexicalOperandSemiStructured(TestSemiStructuredVespaIndexToVespaQuery)
                 vespa_query = vi_no_lex.to_vespa_query(q)
                 lexical_yql = vespa_query.get('marqo__yql.lexical', '')
                 self.assertEqual(expected, lexical_yql)
+
+
+class TestOptimizeYqlQuery(unittest.TestCase):
+    """Tests for SemiStructuredVespaIndex._optimize_yql_query."""
+
+    def test_noop_for_non_rank_term(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('weakAnd(a, b)')
+        self.assertEqual('weakAnd(a, b)', result)
+
+    def test_noop_for_simple_rank(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(a, b)')
+        self.assertEqual('rank(a, b)', result)
+
+    def test_flatten_nested_rank_first_child(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(rank(a, b), c)')
+        self.assertEqual('rank(a, b, c)', result)
+
+    def test_flatten_nested_rank_non_first(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(a, rank(b, c))')
+        self.assertEqual('rank(a, b, c)', result)
+
+    def test_flatten_double_nested(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(rank(a, b), rank(c, d))')
+        self.assertEqual('rank(a, b, c, d)', result)
+
+    def test_unwrap_weakand_in_non_first(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(a, weakAnd(b, c))')
+        self.assertEqual('rank(a, b, c)', result)
+
+    def test_unwrap_target_hits_weakand(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(a, {targetHits:100}weakAnd(b, c))')
+        self.assertEqual('rank(a, b, c)', result)
+
+    def test_unwrap_or_in_non_first(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(a, b OR c)')
+        self.assertEqual('rank(a, b, c)', result)
+
+    def test_preserve_weakand_in_first_position(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query('rank(weakAnd(a, b), c)')
+        self.assertEqual('rank(weakAnd(a, b), c)', result)
+
+    def test_complex_real_world(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query(
+            'rank(rank(required AND optional_wa, tensor1), weakAnd(extra))'
+        )
+        self.assertEqual('rank(required AND optional_wa, tensor1, extra)', result)
+
+    def test_empty_trivial(self):
+        self.assertEqual('false', SemiStructuredVespaIndex._optimize_yql_query('false'))
+        self.assertEqual('true', SemiStructuredVespaIndex._optimize_yql_query('true'))
+
+    def test_nested_contains_with_parens(self):
+        result = SemiStructuredVespaIndex._optimize_yql_query(
+            'rank(a, (field1 contains "x" OR field2 contains "x"))'
+        )
+        self.assertEqual('rank(a, field1 contains "x", field2 contains "x")', result)
+
+
+class TestCombineLexicalOrAndTerms(unittest.TestCase):
+    """Tests for SemiStructuredVespaIndex._combine_lexical_or_and_terms."""
+
+    def test_both_present_use_rank_true(self):
+        result = SemiStructuredVespaIndex._combine_lexical_or_and_terms(
+            'weakAnd(a, b)', 'c AND d', True
+        )
+        self.assertEqual('rank(c AND d, weakAnd(a, b))', result)
+
+    def test_both_present_use_rank_false(self):
+        result = SemiStructuredVespaIndex._combine_lexical_or_and_terms(
+            'weakAnd(a, b)', 'c AND d', False
+        )
+        self.assertEqual('(weakAnd(a, b)) AND (c AND d)', result)
+
+    def test_only_or_terms(self):
+        result = SemiStructuredVespaIndex._combine_lexical_or_and_terms(
+            'weakAnd(a, b)', '', True
+        )
+        self.assertEqual('weakAnd(a, b)', result)
+
+    def test_only_and_terms(self):
+        result = SemiStructuredVespaIndex._combine_lexical_or_and_terms(
+            '', 'c AND d', True
+        )
+        self.assertEqual('c AND d', result)
+
+    def test_neither(self):
+        result = SemiStructuredVespaIndex._combine_lexical_or_and_terms('', '', True)
+        self.assertEqual('false', result)
+
+
+class TestSplitTopLevel(unittest.TestCase):
+    """Tests for SemiStructuredVespaIndex._split_top_level."""
+
+    def test_simple_comma_split(self):
+        result = SemiStructuredVespaIndex._split_top_level('a, b, c', ',')
+        self.assertEqual(['a', 'b', 'c'], result)
+
+    def test_nested_parens_preserved(self):
+        result = SemiStructuredVespaIndex._split_top_level('rank(a, b), c', ',')
+        self.assertEqual(['rank(a, b)', 'c'], result)
+
+    def test_or_split(self):
+        result = SemiStructuredVespaIndex._split_top_level('a OR b OR c', ' OR ')
+        self.assertEqual(['a', 'b', 'c'], result)
+
+    def test_nested_or_preserved(self):
+        result = SemiStructuredVespaIndex._split_top_level('(a OR b) AND c', ' OR ')
+        self.assertEqual(['(a OR b) AND c'], result)
+
+
+class TestLexicalRankBehavior(unittest.TestCase):
+    """Tests for the rank() behavior with mixed required/optional terms."""
+
+    _SENTINEL = object()
+
+    def setUp(self):
+        """Set up test fixtures."""
+        marqo_index = SemiStructuredMarqoIndex(
+            name='test_index',
+            schema_name='test_index',
+            model=Model(name='hf/all-MiniLM-L6-v2'),
+            normalize_embeddings=True,
+            distance_metric=DistanceMetric.Angular,
+            vector_numeric_type='float',
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            marqo_version='2.16.0',
+            created_at=time.time(),
+            updated_at=time.time(),
+            text_preprocessing=TextPreProcessing(
+                split_length=2, split_overlap=0, split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing=ImagePreProcessing(patch_method=None),
+            treat_urls_and_pointers_as_images=False,
+            treat_urls_and_pointers_as_media=False,
+            filter_string_max_length=50,
+            lexical_fields=[
+                Field(name='title', type=FieldType.Text,
+                      features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
+                      lexical_field_name=f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}title',
+                      filter_field_name='title_filter'),
+                Field(name='description', type=FieldType.Text,
+                      features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
+                      lexical_field_name=f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}description',
+                      filter_field_name='description_filter'),
+            ],
+            tensor_fields=[
+                TensorField(name='title',
+                            embeddings_field_name=f'{SemiStructuredVespaSchema.FIELD_EMBEDDING_PREFIX}title',
+                            chunk_field_name=f'{SemiStructuredVespaSchema.FIELD_CHUNKS_PREFIX}title'),
+                TensorField(name='description',
+                            embeddings_field_name=f'{SemiStructuredVespaSchema.FIELD_EMBEDDING_PREFIX}description',
+                            chunk_field_name=f'{SemiStructuredVespaSchema.FIELD_CHUNKS_PREFIX}description'),
+            ],
+        )
+        self.vespa_index = SemiStructuredVespaIndex(marqo_index)
+
+    def _make_hybrid_query(self, lexical_operand=None, rerank_depth_lexical=None,
+                           or_phrases=_SENTINEL, and_phrases=None, relevance_cutoff=None,
+                           score_modifiers=None, searchable_attributes_lexical=None,
+                           retrieval_method=RetrievalMethod.Disjunction,
+                           ranking_method=RankingMethod.RRF):
+        """Helper to create a MarqoHybridQuery."""
+        if or_phrases is self._SENTINEL:
+            or_phrases = ['search']
+        hp = HybridParameters(
+            retrievalMethod=retrieval_method,
+            rankingMethod=ranking_method,
+            lexicalOperand=lexical_operand,
+            rerankDepthLexical=rerank_depth_lexical,
+            searchableAttributesLexical=searchable_attributes_lexical,
+        )
+        return MarqoHybridQuery(
+            index_name='test_index',
+            limit=10,
+            offset=0,
+            vector_query=[0.1] * 4,
+            or_phrases=or_phrases or [],
+            and_phrases=and_phrases or [],
+            hybrid_parameters=hp,
+            approximate=True,
+            relevance_cutoff=relevance_cutoff,
+            score_modifiers=score_modifiers,
+        )
+
+    def test_or_only_query_unchanged(self):
+        """OR-only query produces weakAnd as before."""
+        q = self._make_hybrid_query(or_phrases=['a', 'b'])
+        term = self.vespa_index._get_lexical_search_term(q)
+        self.assertEqual('weakAnd(default contains "a", default contains "b")', term)
+
+    def test_and_only_query_unchanged(self):
+        """AND-only query produces AND as before."""
+        q = self._make_hybrid_query(or_phrases=[], and_phrases=['a', 'b'])
+        term = self.vespa_index._get_lexical_search_term(q)
+        self.assertEqual('default contains "a" AND default contains "b"', term)
+
+    def test_mixed_query_uses_rank(self):
+        """Mixed query uses rank(required, optional) instead of AND."""
+        q = self._make_hybrid_query(or_phrases=['opt1', 'opt2'], and_phrases=['req1'])
+        term = self.vespa_index._get_lexical_search_term(q)
+        self.assertEqual(
+            'rank(default contains "req1", weakAnd(default contains "opt1", default contains "opt2"))',
+            term
+        )
+
+    def test_mixed_query_after_optimize(self):
+        """After _optimize_yql_query, weakAnd in non-first position is unwrapped."""
+        q = self._make_hybrid_query(or_phrases=['opt1', 'opt2'], and_phrases=['req1'])
+        term = self.vespa_index._get_lexical_search_term(q)
+        optimized = SemiStructuredVespaIndex._optimize_yql_query(term)
+        self.assertEqual(
+            'rank(default contains "req1", default contains "opt1", default contains "opt2")',
+            optimized
+        )
+
+    def test_mixed_query_lexical_operand_and(self):
+        """With lexicalOperand='and', mixed terms use old AND behavior."""
+        q = self._make_hybrid_query(
+            lexical_operand='and', or_phrases=['opt1', 'opt2'], and_phrases=['req1']
+        )
+        term = self.vespa_index._get_lexical_search_term(q)
+        self.assertEqual(
+            '(default contains "opt1" AND default contains "opt2") AND (default contains "req1")',
+            term
+        )
+
+    def test_mixed_query_lexical_operand_weakand(self):
+        """With lexicalOperand='weakAnd', mixed terms use rank()."""
+        q = self._make_hybrid_query(
+            lexical_operand='weakAnd', or_phrases=['opt1', 'opt2'], and_phrases=['req1']
+        )
+        term = self.vespa_index._get_lexical_search_term(q)
+        self.assertEqual(
+            'rank(default contains "req1", weakAnd(default contains "opt1", default contains "opt2"))',
+            term
+        )
+
+    def test_mixed_query_with_rerank_depth(self):
+        """Mixed terms + rerankDepthLexical uses targetHits in weakAnd."""
+        q = self._make_hybrid_query(
+            or_phrases=['opt1', 'opt2'], and_phrases=['req1'],
+            rerank_depth_lexical=100
+        )
+        term = self.vespa_index._get_lexical_search_term(q)
+        self.assertEqual(
+            'rank(default contains "req1", {targetHits:100}weakAnd(default contains "opt1", default contains "opt2"))',
+            term
+        )
+
+    def test_mixed_query_full_vespa_query_optimized(self):
+        """Full vespa query with mixed terms produces optimized rank() in lexical YQL."""
+        q = self._make_hybrid_query(or_phrases=['opt1', 'opt2'], and_phrases=['req1'])
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        expected = (
+            'select * from test_index where '
+            '(rank(default contains "req1", default contains "opt1", default contains "opt2"))'
+        )
+        self.assertEqual(expected, lexical_yql)
+
+    def test_mixed_query_with_custom_score_rerank_flattened(self):
+        """Mixed terms + custom score rerank produces flattened rank()."""
+        q = self._make_hybrid_query(
+            or_phrases=['opt1', 'opt2'], and_phrases=['req1'],
+            searchable_attributes_lexical=['description'],
+            score_modifiers=[
+                ScoreModifier(
+                    field=f"{MARQO_CUSTOM_SCORE_RERANK_INPUT_PREFIX}bm25_field_title",
+                    weight=1.0,
+                    type=ScoreModifierType.Add,
+                ),
+            ],
+        )
+        vespa_query = self.vespa_index.to_vespa_query(q)
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        # rank(rank(req, weakAnd(opt)), weakAnd(extra)) should be flattened
+        self.assertIn('rank(', lexical_yql)
+        # Verify it's a single level rank()
+        # The inner content after first 'rank(' should not contain another 'rank('
+        inner = lexical_yql[lexical_yql.index('rank('):]
+        self.assertEqual(1, inner.count('rank('))
+
+    def test_facets_query_with_mixed_terms(self):
+        """Facets query with mixed terms uses rank() with OR-joined facet terms."""
+        q = self._make_hybrid_query(or_phrases=['opt1', 'opt2'], and_phrases=['req1'])
+        facets_term = self.vespa_index._get_lexical_search_term(q, is_facets_term=True)
+        optimized = SemiStructuredVespaIndex._optimize_yql_query(facets_term)
+        # Facets use OR for or_terms, then rank() with and_terms
+        self.assertIn('rank(', optimized)
+
+    def test_relevance_cutoff_probe_with_and_override(self):
+        """Probe query with lexicalOperand='and' override uses AND, main query uses rank()."""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters=RelativeMaxScoreParameters(relativeScoreFactor=0.5),
+            lexicalOperand='and'
+        )
+        q = self._make_hybrid_query(
+            or_phrases=['opt1', 'opt2'], and_phrases=['req1'],
+            relevance_cutoff=relevance_cutoff
+        )
+        vespa_query = self.vespa_index.to_vespa_query(q)
+
+        # Main lexical query uses rank()
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        self.assertIn('rank(', lexical_yql)
+
+        # Probe uses AND (from override)
+        probe_yql = vespa_query.get('marqo__yql.lexical.probe', '')
+        self.assertIn(' AND ', probe_yql)
+        self.assertNotIn('rank(', probe_yql)
+
+    def test_relevance_cutoff_probe_without_override(self):
+        """Probe query without override follows hybrid_parameters.lexicalOperand."""
+        relevance_cutoff = RelevanceCutoffModel(
+            method=RelevanceCutoffMethod.RelativeMaxScore,
+            parameters=RelativeMaxScoreParameters(relativeScoreFactor=0.5),
+        )
+        q = self._make_hybrid_query(
+            or_phrases=['opt1', 'opt2'], and_phrases=['req1'],
+            relevance_cutoff=relevance_cutoff
+        )
+        vespa_query = self.vespa_index.to_vespa_query(q)
+
+        # Both main and probe should use rank()
+        lexical_yql = vespa_query.get('marqo__yql.lexical', '')
+        probe_yql = vespa_query.get('marqo__yql.lexical.probe', '')
+        self.assertIn('rank(', lexical_yql)
+        self.assertIn('rank(', probe_yql)
+
+
+class TestHybridParametersLexicalOperandValidation(unittest.TestCase):
+    """Tests for the rerankDepthLexical + lexicalOperand validation."""
+
+    def test_rerank_depth_with_and_raises(self):
+        with self.assertRaises(Exception):
+            HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                lexicalOperand='and',
+                rerankDepthLexical=100,
+            )
+
+    def test_rerank_depth_with_or_raises(self):
+        with self.assertRaises(Exception):
+            HybridParameters(
+                retrievalMethod=RetrievalMethod.Disjunction,
+                rankingMethod=RankingMethod.RRF,
+                lexicalOperand='or',
+                rerankDepthLexical=100,
+            )
+
+    def test_rerank_depth_with_weakand_ok(self):
+        hp = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            lexicalOperand='weakAnd',
+            rerankDepthLexical=100,
+        )
+        self.assertEqual(100, hp.rerankDepthLexical)
+
+    def test_rerank_depth_with_none_operand_ok(self):
+        hp = HybridParameters(
+            retrievalMethod=RetrievalMethod.Disjunction,
+            rankingMethod=RankingMethod.RRF,
+            rerankDepthLexical=100,
+        )
+        self.assertEqual(100, hp.rerankDepthLexical)
 
 
 if __name__ == '__main__':
