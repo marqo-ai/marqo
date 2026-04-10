@@ -1,0 +1,96 @@
+#A Docker Compose file to set up a Marqo inference environment with Triton Inference Server,
+#Marqo Model Management Container (MMC), and Marqo Inference Orchestrator Container(MIOC).
+#
+#This will expose the vectorise endpoint in MIOC on port 8884. Integration tests can be run against this endpoint.
+
+name: marqo-inference
+
+services:
+  triton-gpu:
+    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--log-verbose=1",
+        "--model-control-mode=explicit"
+      ]
+    volumes:
+      - modelrepo:/models          # <== shared
+    ports:
+      - "8000:8000"                # HTTP
+      - "8001:8001"                # gRPC
+      - "8002:8002"                # Metrics
+    networks:
+      mmc-net:
+        aliases: [triton]
+    profiles: [gpu]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--log-verbose=1",
+        "--model-control-mode=explicit"
+      ]
+    volumes:
+      - modelrepo:/models          # <== shared
+    ports:
+      - "8000:8000"                # HTTP
+      - "8001:8001"                # gRPC
+      - "8002:8002"                # Metrics
+    networks: [ mmc-net ]
+    profiles: [cpu]
+    restart: unless-stopped
+
+  mmc:
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/model-management:latest
+    build:
+      context: ./components
+      dockerfile: model_management/Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      MARQO_LOG_LEVEL: "INFO"
+      MARQO_MODELS_TO_PRELOAD: "[]"
+      MARQO_TRITON_REST_URL: http://triton:8000
+      MARQO_MODEL_CACHE_PATH: /models
+    volumes:
+      - modelrepo:/models
+      - ~/.aws/credentials:/root/.aws/credentials:ro  # If using AWS S3 for model storage
+    ports:
+      - "8883:8883"
+    networks: [mmc-net]
+    restart: unless-stopped
+
+  mioc:
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/inference-orchestrator:latest
+    build:
+      context: ./components
+      dockerfile: inference_orchestrator/Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      LOG_LEVEL: "INFO"
+      MARQO_TRITON_URL: http://triton:8001
+      MARQO_MODEL_MANAGEMENT_CONTAINER_URL: http://mmc:8883
+    ports:
+      - "8884:8884"
+    networks: [mmc-net]
+    restart: unless-stopped
+
+volumes:
+  modelrepo:
+
+networks:
+  mmc-net:

@@ -1,3 +1,98 @@
+# Release 2.24.0
+
+## New features
+- Support typeahead search([#1289](https://github.com/marqo-ai/marqo/pull/1289)). You can now get intelligent query suggestions based on partial user input to help users find relevant content faster and reduce zero-result searches. For details, please refer to [this API document](https://docs.marqo.ai/latest/reference/api/typeahead/typeahead/) and [this recipe](https://docs.marqo.ai/latest/other-resources/cookbook/recipes/implementing-typeahead-search/). This is supported only for indexes created with Marqo 2.23.0 or later.
+- Support caching embeddings of base64-encoded images([#1285](https://github.com/marqo-ai/marqo/pull/1285)). This feature greatly improves performance by cutting the vectorisation time of commonly reused images from ~10 ms down to ~1 ms.
+
+## Bug fixes and minor changes
+- Fix an issue where facet counts were incorrect when using the lexical retrieval method with filters and multiple `OR` phrases ([#1282](https://github.com/marqo-ai/marqo/pull/1282)).
+- Fix an issue where collasing search stops working when the collapse field is not included in `attributesToRetrieve` search parameter ([#1294](https://github.com/marqo-ai/marqo/pull/1294)). 
+- Fix metric emission for the `get-batch` and `delete-batch` endpoints ([#1300](https://github.com/marqo-ai/marqo/pull/1300)).
+- Ensure access log level now inherits from the root log level ([#1301](https://github.com/marqo-ai/marqo/pull/1301)).
+- Reduce verbosity of some logs emitted from `HybridSearcher` ([#1299](https://github.com/marqo-ai/marqo/pull/1299)).
+
+# Release 2.23.2
+
+## Bug Fixes and Minor Changes
+- Fix `totalHits` count for collapsed searches([#1292](https://github.com/marqo-ai/marqo/pull/1292)). When a collapse field is provided in search parameters, the `totalHits` now reflects the number of unique values for that field (i.e., the number of groups), rather than the raw number of matching documents.
+
+# Release 2.23.1
+
+## Bug Fixes and Minor Changes
+- Add `"allowMissingDocuments"` and `"allowMissingEmbeddings"` parameters to the recommend and search with context endpoints ([#1287](https://github.com/marqo-ai/marqo/pull/1287)). Users can set these parameters to `true` to skip errors when documents or their embeddings are missing.
+- Relax the restrictions on the `"queryTensor"` field in hybrid search when using `retrievalMethod="disjunction"` and `rankingMethod="rrf"` ([#1287](https://github.com/marqo-ai/marqo/pull/1287)). This field can now accept `None` or an empty dictionary, making hybrid search more flexible.
+
+# Release 2.23.0
+
+## New Features
+- **Configurable stemming for text fields** ([#1273](https://github.com/marqo-ai/marqo/pull/1273)). You can now control stemming on a per-field basis in a unstructured index. Stemming influences full-text search behavior. Filters are unaffected. Please refer to [this document](https://docs.marqo.ai/latest/reference/api/documents/mappings/#text-field-language-and-stemming-mappings) for detailed guidance.
+- **Collapse fields (variant grouping)** ([#1276](https://github.com/marqo-ai/marqo/pull/1276), [#1277](https://github.com/marqo-ai/marqo/pull/1277)). Collapse field groups search results by a field (e.g., product_id) and returns only one "top" document per group. It’s perfect for product variants (sizes, colors, SKUs) because you can show the "top" variant per product. This feature is available for hybrid search in unstructured indexes. Please refer to [this cookbook](https://docs.marqo.ai/latest/other-resources/cookbook/recipes/search-result-grouping-with-collapse-fields/) for more details. 
+
+# Release 2.22.2
+
+## Bug Fixes and Minor Changes
+- Add `"allowMissingDocuments"` and `"allowMissingEmbeddings"` parameters to the recommend and search with context endpoints ([#1287](https://github.com/marqo-ai/marqo/pull/1287)). Users can set these parameters to `true` to skip errors when documents or their embeddings are missing.
+- Relax the restrictions on the `"queryTensor"` field in hybrid search when using `retrievalMethod="disjunction"` and `rankingMethod="rrf"` ([#1287](https://github.com/marqo-ai/marqo/pull/1287)). This field can now accept `None` or an empty dictionary, making hybrid search more flexible.
+
+# Release 2.22.1
+
+## Bug Fixes and Minor Changes
+- Remove the concurrency parameter from context documents in search API ([#1268](https://github.com/marqo-ai/marqo/pull/1268))
+- Emit generic high cardinality metrics ([#1272](https://github.com/marqo-ai/marqo/pull/1272))
+- Exclude document-operation-executor config from Vespa bootstrapping ([#1271](https://github.com/marqo-ai/marqo/pull/1271))
+
+# Release 2.22.0
+
+## New features
+- Search result sorting and relevance cutoff ([#1246](https://github.com/marqo-ai/marqo/pull/1246)). You can now sort search results by up to 3 fields with the `sortBy` parameter. Customize further with field sort `order` and `missing`, which determines placement of documents without said fields. You can also exclude results that do not meet a certain relevance threshhold with `relevanceCutoff`. Check [here](https://docs.marqo.ai/latest/other-resources/cookbook/tips-and-tricks/sort-and-relevance-cutoff/) for detailed usage.
+- Personalization with context documents ([#1254](https://github.com/marqo-ai/marqo/pull/1254)). You can now search using existing documents in your index in combination with a query by using `documents` in the `context` search parameter. Marqo will interpolate all vectors from your query, context tensors (if any), and context documents using `interpolationMethod`. This is a more robust form of the `recommend` endpoint. Check [here](https://docs.marqo.ai/latest/reference/api/search/search/#using-context-documents) for detailed usage.
+- Query logging for slow or failed queries ([#1247](https://github.com/marqo-ai/marqo/pull/1247)). Marqo now logs the sanitized query and E2E latency for slow queries (configurable with `MARQO_VESPA_SLOW_QUERY_THRESHOLD_MS`). Failed queries are also logged along with the exception that caused it.
+
+## Bug Fixes and Minor Changes
+- Fixed bug where no chunks are generated when `split_overlap` is larger than the duration of the media file ([#1255](https://github.com/marqo-ai/marqo/pull/1255)).
+- Upgraded `cachetools` to 6.1.0 which fixes the LFU cache eviction efficiency issue ([#1262](https://github.com/marqo-ai/marqo/pull/1262)).
+- Emit `StatsD` metrics from Marqo ([#1260](https://github.com/marqo-ai/marqo/pull/1260)).
+
+## Performance Improvements
+- Optimized `recommend` endpoint, resulting in up to 34.9% improvement in latency ([#1254](https://github.com/marqo-ai/marqo/pull/1254)).
+
+# Release 2.21.1
+
+## Bug fixes and minor changes
+- Omit base64 image strings in the search response to avoid returning unnecessarily large responses ([#1256](https://github.com/marqo-ai/marqo/pull/1256)).
+
+# Release 2.21.0
+
+## New features
+- Search with base64-encoded images ([#1236](https://github.com/marqo-ai/marqo/pull/1236)). You can now submit image data as a Base64 string (starting with `"data:image/…"`) when querying any image-compatible index. Marqo will decode and vectorize the image on the fly. This an alternative to supplying an external image URL for search. Check [here](https://docs.marqo.ai/2.21/reference/api/search/search/#query-q) for detailed usage.
+
+- Set language for lexical fields and search ([#1242](https://github.com/marqo-ai/marqo/pull/1242)). When you add a new text field or send a query, you can specify its language to optimize tokenization and parsing. Lexical searches over that field will honour your language setting, delivering more accurate search results. This feature is available for unstructured indexes created with Marqo 2.16 or later. Check [here](https://docs.marqo.ai/2.21/reference/api/documents/add-or-replace-documents/#example-language-mappings) for adding documents and [here](https://docs.marqo.ai/2.21/reference/api/search/search/#language) for searching.
+
+
+# Release 2.20.0
+
+## New features
+- Inference cache ([#1223](https://github.com/marqo-ai/marqo/pull/1223)). Implement inference caching to improve performance and reduce computational overhead for repeated inference operations. In our experiments, 
+we have observed 40% increase in throughput and 25% reduction in P50 latency for ecommerce search traffic. See [here](https://docs.marqo.ai/latest/other-resources/guides/advanced-usage/configuration/) for how to enable and configure the cache.
+- SigLIP 2 model support ([#1229](https://github.com/marqo-ai/marqo/pull/1229)). Add support for SigLIP2 models, expanding the range of available embedding models.
+- Approximate threshold parameter ([#1232](https://github.com/marqo-ai/marqo/pull/1232)). Add support for approximate threshold search parameters to improve search performance and relevance tuning. 
+See [here](https://docs.marqo.ai/latest/reference/api/search/search/#approximate-threshold) for details and usage.
+
+# Release 2.19.3
+
+## Bug fixes and minor changes
+- Fix a bug affecting recall when combining `searchable_attributes` and required terms in lexical and hybrid (rrf) queries ([#1221](https://github.com/marqo-ai/marqo/pull/1221)).
+
+# Release 2.19.2
+
+## Bug fixes and minor changes
+- Fix a bug that affects how filters are applied in hybrid mode lexical search ([#1220](https://github.com/marqo-ai/marqo/pull/1220)).
+- 
+# Release 2.19.1
+
+## Bug fixes and minor changes
+- Improve mdoel warm-up logic ([#1217](https://github.com/marqo-ai/marqo/pull/1217)). Warm up models into a single device only to reduce memory usage.
+
 # Release 2.19.0
 
 ## New features & Performance improvements

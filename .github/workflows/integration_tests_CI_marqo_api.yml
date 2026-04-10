@@ -1,0 +1,182 @@
+name: Integration Tests
+run-name: Integration tests with ${{ inputs.number_of_shards || 1 }} shards and ${{ inputs.number_of_replicas || 0 }} replicas
+# runs integration tests on AMD64 machine
+
+on:
+  workflow_call:
+    inputs:
+      number_of_shards:
+        type: number
+        description: 'Number of shards (content nodes per group in Vespa). Minimum of 1.'
+        required: true
+        default: 1
+
+      number_of_replicas:
+        type: number
+        description: 'Number of replicas (groups in Vespa minus 1). Minimum of 0.'
+        required: true
+        default: 0
+
+  workflow_dispatch:
+    inputs:
+      number_of_shards:
+        type: number
+        description: 'Number of shards (content nodes per group in Vespa). Minimum of 1.'
+        required: true
+        default: 1
+
+      number_of_replicas:
+        type: number
+        description: 'Number of replicas (groups in Vespa - 1)'
+        required: true
+        default: 0
+
+concurrency:
+  group: integration-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  SHARDS: ${{ inputs.number_of_shards || 1 }}
+  REPLICAS: ${{ inputs.number_of_replicas || 0 }}
+
+jobs:
+  Determine-Vespa-Setup:
+    runs-on: ubuntu-latest
+    outputs:
+      VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
+      MULTINODE_TEST_ARGS: ${{ steps.set_var.outputs.MULTINODE_TEST_ARGS }}
+    steps:
+      - name: Determine VESPA_MULTINODE_SETUP
+        id: set_var
+        run: |
+          # For single node, initialize as false
+          echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
+          echo "First assuming single node Vespa setup."
+
+          # Extract inputs from environment variables
+          NUMBER_OF_SHARDS="${{ env.SHARDS }}"
+          NUMBER_OF_REPLICAS="${{ env.REPLICAS }}"
+
+          # Convert inputs to integers
+          NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
+          NUMBER_OF_REPLICAS_INT=$(echo "$NUMBER_OF_REPLICAS" | awk '{print int($0)}')
+
+          # Evaluate the conditions
+          if [[ "$NUMBER_OF_SHARDS_INT" -gt 1 || "$NUMBER_OF_REPLICAS_INT" -gt 0 ]]; then
+            echo "Now using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
+            echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
+            # If multinode vespa, ignore unrelated tests to save time and prevent errors
+            echo "MULTINODE_TEST_ARGS=--multinode --ignore=tests/integ_tests/core/index_management/test_index_management.py --ignore=tests/integ_tests/core/index_management/test_index_management_schema_update.py --ignore=tests/integ_tests/core/inference --ignore=tests/integ_tests/processing --ignore=tests/integ_tests/s2_inference" >> $GITHUB_OUTPUT
+          fi
+
+  Test-Marqo:
+    name: Run Integration Tests (Part ${{ matrix.part }}/2)
+    needs:
+      - Determine-Vespa-Setup
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [ 0, 1, 2 ] # Zero-based index for JSON list access
+
+    runs-on: "runs-on=${{ github.run_id }}/family=${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}/ami=${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}"
+    
+    timeout-minutes: 60
+    env:
+      VESPA_MULTINODE_SETUP: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP }}
+      MULTINODE_TEST_ARGS: ${{ needs.Determine-Vespa-Setup.outputs.MULTINODE_TEST_ARGS }}
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install uv
+        run: |
+          pip install uv
+
+      - name: Install dependencies
+        run: |
+          cd components/marqo
+          uv sync --dev
+          
+      - name: Spin up the inference environment
+        run: |
+          docker compose -f compose-inference.yaml build --quiet
+          docker compose -f compose-inference.yaml up -d --quiet-pull
+
+      - name: Build Vespa
+        run: |
+          cd components/marqo/vespa
+          mvn clean -q package
+
+      - name: Start Vespa
+        run: |
+          cd components/marqo
+          uv run python ./scripts/vespa_local/vespa_local.py full-start --Shards ${{ env.SHARDS }} --Replicas ${{ env.REPLICAS }}
+
+      - name: Run Integration Tests
+        run: |
+          # Define these for use by marqo
+          export VESPA_CONFIG_URL=http://localhost:19071
+          export VESPA_DOCUMENT_URL=http://localhost:8080
+          export VESPA_QUERY_URL=http://localhost:8080
+          export HF_HUB_ENABLE_HF_TRANSFER=1
+
+          export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
+          export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
+          export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
+
+          cd components/marqo
+
+          set -o pipefail
+          COVERAGE_FILE=.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas uv run pytest ${{ env.MULTINODE_TEST_ARGS }} \
+          --ignore=tests/integ_tests/test_documentation.py --durations=100 \
+          --cov=src --cov-branch --cov-context=test \
+          --md-report --md-report-flavor gfm --md-report-output pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md \
+          tests/integ_tests/ --retries 3 --split-n 3 --split-part ${{ matrix.part }} --split-by=classes --suppress-skips | tee pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
+      - name: Upload Test Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-part${{ matrix.part }}
+          path: |
+            components/marqo/.coverage.${{ matrix.part }}_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas
+            components/marqo/pytest_result_summary_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.md
+            components/marqo/pytest_output_${{ env.SHARDS }}shards_${{ env.REPLICAS }}replicas_part${{ matrix.part }}.txt
+          include-hidden-files: true
+
+  Merge-Coverage:
+    name: Merge Coverage And Generate Reports
+    needs:
+      - Test-Marqo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download coverage files for this configuration
+        uses: actions/download-artifact@v4
+        with:
+          pattern: marqo-integ-tests-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas-*
+          path: coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+
+      - name: Merge Coverage Results
+        run: |
+          pip install coverage
+          mkdir -p coverage-reports
+          # Move coverage files to marqo directory for combining
+          find coverage-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas -name ".coverage.*" -exec cp {} . \;
+          coverage combine
+          # Store the combined coverage in a directory specific to this configuration
+          cp .coverage coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+
+      - name: Upload Merged Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-integ-tests-merged-report-${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          path: coverage-reports/.coverage.${{ env.SHARDS }}shards-${{ env.REPLICAS }}replicas
+          include-hidden-files: true

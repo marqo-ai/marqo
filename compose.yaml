@@ -1,0 +1,125 @@
+# A docker compose file that sets up a complete Marqo environment with all components
+# including Triton Inference Server, Marqo API, Marqo Model Management Container (MMC),
+# Marqo Inference Orchestrator Container (MIOC), and Vespa for search capabilities.
+
+name: marqo-all-components
+
+services:
+  triton-gpu:
+    image: nvcr.io/nvidia/tritonserver:${TRITON_VERSION:-25.08-py3}
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--log-verbose=1",
+        "--model-control-mode=explicit"
+      ]
+    volumes:
+      - modelrepo:/models          # <== shared
+    ports:
+      - "8000:8000"                # HTTP
+      - "8001:8001"                # gRPC
+      - "8002:8002"                # Metrics
+    networks:
+      marqo-net:
+        aliases: [triton]
+    profiles: [gpu]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+  triton:
+    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    command:
+      [
+        "tritonserver",
+        "--model-repository=/models",
+        "--log-verbose=1",
+        "--model-control-mode=explicit"
+      ]
+    volumes:
+      - modelrepo:/models          # <== shared
+    ports:
+      - "8000:8000"                # HTTP
+      - "8001:8001"                # gRPC
+      - "8002:8002"                # Metrics
+    networks: [ marqo-net ]
+    profiles: [cpu]
+    restart: unless-stopped
+
+  api:
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/api:latest
+    build:
+      context: ./components
+      dockerfile: marqo/Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+      MARQO_ENABLE_BATCH_APIS: "TRUE"
+      MARQO_ENABLE_OPS_API: "TRUE"
+      MARQO_API_INFERENCE_CACHE_SIZE: "0"
+      MARQO_LOG_FORMAT: "plain"
+      MARQO_LOG_LEVEL: "info"
+      MARQO_MAX_CPU_MODEL_MEMORY: "10"
+      MARQO_MAX_CUDA_MODEL_MEMORY: "10"
+      MARQO_MODELS_TO_PRELOAD: "[]"
+      MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT: "0"
+      MARQO_REMOTE_INFERENCE_URL: "http://mioc:8884"
+      VESPA_CONFIG_URL: "http://host.docker.internal:19071"
+      VESPA_DOCUMENT_URL: "http://host.docker.internal:8080"
+      VESPA_QUERY_URL: "http://host.docker.internal:8080"
+      ZOOKEEPER_HOSTS: "host.docker.internal:2181"
+    ports:
+      - "8882:8882"
+    networks: [marqo-net]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  mmc:
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/model-management:latest
+    build:
+      context: ./components
+      dockerfile: model_management/Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      MARQO_LOG_LEVEL: "INFO"
+      MARQO_MODELS_TO_PRELOAD: "[]"
+      MARQO_TRITON_REST_URL: http://triton:8000
+      MARQO_MODEL_CACHE_PATH: /models
+    volumes:
+      - modelrepo:/models
+      - ~/.aws/credentials:/root/.aws/credentials:ro  # If using AWS S3 for model storage
+    ports:
+      - "8883:8883"
+    networks: [marqo-net]
+    restart: unless-stopped
+
+  mioc:
+    image: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqoai/inference-orchestrator:latest
+    build:
+      context: ./components
+      dockerfile: inference_orchestrator/Dockerfile
+    stdin_open: true
+    tty: true
+    environment:
+      MARQO_LOG_LEVEL: "INFO"
+      MARQO_TRITON_URL: http://triton:8001
+      MARQO_MODEL_MANAGEMENT_CONTAINER_URL: http://mmc:8883
+    ports:
+      - "8884:8884"
+    networks: [marqo-net]
+    restart: unless-stopped
+
+volumes:
+  modelrepo:
+
+networks:
+  marqo-net:

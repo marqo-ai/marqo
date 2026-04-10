@@ -1,0 +1,265 @@
+name: Run Coverage Checks
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  Combine-Coverage-Reports:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+        # By default, this will change the working directory to the root of the repository.
+
+      - name: Download integration tests coverage
+        uses: actions/download-artifact@v4
+        with:
+          # Hardcode to 1 shard and 0 replicas for now, update if shards and replica tests become required.
+          name: marqo-integ-tests-merged-report-1shards-0replicas
+          path: integration-tests-coverage
+
+      - name: Download unit tests coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: marqo-unit-tests-report
+          path: unit-tests-coverage
+
+      - name: List downloaded artifacts
+        run: |
+          echo "Listing all downloaded artifacts:"
+          echo "Integration tests coverage:"
+          ls -la integration-tests-coverage/
+          echo "Unit tests coverage:"
+          ls -la unit-tests-coverage/
+
+      - name: Install coverage package
+        run: |
+          pip install coverage
+          pip install diff-cover
+
+      - name: Move coverage files
+        run: |
+          # Create a directory to store all coverage data
+          mkdir -p coverage_data
+          mkdir -p unit_coverage_data
+          mkdir -p integ_coverage_data
+          
+          # Move all coverage files to a single directory
+          cp integration-tests-coverage/.coverage.1shards-0replicas coverage_data/integration.coverage
+          cp unit-tests-coverage/.coverage coverage_data/unit.coverage
+          
+          # Copy to separate directories for individual analysis
+          cp integration-tests-coverage/.coverage.1shards-0replicas integ_coverage_data/integration.coverage
+          cp unit-tests-coverage/.coverage unit_coverage_data/unit.coverage
+
+          # List all files for debug
+          ls -la
+
+          # Use the same working directory as pytest in original workflows
+          cd components/marqo
+
+          # Combine coverage data if available
+          echo "Combining coverage files..."
+          coverage combine ../../coverage_data/integration.coverage ../../coverage_data/unit.coverage
+          coverage xml -o ../../coverage_data/coverage.xml
+          coverage html --directory=../../coverage_data/htmlcov
+          coverage report -m > ../../coverage_data/coverage.txt
+
+          # Generate unit test coverage data
+          coverage combine ../../unit_coverage_data/unit.coverage
+          coverage xml -o ../../unit_coverage_data/coverage.xml
+          coverage html --directory=../../unit_coverage_data/htmlcov
+          coverage report -m > ../../unit_coverage_data/coverage.txt
+
+          # Generate integration test coverage data
+          coverage combine ../../integ_coverage_data/integration.coverage
+          coverage xml -o ../../integ_coverage_data/coverage.xml
+          coverage html --directory=../../integ_coverage_data/htmlcov
+          coverage report -m > ../../integ_coverage_data/coverage.txt
+
+      - name: Check diff unit test coverage (80% threshold)
+        id: unit_diff_coverage
+        continue-on-error: true
+        run: |
+          cd components/marqo
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            export PYTHONPATH="."
+            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+            echo "Running diff-cover against branch $BASE_BRANCH"
+            git fetch origin $BASE_BRANCH:$BASE_BRANCH
+
+            DIFF_COV_OUTPUT=$(diff-cover ../../unit_coverage_data/coverage.xml --html-report ../../unit_coverage_data/diff_cov.html \
+              --markdown-report ../../unit_coverage_data/diff_cov.md \
+              --compare-branch $BASE_BRANCH --fail-under=80 2>&1) || DIFF_COV_EXIT=$?
+            echo "$DIFF_COV_OUTPUT"
+            PERCENTAGE=$(echo "$DIFF_COV_OUTPUT" | grep -oP 'Coverage: \K[0-9.]+(?=%)' || echo "N/A")
+            echo "percentage=$PERCENTAGE" >> $GITHUB_OUTPUT
+            exit ${DIFF_COV_EXIT:-0}
+          else
+            echo "Skipping diff-cover on push events"
+            echo "Skipped diff-cover on push event" > ../../unit_coverage_data/diff_cov.md
+            touch ../../unit_coverage_data/diff_cov.html
+          fi
+
+      - name: Check diff integ test coverage (90% threshold)
+        id: integ_diff_coverage
+        continue-on-error: true
+        run: |
+          cd components/marqo
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            export PYTHONPATH="."
+            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+            echo "Running diff-cover against branch $BASE_BRANCH"
+            git fetch origin $BASE_BRANCH:$BASE_BRANCH
+
+            DIFF_COV_OUTPUT=$(diff-cover ../../integ_coverage_data/coverage.xml --html-report ../../integ_coverage_data/diff_cov.html \
+              --markdown-report ../../integ_coverage_data/diff_cov.md \
+              --compare-branch $BASE_BRANCH --fail-under=90 2>&1) || DIFF_COV_EXIT=$?
+            echo "$DIFF_COV_OUTPUT"
+            PERCENTAGE=$(echo "$DIFF_COV_OUTPUT" | grep -oP 'Coverage: \K[0-9.]+(?=%)' || echo "N/A")
+            echo "percentage=$PERCENTAGE" >> $GITHUB_OUTPUT
+            exit ${DIFF_COV_EXIT:-0}
+          else
+            echo "Skipping diff-cover on push events"
+            echo "Skipped diff-cover on push event" > ../../integ_coverage_data/diff_cov.md
+            touch ../../integ_coverage_data/diff_cov.html
+          fi
+
+      - name: Check diff combined test coverage (95% threshold)
+        id: combined_diff_coverage
+        continue-on-error: true
+        run: |
+          cd components/marqo
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            export PYTHONPATH="."
+            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+            echo "Running diff-cover against branch $BASE_BRANCH"
+            git fetch origin $BASE_BRANCH:$BASE_BRANCH
+
+            DIFF_COV_OUTPUT=$(diff-cover ../../coverage_data/coverage.xml --html-report ../../coverage_data/diff_cov.html \
+              --markdown-report ../../coverage_data/diff_cov.md \
+              --compare-branch $BASE_BRANCH --fail-under=95 2>&1) || DIFF_COV_EXIT=$?
+            echo "$DIFF_COV_OUTPUT"
+            PERCENTAGE=$(echo "$DIFF_COV_OUTPUT" | grep -oP 'Coverage: \K[0-9.]+(?=%)' || echo "N/A")
+            echo "percentage=$PERCENTAGE" >> $GITHUB_OUTPUT
+            exit ${DIFF_COV_EXIT:-0}
+          else
+            echo "Skipping diff-cover on push events"
+            echo "Skipped diff-cover on push event" > ../../coverage_data/diff_cov.md
+            touch ../../coverage_data/diff_cov.html
+          fi
+
+      - name: Check overall integration test coverage (85% threshold)
+        id: integ_overall_coverage
+        continue-on-error: true
+        run: |
+          cd integ_coverage_data
+          COVERAGE_PERCENT=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib['line-rate']) * 100)")
+          echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
+          echo "Integration test coverage: $COVERAGE_PERCENT%"
+          if (( $(echo "$COVERAGE_PERCENT < 85" | bc -l) )); then
+            echo "::error::Integration test coverage is below 85%"
+            exit 1
+          fi
+
+      - name: Check overall combined test coverage (90% threshold)
+        id: combined_overall_coverage
+        continue-on-error: true
+        run: |
+          cd coverage_data
+          COVERAGE_PERCENT=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib['line-rate']) * 100)")
+          echo "percentage=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
+          echo "Combined test coverage: $COVERAGE_PERCENT%"
+          if (( $(echo "$COVERAGE_PERCENT < 90" | bc -l) )); then
+            echo "::error::Combined test coverage is below 90%"
+            exit 1
+          fi
+
+      - name: Upload combined coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-test-coverage
+          path: |
+            coverage_data/coverage.xml
+            coverage_data/htmlcov/
+            coverage_data/diff_cov.html
+
+      - name: Upload integration test coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-coverage
+          path: |
+            integ_coverage_data/coverage.xml
+            integ_coverage_data/htmlcov/
+            integ_coverage_data/diff_cov.html
+
+      - name: Upload unit test coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: |
+            unit_coverage_data/coverage.xml
+            unit_coverage_data/htmlcov/
+            unit_coverage_data/diff_cov.html
+
+      - name: Print coverage reports
+        run: |
+          {
+            echo "# 📦 Artifact Guide"
+            echo ""
+            echo "The following artifacts are of interest:"
+            echo ""
+            echo "- \`combined-test-coverage\`, \`integration-test-coverage\`, \`unit-test-coverage\`: Coverage and diff coverage reports."
+            echo "- \`marqo-integ-tests-report-*\`, \`marqo-unit-tests-report\`: pytest output and reports."
+          } >> $GITHUB_STEP_SUMMARY
+          echo "# Unit coverage summary" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat unit_coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "# Integ coverage summary" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat integ_coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "# Combined coverage summary" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat coverage_data/coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "# Unit diff coverage summary" >> $GITHUB_STEP_SUMMARY
+          cat unit_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+          echo "# Integ diff coverage summary" >> $GITHUB_STEP_SUMMARY
+          cat integ_coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+          echo "# Combined diff coverage summary" >> $GITHUB_STEP_SUMMARY
+          cat coverage_data/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if coverage thresholds not met
+        if: steps.unit_diff_coverage.outcome == 'failure' || steps.integ_diff_coverage.outcome == 'failure' || steps.combined_diff_coverage.outcome == 'failure' || steps.integ_overall_coverage.outcome == 'failure' || steps.combined_overall_coverage.outcome == 'failure'
+        run: |
+          echo "Coverage threshold check failed"
+          if [ "${{ steps.unit_diff_coverage.outcome }}" == "failure" ]; then
+            echo "❌ Unit test diff coverage: ${{ steps.unit_diff_coverage.outputs.percentage }}% (required: 80%)"
+          fi
+          if [ "${{ steps.integ_diff_coverage.outcome }}" == "failure" ]; then
+            echo "❌ Integration test diff coverage: ${{ steps.integ_diff_coverage.outputs.percentage }}% (required: 90%)"
+          fi
+          if [ "${{ steps.combined_diff_coverage.outcome }}" == "failure" ]; then
+            echo "❌ Combined diff coverage: ${{ steps.combined_diff_coverage.outputs.percentage }}% (required: 95%)"
+          fi
+          if [ "${{ steps.integ_overall_coverage.outcome }}" == "failure" ]; then
+            echo "❌ Integration test coverage: ${{ steps.integ_overall_coverage.outputs.percentage }}% (required: 85%)"
+          fi
+          if [ "${{ steps.combined_overall_coverage.outcome }}" == "failure" ]; then
+            echo "❌ Combined test coverage: ${{ steps.combined_overall_coverage.outputs.percentage }}% (required: 90%)"
+          fi
+          exit 1
+
+

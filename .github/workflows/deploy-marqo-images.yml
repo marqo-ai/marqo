@@ -1,0 +1,129 @@
+name: Deploy Marqo Images to All ECRs (os, staging, preprod, prod)
+# This workflow is mainly for release usage where we want to push images to all ECRs used by different AWS environments.
+# If you want to just push images for dev purposes, please use the 'Build and Push Marqo Images to ECR' workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Tags to apply to the image, comma separated. E.g: latest,stable. If not provided, defaults to commit SHA.'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+    group: deploy-marqo-images-${{ github.ref }} - ${{ inputs.tags }}
+    cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Marqo Images to ECR for all AWS Environments
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [staging, preprod, os, prod-cell-1]
+    environment: ${{ matrix.environment }}
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
+          role-session-name: deploy-marqo-images
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Prepare image tags
+        id: prepare
+        run: |
+          REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          echo "registry=${REGISTRY}" >> $GITHUB_OUTPUT
+          
+          # Use provided tags or default to commit SHA
+          if [ -z "${{ inputs.tags }}" ]; then
+            IMAGE_TAGS="${{ github.sha }}"
+          else
+            IMAGE_TAGS="${{ inputs.tags }}"
+          fi
+          echo "image_tags=${IMAGE_TAGS}" >> $GITHUB_OUTPUT
+          
+          # Build full tag strings for each image (handle comma-separated tags)
+          API_TAGS=""
+          INFERENCE_TAGS=""
+          MODEL_TAGS=""
+          
+          IFS=',' read -ra TAG_ARRAY <<< "$IMAGE_TAGS"
+          for tag in "${TAG_ARRAY[@]}"; do
+            tag=$(echo "$tag" | xargs)  # trim whitespace
+            API_TAGS="${API_TAGS}${REGISTRY}/marqoai/api:${tag},"
+            INFERENCE_TAGS="${INFERENCE_TAGS}${REGISTRY}/marqoai/inference-orchestrator:${tag},"
+            MODEL_TAGS="${MODEL_TAGS}${REGISTRY}/marqoai/model-management:${tag},"
+          done
+          
+          # Remove trailing comma
+          API_TAGS="${API_TAGS%,}"
+          INFERENCE_TAGS="${INFERENCE_TAGS%,}"
+          MODEL_TAGS="${MODEL_TAGS%,}"
+          
+          echo "api_tags=${API_TAGS}" >> $GITHUB_OUTPUT
+          echo "inference_tags=${INFERENCE_TAGS}" >> $GITHUB_OUTPUT
+          echo "model_tags=${MODEL_TAGS}" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create ECR Repository if not found
+        run: |
+          chmod +x ./.github/scripts/create_ecrs_if_not_exist.sh
+          ./.github/scripts/create_ecrs_if_not_exist.sh marqoai
+
+      - name: Build and push api image
+        id: build-and-push-api
+        uses: docker/build-push-action@v6
+        with:
+          context: ./components
+          file: ./components/marqo/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.prepare.outputs.api_tags }}
+
+      - name: Build and push inference orchestrator image
+        id: build-and-push-inference-orchestrator
+        uses: docker/build-push-action@v6
+        with:
+          context: ./components
+          file: ./components/inference_orchestrator/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.prepare.outputs.inference_tags }}
+
+      - name: Build and push model management image
+        id: build-and-push-model-management
+        uses: docker/build-push-action@v6
+        with:
+          context: ./components
+          file: ./components/model_management/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.prepare.outputs.model_tags }}

@@ -9,6 +9,9 @@ on:
 jobs:
   verify-patches-merged:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: components/marqo
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -23,6 +26,8 @@ jobs:
       - name: Get current version
         id: version
         run: |
+          pip install ../common
+          
           VERSION=$(python -c "import sys; sys.path.append('./src'); from marqo.version import __version__; print('.'.join(__version__.split('.')[:2]))")
           PREV_MINOR=$(python -c "import sys; sys.path.append('./src'); from marqo.version import __version__; major, minor = map(int, __version__.split('.')[:2]); print(f'{major}.{minor-1}')")
           echo "current_version=$VERSION" >> $GITHUB_OUTPUT

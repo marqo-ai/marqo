@@ -1,0 +1,98 @@
+name: AMD64 CUDA API Tests
+# runs API Tests on cuda-enabled instance with Vespa and Marqo running in the same container
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      py_marqo_branch:
+        required: false
+        default: mainline
+        description: >
+          The "py-marqo" branch this test is running against.
+          This is optional. If left as the default value "mainline", we run the test based on the "mainline" branch of
+          py-marqo. Otherwise, the specified branch is tested. For example "prefix/test-xx". You can also use "marqo" and 
+          it will use the latest pypi release.
+      image_identifier:
+        required: false
+        # This is the name of the docker image that is built by the build script:
+        default: marqo_docker_0
+        description: >
+          This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
+          Otherwise, the specified Docker image is tested. For example "marqoai/marqo:test"
+  push:
+    branches:
+      - mainline
+      - releases/*
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches:
+      - mainline
+      - releases/*
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: cuda_docker_marqo_split-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  Test-Marqo:
+    name: Run CUDA Docker Marqo API Tests
+    runs-on: "runs-on=${{ github.run_id }}/family=g4dn.2xlarge/ami=${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}"
+    defaults:
+      run:
+        working-directory: components/marqo/tests/api_tests/v1
+    steps:
+      - name: Checkout Marqo repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: install uv
+        run: |
+          pip install uv
+
+      - name: Install dependencies
+        run: |
+          uv sync
+
+      - name: Install py-marqo
+        run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Start vespa
+        run: |
+          uv run python ../../../scripts/vespa_local/vespa_local.py full-start
+
+      - name: Build the Docker Image
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker compose build --quiet
+          docker compose --profile gpu up -d --quiet-pull 
+          end=$((SECONDS + 15*60))
+          until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
+            if (( SECONDS >= end )); then
+              echo "❌ Timed out waiting for Marqo after 15 minutes."
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Marqo is up"
+
+      - name: Run API Tests - CUDA
+        run: |          
+          export TESTING_CONFIGURATION=CUDA_DOCKER_MARQO
+          uv run pytest tests/
+
