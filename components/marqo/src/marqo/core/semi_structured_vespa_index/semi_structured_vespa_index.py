@@ -823,6 +823,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             query["marqo__hybrid.relevanceCutoff.affectFacets"] = marqo_query.relevance_cutoff.affect_facets
             query["marqo__hybrid.relevanceCutoff.overrideSortCandidates"] = marqo_query.relevance_cutoff.override_sort_candidates_with_relevant_candidates
 
+            query["marqo__hybrid.relevanceCutoff.applyInRetrieval"] = marqo_query.relevance_cutoff.apply_in_retrieval
+            query["marqo__hybrid.relevanceCutoff.overrideLimitPlusOffset"] = marqo_query.relevance_cutoff.override_limit_plus_offset
         # Sort by part
         if marqo_query.sort_by:
             query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]
