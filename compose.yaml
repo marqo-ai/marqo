@@ -6,7 +6,7 @@ name: marqo-all-components
 
 services:
   triton-gpu:
-    image: nvcr.io/nvidia/tritonserver:${TRITON_VERSION:-25.08-py3}
+    image: public.ecr.aws/e3z9e6s8/marqo-triton-slim-onnxruntime:${TRITON_VERSION:-25.08}
     command:
       [
         "tritonserver",
@@ -34,7 +34,7 @@ services:
               capabilities: [ gpu ]
 
   triton:
-    image: nvcr.io/nvidia/tritonserver:25.08-py3
+    image: public.ecr.aws/e3z9e6s8/marqo-triton-slim-onnxruntime:25.08
     command:
       [
         "tritonserver",
