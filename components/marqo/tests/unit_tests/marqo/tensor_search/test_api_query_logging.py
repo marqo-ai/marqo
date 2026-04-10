@@ -617,7 +617,6 @@ class TestAPIQueryLogging(MarqoTestCase):
 
         with patch('marqo.core.search.query_logger.marqo_query_logger') as mock_marqo_query_logger:
             mock_time.perf_counter.side_effect = [0.0, 1.0]
-
             search_query = {
                 "searchMethod": "HYBRID",
                 "limit": 10,
@@ -691,7 +690,7 @@ class TestAPIQueryLogging(MarqoTestCase):
                 "relevanceCutoff": {
                     "method": "mean_std_dev",
                     "probe_depth": 500,
-                    "parameters": {"std_dev_factor": 0.5}
+                    "parameters": {"std_dev_factor": 0.5},
                 },
                 "interpolationMethod": InterpolationMethod.NLERP
             }
@@ -774,7 +773,8 @@ class TestAPIQueryLogging(MarqoTestCase):
                 "relevanceCutoff": {
                     "method": "mean_std_dev",
                     "probeDepth": 500,
-                    "parameters": {"stdDevFactor": 0.5}
+                    "parameters": {"stdDevFactor": 0.5},
+                    "applyInRetrieval": "both"
                 },
                 "interpolationMethod": "nlerp"
             }

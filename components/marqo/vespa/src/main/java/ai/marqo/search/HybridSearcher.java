@@ -97,7 +97,10 @@ public class HybridSearcher extends Searcher {
     @VisibleForTesting
     @JsonInclude(Include.NON_NULL)
     record MarqoMetadataFields(
-            Integer sortCandidates, Integer probeCandidates, Integer relevantCandidates)
+            Integer sortCandidates,
+            Integer probeCandidates,
+            Integer relevantCandidates,
+            Integer postProcessCandidates)
             implements JsonProducer {
 
         @Override
@@ -218,6 +221,17 @@ public class HybridSearcher extends Searcher {
         }
     }
 
+    enum ApplyInRetrieval {
+        LEXICAL,
+        TENSOR,
+        BOTH;
+
+        public static ApplyInRetrieval fromString(String value) {
+            if (value == null) return null;
+            return ApplyInRetrieval.valueOf(value.toUpperCase(Locale.ROOT));
+        }
+    }
+
     // Compile the regex pattern once and store it as a static final variable
     private static final Pattern DOC_ID_PATTERN =
             Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
@@ -261,6 +275,13 @@ public class HybridSearcher extends Searcher {
         Boolean relevanceCutoffOverrideSortCandidates =
                 query.properties()
                         .getBoolean("marqo__hybrid.relevanceCutoff.overrideSortCandidates", false);
+        String applyInRetrievalString =
+                query.properties()
+                        .getString("marqo__hybrid.relevanceCutoff.applyInRetrieval", null);
+        ApplyInRetrieval applyInRetrieval = ApplyInRetrieval.fromString(applyInRetrievalString);
+        Boolean relevanceCutoffOverrideLimitPlusOffset =
+                query.properties()
+                        .getBoolean("marqo__hybrid.relevanceCutoff.overrideLimitPlusOffset", false);
 
         // Sort by Parameters
         String sortByFields = query.properties().getString("marqo__hybrid.sortBy.fields", null);
@@ -314,31 +335,55 @@ public class HybridSearcher extends Searcher {
         boolean isRelevanceCutoffMethodEnabled = relevanceCutoffMethod != null;
         boolean isSortByEnabled = sortByFields != null;
 
-        query =
-                updateQueryHitsOffsetsAndTargetHits(
-                        query,
-                        relevantCandidates,
-                        sortByMinSortCandidates,
-                        isRelevanceCutoffMethodEnabled,
-                        isSortByEnabled,
-                        relevanceCutoffAffectFacets,
-                        verbose);
+        // When applyInRetrieval targets a specific leg, we clone the query and let
+        // the clone receive all cutoff modifications (hits, offset, tensor YQL, facets).
+        // The original query stays untouched so its hits won't truncate the final Result.
+        // Target sub-query is created from the clone; non-target from the original.
+        boolean isSelectiveCutoff =
+                isRelevanceCutoffMethodEnabled
+                        && applyInRetrieval != null
+                        && applyInRetrieval != ApplyInRetrieval.BOTH;
 
-        List<Future<Result>> futureFacets =
-                getFacetsFutureList(query, execution, verbose, collapse);
+        // Clone the query for relevance cutoff & sortBy manipulation
+        Query cutoffSortByQuery = query.clone();
+        if (isRelevanceCutoffMethodEnabled || isSortByEnabled) {
+            cutoffSortByQuery =
+                    updateQueryHitsOffsetsAndTargetHits(
+                            cutoffSortByQuery,
+                            relevantCandidates,
+                            sortByMinSortCandidates,
+                            isRelevanceCutoffMethodEnabled,
+                            isSortByEnabled,
+                            relevanceCutoffAffectFacets,
+                            relevanceCutoffOverrideLimitPlusOffset,
+                            verbose);
+        }
+
+        // Facet results will always be generated from a cutoff query to produce a conservative
+        // count until we fix the
+        // implementation in the future
+        List<Future<Result>> futureFacets;
+        if (isRelevanceCutoffMethodEnabled || isSortByEnabled) {
+            futureFacets = getFacetsFutureList(cutoffSortByQuery, execution, verbose, collapse);
+        } else {
+            futureFacets = getFacetsFutureList(query, execution, verbose, collapse);
+        }
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
-            Query queryLexical =
-                    createSubQuery(
+            Query queryLexical, queryTensor;
+
+            Query[] subQueries =
+                    buildDisjunctionSubQueries(
+                            isSelectiveCutoff,
+                            applyInRetrieval,
                             query,
-                            MARQO_SEARCH_METHOD_LEXICAL,
-                            MARQO_SEARCH_METHOD_LEXICAL,
+                            cutoffSortByQuery,
+                            relevanceCutoffProbeDepth,
                             verbose);
-            Query queryTensor =
-                    createSubQuery(
-                            query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+            queryLexical = subQueries[0];
+            queryTensor = subQueries[1];
 
             // Execute both lexical and tensor queries asynchronously.
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
@@ -388,7 +433,7 @@ public class HybridSearcher extends Searcher {
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
             if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
                 Query combinedQuery =
-                        createSubQuery(query, retrievalMethod, rankingMethod, verbose);
+                        createSubQuery(cutoffSortByQuery, retrievalMethod, rankingMethod, verbose);
                 Result result = execution.search(combinedQuery);
                 hitsForPostProcessing = result.hits();
                 logIfVerbose("Unprocessed results: ", verbose);
@@ -415,6 +460,7 @@ public class HybridSearcher extends Searcher {
         // Determine post-processing mode based on query parameters
         HitGroup processedHits;
         Integer sortCandidates = null;
+        int postProcessCandidates;
         if (sortByFields != null) {
             // When overrideSortCandidates is set, trim hits to only relevant candidates
             // before sorting, so that non-relevant documents are excluded from sort results.
@@ -441,6 +487,7 @@ public class HybridSearcher extends Searcher {
                     postProcessBySort(
                             hitsForPostProcessing, sortByFields, sortBySortDepth, limit, offset);
             sortCandidates = hitsForPostProcessing.size();
+            postProcessCandidates = hitsForPostProcessing.size();
         } else {
             // If sortBy is not set, we use the default post-processing
             processedHits =
@@ -451,6 +498,7 @@ public class HybridSearcher extends Searcher {
                             limit,
                             offset,
                             verbose);
+            postProcessCandidates = hitsForPostProcessing.size();
         }
 
         if (!futureFacets.isEmpty()) {
@@ -461,7 +509,8 @@ public class HybridSearcher extends Searcher {
         // enabled)
         processedHits = extractRecencyScore(processedHits, query, verbose);
         MarqoMetadataFields marqoMetadataFields =
-                new MarqoMetadataFields(sortCandidates, probeCandidates, relevantCandidates);
+                new MarqoMetadataFields(
+                        sortCandidates, probeCandidates, relevantCandidates, postProcessCandidates);
 
         processedHits.setField(MARQO_METADATA_FIELDS, marqoMetadataFields);
         return new Result(query, processedHits);
@@ -537,6 +586,67 @@ public class HybridSearcher extends Searcher {
             }
         }
         return futureFacets;
+    }
+
+    /**
+     * Builds lexical and tensor sub-queries for disjunction retrieval.
+     *
+     * @return a two-element array {@code [queryLexical, queryTensor]}
+     */
+    Query[] buildDisjunctionSubQueries(
+            boolean isSelectiveCutoff,
+            ApplyInRetrieval applyInRetrieval,
+            Query originalQuery,
+            Query cutoffQuery,
+            Integer probeDepth,
+            boolean verbose) {
+        Query queryLexical, queryTensor;
+        if (isSelectiveCutoff) {
+            // Target from cutoffQuery (reduced), non-target from original (unreduced)
+            if (applyInRetrieval == ApplyInRetrieval.LEXICAL) {
+                throw new RuntimeException(
+                        "applyInRetrieval='lexical' is not supported. This value is blocked at"
+                                + " the API layer and should never reach this point.");
+            } else {
+                // Must be tensor cutoff
+                queryLexical =
+                        createSubQuery(
+                                originalQuery,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                MARQO_SEARCH_METHOD_LEXICAL,
+                                verbose);
+                queryLexical.setOffset(0);
+                // The lexical leg is not subject to relevance cut-off here; expand its hits to
+                // probeDepth so the post-process/sort pool remains stable regardless of
+                // limit/offset.
+                queryLexical.setHits(probeDepth);
+                queryTensor =
+                        createSubQuery(
+                                cutoffQuery,
+                                MARQO_SEARCH_METHOD_TENSOR,
+                                MARQO_SEARCH_METHOD_TENSOR,
+                                verbose);
+            }
+        } else {
+            // Two cases both handled correctly by using cutoffQuery:
+            // 1. No relevance cutoff: cutoffQuery is a plain clone of the original, so both legs
+            //    are unmodified.
+            // 2. applyInRetrieval=both: cutoffQuery is reduced and both legs should use the same
+            //    reduced query.
+            queryLexical =
+                    createSubQuery(
+                            cutoffQuery,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            verbose);
+            queryTensor =
+                    createSubQuery(
+                            cutoffQuery,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            MARQO_SEARCH_METHOD_TENSOR,
+                            verbose);
+        }
+        return new Query[] {queryLexical, queryTensor};
     }
 
     /**
@@ -636,6 +746,7 @@ public class HybridSearcher extends Searcher {
                 isRelevanceCutoffEnabled,
                 isSortByEnabled,
                 false,
+                false,
                 false);
     }
 
@@ -649,6 +760,7 @@ public class HybridSearcher extends Searcher {
      * @param isRelevanceCutoffEnabled whether relevance cutoff is enabled.
      * @param isSortByEnabled whether sorting is enabled.
      * @param affectFacets whether to also adjust facets YQL (targetHits and max(N) grouping).
+     * @param overrideLimitPlusOffset when true, use max(relevantCandidates, limit+offset) instead of min.
      * @param verbose whether to log detailed information.
      * @return The updated query with new hits, offsets, and targetHits.
      */
@@ -659,6 +771,7 @@ public class HybridSearcher extends Searcher {
             boolean isRelevanceCutoffEnabled,
             boolean isSortByEnabled,
             boolean affectFacets,
+            boolean overrideLimitPlusOffset,
             boolean verbose) {
 
         // Validate input parameters
@@ -702,15 +815,26 @@ public class HybridSearcher extends Searcher {
             // check is required
             newHits = Math.max(relevantCandidates, sortByMinSortCandidates);
             if (currentTensorTargetHits != null) {
-                newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
+                if (overrideLimitPlusOffset) {
+                    newTensorTargetHits = newHits;
+                } else {
+                    newTensorTargetHits = Math.max(newHits, currentTensorTargetHits);
+                }
             }
         } else if (isRelevanceCutoffEnabled) {
-            // Only relevance cut-off enabled:
-            // - If relevantCandidates < limit+offset: reduce to relevantCandidates
-            // - If relevantCandidates >= limit+offset: keep existing behavior (limit+offset)
-            newHits = Math.min(relevantCandidates, (currentLimit + currentOffset));
-            if (currentTensorTargetHits != null) {
-                newTensorTargetHits = Math.min(newHits, currentTensorTargetHits);
+            if (overrideLimitPlusOffset) {
+                // Override mode: expand retrieval to max(relevantCandidates, limit+offset)
+                // so all relevant documents are fetched even if they exceed limit+offset.
+                newHits = relevantCandidates;
+                if (currentTensorTargetHits != null) {
+                    newTensorTargetHits = relevantCandidates;
+                }
+            } else {
+                // Default: reduce to min(relevantCandidates, limit+offset)
+                newHits = Math.min(relevantCandidates, (currentLimit + currentOffset));
+                if (currentTensorTargetHits != null) {
+                    newTensorTargetHits = Math.min(newHits, currentTensorTargetHits);
+                }
             }
         } else {
             // Only sortByMinSortCandidates provided

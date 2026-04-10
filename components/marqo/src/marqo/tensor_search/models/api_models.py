@@ -21,7 +21,7 @@ from marqo.tensor_search.models.recency_parameters import RecencyParameters, App
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor, SearchContextDocuments
 from marqo.tensor_search.models.sort_by_model import SortByModel
-from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffModel
+from marqo.tensor_search.models.relevance_cutoff_model import ApplyInRetrieval, RelevanceCutoffModel
 from marqo.tensor_search.models.collapse_model import CollapseModel
 
 class BaseMarqoModel(BaseModel):
@@ -382,6 +382,29 @@ class SearchQuery(BaseMarqoModel):
         if relevance_cutoff is not None and search_method.upper() != SearchMethod.HYBRID:
             raise ValueError(f"relevanceCutoff can only be provided for 'HYBRID' search, but "
                              f"received search method '{search_method}'")
+        return values
+
+    @root_validator(pre=False)
+    def _validate_apply_in_retrieval_only_works_for_disjunction(cls, values):
+        """Validate that applyInRetrieval requires retrievalMethod=disjunction.
+        Also sets the default value of applyInRetrieval to 'both' when not provided."""
+        relevance_cutoff = values.get('relevance_cutoff')
+        hybrid_parameters = values.get('hybridParameters')
+        if relevance_cutoff is None:
+            return values
+        is_disjunction = (
+                hybrid_parameters is not None
+                and hybrid_parameters.retrievalMethod == RetrievalMethod.Disjunction
+        )
+        if relevance_cutoff.apply_in_retrieval is None:
+            # Resolve the default only for disjunction, where the concept of legs applies.
+            if is_disjunction:
+                relevance_cutoff.apply_in_retrieval = ApplyInRetrieval.Both
+        elif not is_disjunction:
+            raise ValueError(
+                "relevanceCutoff.applyInRetrieval can only be set when "
+                "hybridParameters.retrievalMethod is 'disjunction'"
+            )
         return values
 
     @root_validator(pre=False)

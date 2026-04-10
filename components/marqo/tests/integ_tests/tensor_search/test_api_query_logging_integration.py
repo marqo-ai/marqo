@@ -290,7 +290,8 @@ class TestAPIQueryLoggingIntegration(MarqoTestCase):
             "relevanceCutoff": {
                 "method": "mean_std_dev",
                 "probeDepth": 500,
-                "parameters": {"stdDevFactor": 0.5}
+                "parameters": {"stdDevFactor": 0.5},
+                "applyInRetrieval": "both"
             },
             "interpolationMethod": "nlerp"
         }
