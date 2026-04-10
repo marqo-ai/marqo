@@ -1873,9 +1873,10 @@ class TestCustomScoreRerankingWithOtherFeatures(MarqoTestCase):
         )
         self.assertIn("hits", res)
         self.assertEqual(
-            len(res["hits"]), 3,
-            msg="Relevance cutoff returns at least one hit; count is determined by probe",
+            5, len(res["hits"]),
+            msg="Relevance cutoff returns at least one hit; count is determined by probe"
         )
+        self.assertEqual(5, res["_postProcessCandidates"])
         for hit in res["hits"]:
             self.assertIn(MARQO_DOC_PRE_RERANK_SCORE, hit)
 
