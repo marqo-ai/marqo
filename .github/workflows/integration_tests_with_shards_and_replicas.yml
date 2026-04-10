@@ -12,6 +12,8 @@ on:
     branches:
       - mainline
       - releases/*
+    paths-ignore:
+      - '**.md'
   push:
     branches:
       - mainline
