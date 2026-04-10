@@ -10,9 +10,9 @@ from marqo.core.models.facets_parameters import (
     FacetsParameters, FieldFacetsConfiguration
 )
 from marqo.core.models.hybrid_parameters import (
-    HybridParameters, RankingMethod, RetrievalMethod
+    HybridParameters, LexicalOperand, RankingMethod, RetrievalMethod
 )
-from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, StructuredMarqoIndex
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, StructuredMarqoIndex, UnstructuredMarqoIndex
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.search.hybrid_search import HybridSearch, should_use_collapse_search
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
@@ -412,6 +412,7 @@ class TestHybridSearch(TestCase):
             f"The total hits should be capped to the env var value {capped_total_hits}, "
             f"but got {result['totalHits']}"
         )
+
 
 class TestRecencyValidation(TestCase):
     """Tests for recency scoring validation in HybridSearch."""
@@ -878,6 +879,26 @@ class TestRecencyValidation(TestCase):
         # This test verifies that the validation ONLY fails when grow_from is provided
         self.assertIsNone(recency_params.grow_from)
 
+    @patch('marqo.core.search.hybrid_search.RequestMetricsStore')
+    def test_lexical_operand_on_structured_index_raises_error(self, mock_metrics):
+        """Test that lexicalOperand on a structured index raises UnsupportedFeatureError."""
+        self._setup_metrics_mock(mock_metrics)
+
+        marqo_index = Mock(spec=StructuredMarqoIndex)
+        marqo_index.name = "test_index"
+        marqo_index.model = Mock()
+        marqo_index.model.get_text_query_prefix.return_value = ""
+        marqo_index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.25.0")
+
+        with self.assertRaises(UnsupportedFeatureError) as ctx:
+            HybridSearch().search(
+                config=Mock(spec=Config),
+                marqo_index=marqo_index,
+                query="test",
+                hybrid_parameters=HybridParameters(lexicalOperand=LexicalOperand.Or)
+            )
+        self.assertIn("lexicalOperand", str(ctx.exception))
+
 
 class TestShouldUseCollapseSearch(TestCase):
     """Tests for should_use_collapse_search() logic."""
@@ -931,3 +952,5 @@ class TestShouldUseCollapseSearch(TestCase):
         )
         main_sort = SortByModel(fields=[SortByField(field_name="date", order=SortOrder.Desc)])
         self.assertTrue(should_use_collapse_search(collapse=collapse, main_query_sort_by=main_sort))
+
+

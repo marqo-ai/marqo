@@ -5,7 +5,7 @@ from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.facets_parameters import FacetsParameters
-from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod
+from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, LexicalOperand
 from marqo.core.models.custom_score_rerank import ParsedCustomScoreKey
 from marqo.core.models.marqo_index import DistanceMetric, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
@@ -30,6 +30,7 @@ from marqo.tensor_search.models.recency_parameters import RecencyParameters, App
 from marqo.tensor_search.models.relevance_cutoff_model import RelevanceCutoffMethod
 from marqo.vespa.models import QueryResult
 from marqo.tensor_search.models.collapse_model import CollapseModel
+
 
 
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
@@ -162,12 +163,29 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             )
         return terms
 
+    @staticmethod
+    def _apply_lexical_operand(
+            lexical_operand: LexicalOperand, terms: list,
+            rerank_depth_lexical: Optional[int] = None) -> str:
+        """Apply an explicit lexical operand to combine terms."""
+        if lexical_operand == LexicalOperand.Or:
+            return ' OR '.join(terms)
+        elif lexical_operand == LexicalOperand.And:
+            return ' AND '.join(terms)
+        elif lexical_operand == LexicalOperand.WeakAnd:
+            if rerank_depth_lexical is not None:
+                return f'{{targetHits:{rerank_depth_lexical}}}weakAnd({", ".join(terms)})'
+            return f'weakAnd({", ".join(terms)})'
+        else:
+            raise InternalError(f'Unknown lexical operand: {lexical_operand}')
+
     def _generate_or_terms(
         self,
         marqo_query: Union[MarqoLexicalQuery, MarqoHybridQuery],
         is_facets_term: bool = False,
         is_ranking_term: bool = False,
         attributes_to_search: Optional[List[str]] = None,
+        lexical_operand_override: Optional[LexicalOperand] = None,
     ) -> str:
         """Generate the OR/weakAnd terms for the lexical search term."""
         if not marqo_query.or_phrases:
@@ -199,8 +217,16 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         if is_facets_term:
             return ' OR '.join(terms)
+
         if is_ranking_term:
             return f'weakAnd({", ".join(terms)})'
+
+        lexical_operand = lexical_operand_override or (
+            marqo_query.hybrid_parameters.lexicalOperand if isinstance(marqo_query, MarqoHybridQuery) else None
+        )
+        if lexical_operand is not None:
+            return self._apply_lexical_operand(lexical_operand, terms, rerank_depth_lexical)
+
         if rerank_depth_lexical is not None:
             if rerank_depth_lexical <= 0:
                 raise InternalError('RerankDepthLexical is less than or equal to 0 in _get_lexical_search_term')
@@ -215,6 +241,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         is_facets_term: bool = False,
         is_ranking_term: bool = False,
         attributes_to_search: Optional[List[str]] = None,
+        lexical_operand_override: Optional[LexicalOperand] = None,
     ) -> str:
         """
         Builds a lexical YQL search term for a query. It has an OR-query part (optional phrases)
@@ -256,6 +283,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             is_facets_term=is_facets_term,
             is_ranking_term=is_ranking_term,
             attributes_to_search=attributes_to_search,
+            lexical_operand_override=lexical_operand_override
         )
         if marqo_query.and_phrases:
             and_terms = ' AND '.join([
@@ -510,9 +538,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
 
         # Base lexical YQL without custom-score extra rank() terms. Used for relevance-cutoff probe only.
-        lexical_yql_for_probe = (
-            f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
-        )
+        # Later code will modify lexical_term so we need to build the probe query early here
+        lexical_yql_for_probe = None
+        if getattr(marqo_query, "relevance_cutoff", None) is not None:
+            if not marqo_query.relevance_cutoff.lexical_operand:
+                # If the relevance_cutoff has no lexical_operand, it uses whatever is used in the main lexical query
+                lexical_yql_for_probe = (
+                    f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}'
+                )
+
+            else:
+                probe_lexical_term = self._get_lexical_search_term(
+                    marqo_query, lexical_operand_override=marqo_query.relevance_cutoff.lexical_operand \
+                ) if fields_to_search_lexical else "False"
+                lexical_yql_for_probe = (
+                    f'select {select_attributes} from {self._marqo_index.schema_name} '
+                    f'where ({probe_lexical_term}){filter_term}'
+                )
 
         # Assign parameters to query
         query_inputs = {
@@ -619,15 +661,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose,
+            "marqo__yql.lexical.probe": lexical_yql_for_probe
 
         }
 
         query = {k: v for k, v in query.items() if v is not None}
-
-        # When relevance cutoff is used, send a separate probe lexical YQL without custom-score
-        # extra rank() terms so the probe is unchanged by custom score rerank.
-        if getattr(marqo_query, "relevance_cutoff", None) is not None:
-            query["marqo__yql.lexical.probe"] = lexical_yql_for_probe
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
@@ -635,6 +673,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         if marqo_query.global_rerank_depth is not None:
             query["marqo__hybrid.rerankDepthGlobal"] = marqo_query.global_rerank_depth
+
+        if (hybrid_score_modifiers[constants.MARQO_GLOBAL_SCORE_MODIFIERS]
+                or hybrid_score_modifiers.get(constants.MARQO_CUSTOM_SCORE_RERANK_MODIFIERS)):
+            query["marqo__expose_pre_rerank_score"] = True
 
         # Tell the custom searcher what type of custom score reranking will be done
         if applicable_custom_score_keys:
@@ -778,6 +820,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 # No parameters for other methods
                 pass
             query["marqo__hybrid.relevanceCutoff.probeDepth"] = marqo_query.relevance_cutoff.probe_depth
+            query["marqo__hybrid.relevanceCutoff.affectFacets"] = marqo_query.relevance_cutoff.affect_facets
+            query["marqo__hybrid.relevanceCutoff.overrideSortCandidates"] = marqo_query.relevance_cutoff.override_sort_candidates_with_relevant_candidates
+
         # Sort by part
         if marqo_query.sort_by:
             query["marqo__hybrid.sortBy.fields"] = [field.dict() for field in marqo_query.sort_by.fields]

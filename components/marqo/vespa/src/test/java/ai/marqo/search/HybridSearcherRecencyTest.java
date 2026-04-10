@@ -702,4 +702,35 @@ class HybridSearcherRecencyTest {
             }
         }
     }
+
+    @Nested
+    class PreRerankScoreExposureTests {
+        @Test
+        void shouldNotSetPreRerankScoreWhenPropertyIsFalse() {
+            // Default: marqo__expose_pre_rerank_score is not set → false
+            Query query = new Query("search/?query=test");
+            HitGroup hits = new HitGroup();
+            hits.add(createHitWithScoreModifiers("index:test/0/doc1", 1.0, 2.0, 0.5, null));
+
+            hybridSearcher.applyGlobalScoreModifiers(hits, query, false);
+
+            assertThat(hits.get(0).getField("marqo__pre_rerank_score")).isNull();
+        }
+
+        @Test
+        void shouldSetPreRerankScoreWhenPropertyIsTrue() {
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__expose_pre_rerank_score", true);
+            double originalRelevance = 1.0;
+            HitGroup hits = new HitGroup();
+            hits.add(
+                    createHitWithScoreModifiers(
+                            "index:test/0/doc1", originalRelevance, 2.0, 0.5, null));
+
+            hybridSearcher.applyGlobalScoreModifiers(hits, query, false);
+
+            assertThat(hits.get(0).getField("marqo__pre_rerank_score"))
+                    .isEqualTo(originalRelevance);
+        }
+    }
 }

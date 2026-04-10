@@ -1,3 +1,24 @@
+# Release 2.26.0
+
+## New features
+- Custom score rerankers in global score modifiers for hybrid search ([#1370](https://github.com/marqo-ai/marqo/pull/1370)). You can now rerank hybrid search results using BM25 or vector closeness scores (per-field or aggregate via sum/max/avg) by specifying `marqo__score_*` fields in `scoreModifiers`. Scores are divide-by-max normalized. This is supported only for semi-structured indexes created with Marqo 2.26.0 or later.
+- Opt-in `lexicalOperand` parameter for hybrid search ([#1405](https://github.com/marqo-ai/marqo/pull/1405)). You can now explicitly control the lexical query operator (`or`, `and`, `weakAnd`) in hybrid search via the new `lexicalOperand` parameter in `hybridParameters`. The `lexicalOperand` can also be set in `relevanceCutoffMethod` to override it for the probe query. This is supported only for semi-structured indexes.
+- `matchAllTokens` parameter for typeahead suggestions ([#1385](https://github.com/marqo-ai/marqo/pull/1385)). A new `matchAllTokens` boolean parameter switches typeahead retrieval from OR to AND logic across tokens, requiring all query tokens to match. This improves relevance for multi-word queries.
+- `CONTAINS` filter for semi-structured indexes ([#1394](https://github.com/marqo-ai/marqo/pull/1394)). A new `CONTAINS` filter operator enables token-level matching on lexical fields. Supports bare values and grouped multi-word values, and is case-insensitive.
+- `_id IN` filter support for semi-structured indexes ([#1387](https://github.com/marqo-ai/marqo/pull/1387)). You can now filter by `_id IN (id1, id2, ...)` for semi-structured indexes, supporting up to 10,000 IDs (configurable via `MARQO_MAX_IN_FILTER_IDS`).
+- Apply relevance cutoff to facets and `trackTotalHits` queries ([#1388](https://github.com/marqo-ai/marqo/pull/1388)). When relevance cutoff is enabled with `affectFacets: true`, facets and totalHits now only count documents that pass the cutoff threshold, instead of all matching documents.
+
+## Bug fixes and minor changes
+- Fix a crash when updating documents whose IDs contain special characters such as `#` or non-printable ASCII characters ([#1407](https://github.com/marqo-ai/marqo/pull/1407)).
+- Fix `min_sort_candidates` not being applied when trimming sort results ([#1406](https://github.com/marqo-ai/marqo/pull/1406)).
+- Fix bfloat16 indexes generating incorrect Vespa schema definitions by parameterizing the tensor numeric type ([#1390](https://github.com/marqo-ai/marqo/pull/1390)).
+- Fix documentation URLs for the restructured docs site ([#1400](https://github.com/marqo-ai/marqo/pull/1400)).
+
+## Other changes
+- Remove LanguageBind model support ([#1382](https://github.com/marqo-ai/marqo/pull/1382)). LanguageBind models have been removed as they were never registered in the model registry.
+- Remove NLTK from the API container and upgrade NLTK in the inference container ([#1395](https://github.com/marqo-ai/marqo/pull/1395)).
+- Move version to `components/common` as a single source of truth ([#1391](https://github.com/marqo-ai/marqo/pull/1391)).
+
 # Release 2.24.0
 
 ## New features
