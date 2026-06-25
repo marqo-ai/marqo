@@ -4,12 +4,23 @@ A FastAPI-based service that handles ML model inference for the Marqo tensor sea
 
 ## Features
 
-- Model loading and management (HuggingFace, OpenCLIP)
+- Model loading and management (HuggingFace, OpenCLIP, TwelveLabs Marengo)
 - Media download and preprocessing (images, text, multimodal)
 - Inference caching for improved performance (LRU/LFU)
 - Triton inference server integration
 - OpenTelemetry instrumentation for observability
 - MessagePack serialization for efficient communication
+
+### TwelveLabs Marengo (multimodal, API-served)
+
+[TwelveLabs](https://twelvelabs.io) Marengo is an opt-in, API-served multimodal
+embedding model. Text, image and video all map into the same 512-dimensional
+space, making it a cross-modal alternative to CLIP (e.g. text-to-video search).
+Unlike the OpenCLIP/HuggingFace models, Marengo is not served by Triton, so it
+needs no ONNX artifacts. Select it with the registered model name
+`Marqo/marengo-3.0` (model `type: "twelvelabs"`), and set the
+`TWELVELABS_API_KEY` environment variable. A free key with a generous free tier
+is available at https://twelvelabs.io .
 
 ## Requirements
 
@@ -105,6 +116,7 @@ inference_orchestrator/
 │   │   │   │   ├── hugging_face/         # HuggingFace models
 │   │   │   │   ├── open_clip/            # OpenCLIP models
 │   │   │   │   ├── random/               # Random models (testing)
+│   │   │   │   ├── twelvelabs/            # TwelveLabs Marengo (API-served)
 │   │   │   │   ├── abstract_embedding_model.py
 │   │   │   │   ├── abstract_preprocessor.py
 │   │   │   │   ├── base_model_properties.py
@@ -117,7 +129,8 @@ inference_orchestrator/
 │   │   │   │   ├── abstract_inference_pipeline.py
 │   │   │   │   ├── hugging_face_model_inference_pipeline.py
 │   │   │   │   ├── open_clip_model_inference_pipeline.py
-│   │   │   │   └── random_model_inference_pipeline.py
+│   │   │   │   ├── random_model_inference_pipeline.py
+│   │   │   │   └── twelvelabs_model_inference_pipeline.py
 │   │   │   ├── model_manager/            # Model lifecycle management
 │   │   │   │   ├── model_management_client.py
 │   │   │   │   └── model_manager.py

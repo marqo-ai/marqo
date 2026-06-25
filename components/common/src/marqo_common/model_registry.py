@@ -445,6 +445,17 @@ _MODEL_REGISTRY: dict[str, dict] = {
         "type": "random",
         "notes": "",
     },
+    # TwelveLabs Marengo is an API-served multimodal model (text, image and
+    # video share one 512-dim space). It is served by the TwelveLabs API rather
+    # than Triton, so it carries no ONNX encoder properties. Requires the
+    # TWELVELABS_API_KEY environment variable. Free key: https://twelvelabs.io
+    "Marqo/marengo-3.0": {
+        "name": "Marqo/marengo-3.0",
+        "dimensions": 512,
+        "type": "twelvelabs",
+        "apiModelName": "marengo3.0",
+        "notes": "TwelveLabs Marengo multimodal (text/image/video) embeddings.",
+    },
 }
 
 

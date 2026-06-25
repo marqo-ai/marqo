@@ -36,7 +36,7 @@ class BaseModelProperties(AppImmutableBaseModel):
     name: str
     triton_model_name: Optional[str] = Field(default=None, alias="tritonModelName")
     dimensions: int = Field(..., ge=1)
-    type: Literal["open_clip", "hf", "random"]
+    type: Literal["open_clip", "hf", "random", "twelvelabs"]
 
     @property
     def effective_name(self) -> str:

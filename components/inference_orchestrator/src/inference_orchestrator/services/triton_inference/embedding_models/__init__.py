@@ -6,6 +6,8 @@ from .open_clip.open_clip_model import OpenCLIPModel
 from .open_clip.open_clip_model_properties import OpenCLIPModelProperties
 from .random.random_model import RandomModel
 from .random.random_model_properties import RandomModelProperties
+from .twelvelabs.twelvelabs_model import TwelveLabsModel
+from .twelvelabs.twelvelabs_model_properties import TwelveLabsModelProperties
 
 __all__ = [
     "AbstractEmbeddingModel",
@@ -16,4 +18,6 @@ __all__ = [
     "OpenCLIPModelProperties",
     "RandomModel",
     "RandomModelProperties",
+    "TwelveLabsModel",
+    "TwelveLabsModelProperties",
 ]

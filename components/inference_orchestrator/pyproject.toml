@@ -30,6 +30,7 @@ dependencies = [
     "torchvision==0.23.0",
     "transformers>=4.56.2",
     "tritonclient[grpc,http]==2.60.0",
+    "twelvelabs>=1.2.8",
     "uvicorn>=0.37.0",
     "validators>=0.35.0",
     "marqo-common",

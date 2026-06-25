@@ -8,6 +8,7 @@ from inference_orchestrator.services.triton_inference.embedding_models import (
     HuggingFaceModel,
     OpenCLIPModel,
     RandomModel,
+    TwelveLabsModel,
 )
 from inference_orchestrator.services.triton_inference.inference_pipelines.hugging_face_model_inference_pipeline import (
     HuggingFaceModelInferencePipeline,
@@ -17,6 +18,9 @@ from inference_orchestrator.services.triton_inference.inference_pipelines.open_c
 )
 from inference_orchestrator.services.triton_inference.inference_pipelines.random_model_inference_pipeline import (
     RandomModelInferencePipeline,
+)
+from inference_orchestrator.services.triton_inference.inference_pipelines.twelvelabs_model_inference_pipeline import (
+    TwelveLabsModelInferencePipeline,
 )
 from inference_orchestrator.services.triton_inference.model_manager.model_manager import (
     load_model,
@@ -42,5 +46,7 @@ class TritonInference(Inference):
             return HuggingFaceModelInferencePipeline(model, request).run_pipeline()
         elif isinstance(model, RandomModel):
             return RandomModelInferencePipeline(model, request).run_pipeline()
+        elif isinstance(model, TwelveLabsModel):
+            return TwelveLabsModelInferencePipeline(model, request).run_pipeline()
         else:
             raise InternalServerError("Model not supported.")  # pragma: no cover
