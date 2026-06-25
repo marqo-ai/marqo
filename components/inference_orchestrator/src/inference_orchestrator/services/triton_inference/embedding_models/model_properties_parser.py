@@ -3,6 +3,7 @@ from inference_orchestrator.services.triton_inference.embedding_models import (
     HuggingFaceModel,
     OpenCLIPModel,
     RandomModel,
+    TwelveLabsModel,
 )
 
 
@@ -17,5 +18,7 @@ def get_model_loader(model_properties: dict):
         return OpenCLIPModel
     elif model_type == "random":
         return RandomModel
+    elif model_type == "twelvelabs":
+        return TwelveLabsModel
     else:
         raise InvalidModelPropertiesError(f"Unsupported model type: {model_type}")
