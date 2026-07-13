@@ -28,7 +28,7 @@ dependencies = [
     "semver>=3.0.4",
     "torch==2.8.0",
     "torchvision==0.23.0",
-    "transformers>=4.56.2",
+    "transformers>=5.5.0",
     "tritonclient[grpc,http]==2.60.0",
     "uvicorn>=0.37.0",
     "validators>=0.35.0",
