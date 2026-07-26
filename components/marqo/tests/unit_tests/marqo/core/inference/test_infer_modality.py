@@ -1,25 +1,53 @@
 import unittest
+import os
+import socket
+import threading
 from unittest.mock import patch, MagicMock
 import base64
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 
 import requests
 from PIL import Image
 
-from marqo.core.inference.api import Modality
+from marqo.tensor_search.enums import EnvVars
+from marqo.core.inference.api import MediaDownloadError, Modality
 from marqo.core.inference.modality_utils import fetch_content_sample, infer_modality, \
     _infer_modality_based_on_extension, \
     get_url_file_extension, is_base64_image
 
 
+def _resolves_to(*addresses):
+    """Build a getaddrinfo replacement so destination checks do not depend on real DNS."""
+
+    def _getaddrinfo(host, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (address, port)) for address in addresses]
+
+    return _getaddrinfo
+
+
+def _non_redirect_response(**attributes):
+    """Build a mock response that the redirect loop treats as the final hop."""
+    response = MagicMock()
+    response.is_redirect = False
+    for name, value in attributes.items():
+        setattr(response, name, value)
+    return response
+
+
 class TestMultimodalUtils(unittest.TestCase):
+
+    def setUp(self):
+        # A publicly routable address, so these tests exercise the allowed path of the
+        # destination check without reaching the network.
+        patcher = patch('socket.getaddrinfo', side_effect=_resolves_to('93.184.216.34'))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     @patch('requests.get')
     def test_fetch_content_sample(self, mock_get):
         url = "https://example.com/sample.txt"
-        mock_response = MagicMock()
-        mock_response.iter_content.return_value = [b'sample content']
-        mock_get.return_value = mock_response
+        mock_get.return_value = _non_redirect_response(iter_content=MagicMock(return_value=[b'sample content']))
 
         with fetch_content_sample(url) as sample:
             self.assertEqual(sample.read(), b'sample content')
@@ -27,9 +55,8 @@ class TestMultimodalUtils(unittest.TestCase):
     @patch('requests.get')
     def test_fetch_content_sample_large_size(self, mock_get):
         url = "https://example.com/large_sample.txt"
-        mock_response = MagicMock()
-        mock_response.iter_content.return_value = [b'a' * 5000, b'b' * 5000, b'c' * 5000]
-        mock_get.return_value = mock_response
+        mock_get.return_value = _non_redirect_response(
+            iter_content=MagicMock(return_value=[b'a' * 5000, b'b' * 5000, b'c' * 5000]))
 
         with fetch_content_sample(url, sample_size=15000) as sample:
             content = sample.read()
@@ -190,7 +217,127 @@ class TestMultimodalUtils(unittest.TestCase):
         buffer = BytesIO()
         img.save(buffer, format='PNG')
         base64_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        
+
         # Test data URL format
         data_url = f"data:image/png;base64,{base64_data}"
         self.assertEqual(infer_modality(data_url), Modality.IMAGE)
+
+
+class _StaticContentHandler(BaseHTTPRequestHandler):
+    """Serves a small PNG so that a completed fetch is distinguishable from a refused one."""
+
+    protocol_version = "HTTP/1.0"
+    body = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(self.body)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(self.body)
+
+    def log_message(self, *args):
+        """Silence the default stderr request log."""
+
+
+def _make_redirect_handler(location):
+    """Build a handler that answers every request with a 302 to `location`."""
+
+    class _RedirectHandler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", location)
+            self.send_header("Content-Length", "0")
+            self.send_header("Connection", "close")
+            self.end_headers()
+
+        def log_message(self, *args):
+            """Silence the default stderr request log."""
+
+    return _RedirectHandler
+
+
+def _serve(handler) -> ThreadingHTTPServer:
+    """Start `handler` on an ephemeral loopback port and return the running server."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+class TestFetchContentSampleDestinationChecks(unittest.TestCase):
+    """The MIME sniffing fetch must refuse destinations that are not publicly routable.
+
+    `infer_modality` reaches this fetch for any URL without a recognised file extension,
+    on both the add_documents and the search path, so it is reachable by an unauthenticated
+    caller and needs the same destination check as the media download itself.
+    """
+
+    def setUp(self):
+        self.server = _serve(_StaticContentHandler)
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.port = self.server.server_address[1]
+
+    def test_fetch_from_loopback_address_is_refused(self):
+        """A loopback URL must not be fetched, even though the server would answer it."""
+        with self.assertRaises(MediaDownloadError) as context:
+            with fetch_content_sample(f"http://127.0.0.1:{self.port}/sample"):
+                pass
+
+        self.assertIn("not publicly routable", str(context.exception))
+
+    def test_infer_modality_refuses_loopback_url_without_extension(self):
+        """The refusal must surface through infer_modality rather than being reported as TEXT."""
+        with self.assertRaises(MediaDownloadError) as context:
+            infer_modality(f"http://127.0.0.1:{self.port}/sample")
+
+        self.assertIn("not publicly routable", str(context.exception))
+
+    def test_fetch_refuses_redirect_to_internal_address(self):
+        """A reachable first hop must not be able to redirect the fetch to an internal address."""
+        redirect_server = _serve(_make_redirect_handler("http://169.254.169.254/latest/meta-data/"))
+        self.addCleanup(redirect_server.server_close)
+        self.addCleanup(redirect_server.shutdown)
+        url = f"http://127.0.0.1:{redirect_server.server_address[1]}/start"
+
+        with patch.dict(os.environ, {EnvVars.MARQO_MEDIA_DOWNLOAD_ALLOWED_NETWORKS: "127.0.0.0/8"}):
+            with self.assertRaises(MediaDownloadError) as context:
+                with fetch_content_sample(url):
+                    pass
+
+        self.assertIn("not publicly routable", str(context.exception))
+        self.assertIn("169.254.169.254", str(context.exception))
+
+    def test_fetch_allows_destination_named_in_allowed_networks(self):
+        """An operator that serves media from a private network can name it and be served."""
+        url = f"http://127.0.0.1:{self.port}/sample"
+
+        with patch.dict(os.environ, {EnvVars.MARQO_MEDIA_DOWNLOAD_ALLOWED_NETWORKS: "127.0.0.0/8"}):
+            with fetch_content_sample(url) as sample:
+                self.assertEqual(_StaticContentHandler.body, sample.read())
+
+    def test_fetch_refuses_non_http_scheme(self):
+        """Only http and https are fetched, so a file URL never reaches the HTTP client."""
+        with self.assertRaises(MediaDownloadError) as context:
+            with fetch_content_sample("file:///etc/hostname"):
+                pass
+
+        self.assertIn("only downloads media over http and https", str(context.exception))
+
+    def test_fetch_refuses_a_redirect_loop(self):
+        """A redirect chain that never terminates is bounded rather than followed forever."""
+        server = _serve(_make_redirect_handler("/again"))
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        url = f"http://127.0.0.1:{server.server_address[1]}/start"
+
+        with patch.dict(os.environ, {EnvVars.MARQO_MEDIA_DOWNLOAD_ALLOWED_NETWORKS: "127.0.0.0/8"}):
+            with self.assertRaises(MediaDownloadError) as context:
+                with fetch_content_sample(url):
+                    pass
+
+        self.assertIn("exceeded", str(context.exception))

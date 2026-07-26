@@ -1,3 +1,4 @@
+import ipaddress
 import os
 from unittest import TestCase
 from unittest.mock import patch
@@ -464,3 +465,59 @@ class TestSettings(TestCase):
                 Settings(_env_file=None)
 
         self.assertIn("cannot be empty", str(context.exception).lower())
+
+    def test_media_download_allowed_networks_defaults_to_empty(self):
+        """With nothing set, media downloads reach only publicly routable addresses."""
+        with patch.dict(os.environ, {}, clear=True):
+            settings = Settings(_env_file=None)
+
+            self.assertEqual((), settings.marqo_media_download_allowed_networks)
+
+    def test_media_download_allowed_networks_read_from_environment(self):
+        """The setting has to parse from the comma separated CIDR form an operator writes.
+
+        The value is read as a plain string rather than as JSON, which is what a tuple
+        field would otherwise be decoded as.
+        """
+        test_cases = [
+            ("single network", "10.0.0.0/8", (ipaddress.ip_network("10.0.0.0/8"),)),
+            (
+                "several networks with spacing",
+                " 10.0.0.0/8 , 192.168.0.0/16 ",
+                (
+                    ipaddress.ip_network("10.0.0.0/8"),
+                    ipaddress.ip_network("192.168.0.0/16"),
+                ),
+            ),
+            ("ipv6 network", "fd00::/8", (ipaddress.ip_network("fd00::/8"),)),
+            (
+                "single host",
+                "127.0.0.1/32",
+                (ipaddress.ip_network("127.0.0.1/32"),),
+            ),
+        ]
+
+        for message, value, expected in test_cases:
+            with self.subTest(msg=message, value=value):
+                with patch.dict(
+                    os.environ,
+                    {"MARQO_MEDIA_DOWNLOAD_ALLOWED_NETWORKS": value},
+                    clear=True,
+                ):
+                    settings = Settings(_env_file=None)
+
+                    self.assertEqual(
+                        expected, settings.marqo_media_download_allowed_networks
+                    )
+
+    def test_media_download_allowed_networks_rejects_an_invalid_entry(self):
+        """A misspelled network must stop startup rather than be silently dropped."""
+        with self.assertRaises(ValidationError) as context:
+            with patch.dict(
+                os.environ,
+                {"MARQO_MEDIA_DOWNLOAD_ALLOWED_NETWORKS": "10.0.0.0/8,not-a-network"},
+                clear=True,
+            ):
+                Settings(_env_file=None)
+
+        self.assertIn("not-a-network", str(context.exception))

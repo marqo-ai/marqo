@@ -1,5 +1,6 @@
 import base64
 import os
+import socket
 from io import BytesIO
 from typing import Optional
 
@@ -7,6 +8,12 @@ import certifi
 import pycurl
 import requests
 import validators
+from marqo_common.media_url_guard import (
+    UnsafeMediaUrlError,
+    assert_scheme_allowed,
+    is_ip_allowed,
+    refusal_message,
+)
 from PIL import Image, UnidentifiedImageError
 
 from inference_orchestrator import marqo_docs
@@ -22,6 +29,11 @@ from inference_orchestrator.services.errors import (
 settings = get_settings()
 
 DEFAULT_HEADERS = {"User-Agent": "Marqobot/1.0"}
+
+# libcurl speaks far more than HTTP, and an unrestricted handle will happily serve a
+# `file://` URL out of the container filesystem. Media is only ever fetched over HTTP,
+# on the first request and on any redirect.
+_ALLOWED_CURL_PROTOCOLS = pycurl.PROTO_HTTP | pycurl.PROTO_HTTPS
 
 
 def get_allowed_image_types():
@@ -158,7 +170,8 @@ def download_image_from_url(
         buffer (BytesIO): The image as a BytesIO object.
 
     Raises:
-        ImageDownloadError: If the image download fails or exceeds size limit for video/audio.
+        ImageDownloadError: If the image download fails, exceeds size limit for
+            video/audio, or is aimed at a destination that is not publicly routable.
     """
 
     if not isinstance(timeout_ms, int):
@@ -167,12 +180,38 @@ def download_image_from_url(
         )
 
     try:
+        assert_scheme_allowed(image_path)
+    except UnsafeMediaUrlError as e:
+        raise ImageDownloadError(str(e)) from e
+
+    try:
         encoded_url = encode_url(image_path)
     except UnicodeEncodeError as e:
         raise ImageDownloadError(
             f"Marqo encountered an error when downloading the media url {image_path}. "
             f"The url could not be encoded properly. Original error: {e}"
         )
+
+    allowed_networks = settings.marqo_media_download_allowed_networks
+    refused_destination = False
+
+    def open_socket(purpose, address):
+        """Vet the address libcurl is about to use, before the connection is opened.
+
+        libcurl calls this for the first request and again for every redirect it
+        follows, and it passes the address it actually resolved. Checking here rather
+        than against the URL text means a hostname that resolves to an internal address,
+        including one that only does so on a later lookup, is caught, and that a refused
+        destination is never connected to at all.
+        """
+        nonlocal refused_destination
+        if not is_ip_allowed(address.addr[0], allowed_networks):
+            refused_destination = True
+            return pycurl.SOCKET_BAD
+        # libcurl takes ownership of the descriptor and closes it, so the socket object
+        # is deliberately not retained here.
+        return socket.socket(address.family, address.socktype, address.protocol)
+
     buffer = BytesIO()
     c = pycurl.Curl()
     c.setopt(pycurl.CAINFO, certifi.where())
@@ -180,6 +219,9 @@ def download_image_from_url(
     c.setopt(pycurl.WRITEDATA, buffer)
     c.setopt(pycurl.TIMEOUT_MS, timeout_ms)
     c.setopt(pycurl.FOLLOWLOCATION, 1)
+    c.setopt(pycurl.PROTOCOLS, _ALLOWED_CURL_PROTOCOLS)
+    c.setopt(pycurl.REDIR_PROTOCOLS, _ALLOWED_CURL_PROTOCOLS)
+    c.setopt(pycurl.OPENSOCKETFUNCTION, open_socket)
 
     headers = DEFAULT_HEADERS.copy()
     if media_download_headers is None:
@@ -194,6 +236,10 @@ def download_image_from_url(
                 f"media url `{image_path}` returned {c.getinfo(pycurl.RESPONSE_CODE)}"
             )
     except pycurl.error as e:
+        # A refused destination surfaces as a generic connection failure, so it is
+        # reported from the flag rather than from the curl error code.
+        if refused_destination:
+            raise ImageDownloadError(refusal_message(image_path)) from e
         error_message = str(e)
         if len(e.args) > 0:
             error_code = e.args[0]
