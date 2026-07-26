@@ -85,6 +85,10 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 5,
         EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 20,
 
+        # Comma separated CIDR blocks that media downloads may reach in addition to
+        # publicly routable addresses. Empty means only publicly routable addresses.
+        EnvVars.MARQO_MEDIA_DOWNLOAD_ALLOWED_NETWORKS: None,
+
         ##########################################
         # Inference Server config (In Inference)
         EnvVars.MARQO_MODELS_TO_PRELOAD: [],

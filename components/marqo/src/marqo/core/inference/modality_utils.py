@@ -2,13 +2,69 @@ import io
 import os
 from contextlib import contextmanager
 from typing import Optional, Union, List
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import magic
 import requests
 import validators
+from marqo_common.media_url_guard import (
+    MAX_MEDIA_REDIRECTS,
+    UnsafeMediaUrlError,
+    assert_destination_allowed,
+    parse_allowed_networks,
+)
 
 from marqo.core.inference.api import Modality, MediaDownloadError
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults
+
+# Headers that must not follow a redirect onto a different host, matching what requests
+# does for us when it is the one following the redirect.
+_HEADERS_TO_DROP_ACROSS_HOSTS = ('authorization', 'proxy-authorization', 'cookie')
+
+
+def _allowed_media_networks():
+    """Read the networks that media fetches may reach beyond publicly routable addresses."""
+    return parse_allowed_networks(read_env_vars_and_defaults(EnvVars.MARQO_MEDIA_DOWNLOAD_ALLOWED_NETWORKS))
+
+
+def _strip_cross_host_headers(headers: Optional[dict], from_url: str, to_url: str) -> Optional[dict]:
+    """Drop credential headers when a redirect moves to a different host."""
+    if not headers or urlparse(from_url).hostname == urlparse(to_url).hostname:
+        return headers
+    return {k: v for k, v in headers.items() if k.lower() not in _HEADERS_TO_DROP_ACROSS_HOSTS}
+
+
+def _get_with_checked_redirects(url: str, media_download_headers: Optional[dict]) -> requests.Response:
+    """GET `url`, checking the destination of the first request and of every redirect.
+
+    requests resolves the host itself when it follows a redirect, so redirects are
+    followed a hop at a time here. Letting requests follow them would mean the request
+    to an internal address had already been made by the time it could be inspected.
+
+    Raises:
+        MediaDownloadError: If a destination is not allowed or the chain is too long.
+    """
+    allowed_networks = _allowed_media_networks()
+    current_url = url
+
+    for _ in range(MAX_MEDIA_REDIRECTS + 1):
+        try:
+            assert_destination_allowed(current_url, allowed_networks=allowed_networks)
+        except UnsafeMediaUrlError as e:
+            raise MediaDownloadError(str(e)) from e
+
+        response = requests.get(current_url, stream=True, headers=media_download_headers,
+                                allow_redirects=False)
+        if not response.is_redirect:
+            return response
+
+        next_url = urljoin(current_url, response.headers['Location'])
+        response.close()
+        media_download_headers = _strip_cross_host_headers(media_download_headers, current_url, next_url)
+        current_url = next_url
+
+    raise MediaDownloadError(f"Media url `{url}` exceeded {MAX_MEDIA_REDIRECTS} redirects.")
 
 
 @contextmanager
@@ -18,8 +74,9 @@ def fetch_content_sample(url: str, media_download_headers: Optional[dict] = None
 
     Raises:
         HTTPError: If the response status code is not 200
+        MediaDownloadError: If the URL, or a URL it redirects to, is not one Marqo may fetch
     """
-    response = requests.get(url, stream=True, headers=media_download_headers)
+    response = _get_with_checked_redirects(url, media_download_headers)
     response.raise_for_status()
     buffer = io.BytesIO()
     try:

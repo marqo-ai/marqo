@@ -1,9 +1,19 @@
 import os
 from pathlib import Path
-from typing import Union
+from typing import Annotated, Union
 
+from marqo_common.media_url_guard import (
+    ALLOWED_NETWORKS_ENV_VAR,
+    IpNetwork,
+    parse_allowed_networks,
+)
 from pydantic import Field, ValidationError, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
+from pydantic_settings import (
+    BaseSettings,
+    NoDecode,
+    SettingsConfigDict,
+    SettingsError,
+)
 
 from inference_orchestrator.core.enum import MarqoCacheType
 from inference_orchestrator.errors.common_errors import EnvironmentVariableParsingError
@@ -58,6 +68,24 @@ class Settings(BaseSettings):
     marqo_default_models_s3_bucket: str = Field(
         "s3://marqo-default-models-os", alias="MARQO_DEFAULT_MODELS_S3_BUCKET"
     )
+
+    # NoDecode keeps pydantic-settings from JSON decoding the raw environment value,
+    # which a tuple field would otherwise get before the validator below runs.
+    marqo_media_download_allowed_networks: Annotated[
+        tuple[IpNetwork, ...], NoDecode
+    ] = Field(default=(), alias=ALLOWED_NETWORKS_ENV_VAR)
+
+    @field_validator("marqo_media_download_allowed_networks", mode="before")
+    @classmethod
+    def _parse_media_download_allowed_networks(cls, v):
+        """Accept the comma separated CIDR form the environment variable is written in.
+
+        Media downloads are refused for destinations that are not publicly routable.
+        Deployments that serve media from a private network name those networks here.
+        """
+        if isinstance(v, str):
+            return parse_allowed_networks(v)
+        return v
 
     @field_validator("marqo_default_models_s3_bucket")
     def validate_marqo_default_models_s3_bucket(cls, value):

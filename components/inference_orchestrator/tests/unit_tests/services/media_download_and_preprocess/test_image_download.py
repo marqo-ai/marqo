@@ -1,5 +1,6 @@
 import base64
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
@@ -8,10 +9,12 @@ from unittest.mock import MagicMock, patch
 import pycurl
 from PIL import Image, UnidentifiedImageError
 
+from inference_orchestrator.core.settings import Settings
 from inference_orchestrator.services.errors import (
     ImageDownloadError,
     InternalServerError,
 )
+from inference_orchestrator.services.media_download_and_preprocess import image_download
 from inference_orchestrator.services.media_download_and_preprocess.image_download import (
     _load_base64_image,
     download_image_from_url,
@@ -388,12 +391,36 @@ class _StaticImageHandler(BaseHTTPRequestHandler):
         """Silence the default stderr request log."""
 
 
+def _make_redirect_handler(location):
+    """Build a handler that answers every request with a 302 to `location`."""
+
+    class _RedirectHandler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", location)
+            self.send_header("Content-Length", "0")
+            self.send_header("Connection", "close")
+            self.end_headers()
+
+        def log_message(self, *args):
+            """Silence the default stderr request log."""
+
+    return _RedirectHandler
+
+
 def _serve(handler) -> ThreadingHTTPServer:
     """Start `handler` on an ephemeral loopback port and return the running server."""
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
+
+
+def _settings_allowing(networks: str):
+    """Build a settings object whose media download allow list is `networks`."""
+    return Settings(MARQO_MEDIA_DOWNLOAD_ALLOWED_NETWORKS=networks)
 
 
 class TestDownloadImageFromUrlDestinationChecks(unittest.TestCase):
@@ -425,6 +452,66 @@ class TestDownloadImageFromUrlDestinationChecks(unittest.TestCase):
             )
 
         self.assertIn("not publicly routable", str(context.exception))
+
+    def test_download_refuses_redirect_to_internal_address(self):
+        """A reachable first hop must not be able to redirect the download to an internal address."""
+        redirect_server = _serve(
+            _make_redirect_handler("http://169.254.169.254/latest/meta-data/")
+        )
+        self.addCleanup(redirect_server.server_close)
+        self.addCleanup(redirect_server.shutdown)
+        url = f"http://127.0.0.1:{redirect_server.server_address[1]}/start"
+
+        with patch.object(
+            image_download, "settings", _settings_allowing("127.0.0.0/8")
+        ):
+            with self.assertRaises(ImageDownloadError) as context:
+                download_image_from_url(url, {}, 3000)
+
+        self.assertIn("not publicly routable", str(context.exception))
+
+    def test_download_refuses_redirect_before_connecting_to_it(self):
+        """The refused hop must be rejected without a connection attempt, not by timing out.
+
+        A link-local address is not reachable from the test host, so if the guard let the
+        connection be attempted this would take the full timeout instead of failing at once.
+        """
+        redirect_server = _serve(
+            _make_redirect_handler("http://169.254.169.254/latest/meta-data/")
+        )
+        self.addCleanup(redirect_server.server_close)
+        self.addCleanup(redirect_server.shutdown)
+        url = f"http://127.0.0.1:{redirect_server.server_address[1]}/start"
+
+        with patch.object(
+            image_download, "settings", _settings_allowing("127.0.0.0/8")
+        ):
+            started = time.monotonic()
+            with self.assertRaises(ImageDownloadError):
+                download_image_from_url(url, {}, 10000)
+            elapsed = time.monotonic() - started
+
+        self.assertLess(elapsed, 5.0)
+
+    def test_download_allows_destination_named_in_allowed_networks(self):
+        """An operator that serves media from a private network can name it and be served."""
+        with patch.object(
+            image_download, "settings", _settings_allowing("127.0.0.0/8")
+        ):
+            buffer = download_image_from_url(
+                f"http://127.0.0.1:{self.port}/image.png", {}, 3000
+            )
+
+        self.assertEqual(_StaticImageHandler.body, buffer.read())
+
+    def test_download_refuses_non_http_scheme(self):
+        """Only http and https are downloaded, so a file URL never reaches libcurl."""
+        with self.assertRaises(ImageDownloadError) as context:
+            download_image_from_url("file:///etc/hostname", {}, 3000)
+
+        self.assertIn(
+            "only downloads media over http and https", str(context.exception)
+        )
 
 
 class TestEncodeUrl(unittest.TestCase):
