@@ -1,5 +1,7 @@
 import base64
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
@@ -366,6 +368,63 @@ class TestDownloadImageFromUrl(unittest.TestCase):
 
         mock_curl.perform.assert_called_once()
         mock_curl.close.assert_called_once()
+
+
+class _StaticImageHandler(BaseHTTPRequestHandler):
+    """Serves a small PNG so that a completed download is distinguishable from a refused one."""
+
+    protocol_version = "HTTP/1.0"
+    body = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(self.body)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(self.body)
+
+    def log_message(self, *args):
+        """Silence the default stderr request log."""
+
+
+def _serve(handler) -> ThreadingHTTPServer:
+    """Start `handler` on an ephemeral loopback port and return the running server."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+class TestDownloadImageFromUrlDestinationChecks(unittest.TestCase):
+    """Media downloads must refuse destinations that are not publicly routable.
+
+    These tests drive a real loopback HTTP server instead of a mocked pycurl handle
+    because the check has to hold for the address libcurl actually connects to, which
+    a mocked handle cannot demonstrate.
+    """
+
+    def setUp(self):
+        self.server = _serve(_StaticImageHandler)
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.port = self.server.server_address[1]
+
+    def test_download_from_loopback_address_is_refused(self):
+        """A loopback URL must not be fetched, even though the server would answer it."""
+        with self.assertRaises(ImageDownloadError) as context:
+            download_image_from_url(f"http://127.0.0.1:{self.port}/image.png", {}, 3000)
+
+        self.assertIn("not publicly routable", str(context.exception))
+
+    def test_download_from_ipv4_mapped_loopback_address_is_refused(self):
+        """`::ffff:127.0.0.1` reaches the same host as `127.0.0.1` and must be refused too."""
+        with self.assertRaises(ImageDownloadError) as context:
+            download_image_from_url(
+                f"http://[::ffff:127.0.0.1]:{self.port}/image.png", {}, 3000
+            )
+
+        self.assertIn("not publicly routable", str(context.exception))
 
 
 class TestEncodeUrl(unittest.TestCase):
