@@ -4,6 +4,10 @@
 export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
 MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 
+if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+    pip freeze
+fi
+
 # set the default host to 0.0.0.0
 export MARQO_HOST=${MARQO_HOST:-"0.0.0.0"}
 
