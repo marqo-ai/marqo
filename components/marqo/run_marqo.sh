@@ -4,9 +4,15 @@
 export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
 MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 
-# set the default host to 0.0.0.0
-export MARQO_HOST=${MARQO_HOST:-"0.0.0.0"}
+# Only print installed packages when the operator asks for verbose/debug output.
+# Avoids cluttering the default startup log (resolves issue #500).
+if [ "$MARQO_LOG_LEVEL" = "debug" ]; then
+  echo "=== Installed packages (debug) ==="
+  pip freeze
+fi
 
+# set default host to 0.0.0.0
+export MARQO_HOST=${MARQO_HOST:-"0.0.0.0"}
 
 # set default number of workers to 1
 if [ -z "${MARQO_API_WORKERS}" ]; then
