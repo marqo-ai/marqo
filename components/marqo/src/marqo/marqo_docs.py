@@ -76,6 +76,10 @@ def search_api_score_modifiers_parameter():
     return _build_url('reference/api/search/#score-modifiers')
 
 
+def search_api_boost_parameter():
+    return _build_url('reference/api/search/')
+
+
 # TODO: Update URL when a bring-your-own-model page is available in the new docs
 def hugging_face_trust_remote_code():
     return _build_url('reference/')

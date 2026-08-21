@@ -194,8 +194,8 @@ def validate_context(context: Optional[SearchContext], search_method: SearchMeth
 
 def validate_boost(boost: Dict, search_method: Union[str, SearchMethod]):
     if boost is not None:
-        further_info_message = ("\nRead about boost usage here: "
-                                "https://docs.marqo.ai/0.0.13/API-Reference/search/#boost")
+        further_info_message = (f"\nRead about boost usage here: "
+                                f"{marqo_docs.search_api_boost_parameter()}")
         for boost_attr in boost:
             try:
                 validate_field_name(boost_attr)
