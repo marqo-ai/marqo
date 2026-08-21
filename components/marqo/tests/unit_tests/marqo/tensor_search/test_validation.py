@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 
+from marqo import marqo_docs
 from marqo.api.exceptions import InvalidArgError, InvalidFieldNameError
 from marqo.core.models import marqo_index
 from marqo.tensor_search import validation
@@ -328,6 +329,27 @@ class TestValidateMappingsObject(unittest.TestCase):
                     with self.assertRaises(InvalidArgError) as cm:
                         validation.validate_mappings_object(case["mapping"], mock_index)
                     self.assertIn(case["expected_error"], str(cm.exception))
+
+
+class TestValidateBoost(unittest.TestCase):
+    """Unit tests for the validate_boost function."""
+
+    def test_boost_error_messages_reference_current_docs(self):
+        """Boost validation errors must link to the current docs rather than a pinned old version."""
+        expected_url = marqo_docs.search_api_boost_parameter()
+        test_cases = [
+            ("invalid field name", {'': [1.2]}, SearchMethod.TENSOR),
+            ("unsupported search method", {'fine': [1.2]}, SearchMethod.LEXICAL),
+            ("invalid boost value", {'bad': [1, 2, 3]}, SearchMethod.TENSOR),
+        ]
+
+        for description, boost, search_method in test_cases:
+            with self.subTest(description=description):
+                with self.assertRaises((InvalidArgError, InvalidFieldNameError)) as cm:
+                    validation.validate_boost(boost=boost, search_method=search_method)
+                message = str(cm.exception)
+                self.assertIn(expected_url, message)
+                self.assertNotRegex(message, r'docs\.marqo\.ai/\d+\.\d+')
 
 
 if __name__ == '__main__':
