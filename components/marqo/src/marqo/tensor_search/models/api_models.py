@@ -27,6 +27,11 @@ from marqo.tensor_search.models.collapse_model import CollapseModel
 class BaseMarqoModel(BaseModel):
     class Config:
         extra: str = "forbid"
+        # imageDownloadHeaders (SearchQuery) is aliased to the deprecated
+        # image_download_headers for backwards compatibility. Without this,
+        # pydantic only accepts the alias as input, so the documented
+        # camelCase field name would be rejected outright by extra="forbid".
+        allow_population_by_field_name = True
 
     pass
 

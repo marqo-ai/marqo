@@ -218,6 +218,17 @@ class TestSearchQuery(unittest.TestCase):
         )
         self.assertEqual(search_query.mediaDownloadHeaders, {"header1": "value1"})
 
+    def test_image_download_headers_accepts_camel_case_field_name(self):
+        """imageDownloadHeaders is the documented field name; the snake_case
+        image_download_headers is only a deprecated alias kept for backwards
+        compatibility. Both must be accepted as input."""
+        search_query = SearchQuery(
+            q="test",
+            imageDownloadHeaders={"header1": "value1"}
+        )
+        self.assertEqual(search_query.imageDownloadHeaders, {"header1": "value1"})
+        self.assertEqual(search_query.mediaDownloadHeaders, {"header1": "value1"})
+
     def test_search_query_with_invalid_search_method_fails(self):
         """Test that invalid search method raises validation error"""
         with self.assertRaises(ValidationError) as cm:
