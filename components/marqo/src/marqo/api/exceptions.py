@@ -235,7 +235,7 @@ class ServiceUnavailableError(MarqoWebError):
 class BackendCommunicationError(InternalError):
     """Error when connecting to Vespa"""
     code = "backend_communication_error"
-    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
+    status_code = HTTPStatus.BAD_REQUEST
 
 
 class BackendDataParsingError(InternalError):
