@@ -141,20 +141,40 @@ class HnswConfig(ImmutableBaseModel):
     m: int = pydantic.Field(gt=0)
 
 
+def _validate_split_overlap_less_than_split_length(cls, values: dict) -> dict:
+    """A splitOverlap >= splitLength leaves the chunker with a zero or negative
+    stride, which fails deep inside the text/video/audio splitters at
+    add_documents time instead of at index-creation time (see #605).
+    """
+    split_length = values.get('split_length')
+    split_overlap = values.get('split_overlap')
+    if split_length is not None and split_overlap is not None and split_overlap >= split_length:
+        raise ValueError(
+            f'splitOverlap ({split_overlap}) must be less than splitLength ({split_length})'
+        )
+    return values
+
+
 class TextPreProcessing(ImmutableBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
     split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
+
+    _validate_split_overlap = root_validator(allow_reuse=True)(_validate_split_overlap_less_than_split_length)
 
 
 class VideoPreProcessing(ImmutableBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
+    _validate_split_overlap = root_validator(allow_reuse=True)(_validate_split_overlap_less_than_split_length)
+
 
 class AudioPreProcessing(ImmutableBaseModel):
     split_length: int = pydantic.Field(gt=0, alias='splitLength')
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
+    _validate_split_overlap = root_validator(allow_reuse=True)(_validate_split_overlap_less_than_split_length)
 
 
 class ImagePreProcessing(ImmutableBaseModel):

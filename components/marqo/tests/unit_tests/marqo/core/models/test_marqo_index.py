@@ -684,6 +684,38 @@ class TestForwardCompatibility(unittest.TestCase):
         self.assertEqual(image_preprocessing.patch_method, PatchMethod.Simple)
 
 
+class TestPreProcessingSplitOverlapValidation(unittest.TestCase):
+    """splitOverlap >= splitLength used to pass model construction and only fail deep in
+    the chunker at add_documents time with an unhelpful 500 (more_itertools.windowed
+    raises 'step must be >= 1' because step = split_length - split_overlap). See #605.
+    """
+
+    def test_text_preprocessing_rejects_overlap_equal_to_length(self):
+        with self.assertRaises(ValidationError):
+            TextPreProcessing(splitLength=2, splitOverlap=2, splitMethod=TextSplitMethod.Word)
+
+    def test_text_preprocessing_rejects_overlap_greater_than_length(self):
+        with self.assertRaises(ValidationError):
+            TextPreProcessing(splitLength=2, splitOverlap=5, splitMethod=TextSplitMethod.Word)
+
+    def test_text_preprocessing_accepts_overlap_less_than_length(self):
+        text_preprocessing = TextPreProcessing(splitLength=2, splitOverlap=1, splitMethod=TextSplitMethod.Word)
+        self.assertEqual(text_preprocessing.split_length, 2)
+        self.assertEqual(text_preprocessing.split_overlap, 1)
+
+    def test_text_preprocessing_accepts_zero_overlap(self):
+        text_preprocessing = TextPreProcessing(splitLength=2, splitOverlap=0, splitMethod=TextSplitMethod.Word)
+        self.assertEqual(text_preprocessing.split_overlap, 0)
+
+    def test_video_preprocessing_rejects_overlap_greater_than_or_equal_to_length(self):
+        with self.assertRaises(ValidationError):
+            VideoPreProcessing(splitLength=30, splitOverlap=30)
+
+    def test_audio_preprocessing_rejects_overlap_greater_than_or_equal_to_length(self):
+        with self.assertRaises(ValidationError):
+            AudioPreProcessing(splitLength=60, splitOverlap=60)
+
+
 class TestMarqoIndexSchemaVersion(MarqoTestCase):
     """Unit tests for MarqoIndex schema_template_version functionality."""
 
