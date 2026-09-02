@@ -12,3 +12,4 @@ class MarqoIndexStats(StrictBaseModel):
     number_of_documents: int
     number_of_vectors: int
     backend: VespaStats
+    storage_size_gb: Optional[float]

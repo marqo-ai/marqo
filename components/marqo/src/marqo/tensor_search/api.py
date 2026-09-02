@@ -434,7 +434,8 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
         'backend': {
             'memoryUsedPercentage': stats.backend.memory_used_percentage,
             'storageUsedPercentage': stats.backend.storage_used_percentage
-        }
+        },
+        'storageSizeGb': stats.storage_size_gb
     }
 
 

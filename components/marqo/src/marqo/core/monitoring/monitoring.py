@@ -54,12 +54,15 @@ class Monitoring:
 
         memory_utilization = metrics.clusterController_resourceUsage_maxMemoryUtilization_max
         disk_utilization = metrics.clusterController_resourceUsage_maxDiskUtilization_max
+        storage_size_bytes = metrics.documentDb_diskUsage_bytes(marqo_index.schema_name)
 
         # Occasionally Vespa returns empty metrics, often for the first call after a restart
         if memory_utilization is None:
             logger.warning(f'Vespa did not return a value for memory utilization metrics')
         if disk_utilization is None:
             logger.warning(f'Vespa did not return a value for disk utilization metrics')
+        if storage_size_bytes is None:
+            logger.warning(f'Vespa did not return a value for index disk usage metrics')
 
         return MarqoIndexStats(
             number_of_documents=doc_count_query_result.total_count,
@@ -67,7 +70,8 @@ class Monitoring:
             backend=VespaStats(
                 memory_used_percentage=memory_utilization * 100 if memory_utilization is not None else None,
                 storage_used_percentage=disk_utilization * 100 if disk_utilization is not None else None
-            )
+            ),
+            storage_size_gb=storage_size_bytes / (1024 ** 3) if storage_size_bytes is not None else None
         )
 
     def get_index_stats_by_name(self, index_name: str) -> MarqoIndexStats:
