@@ -66,11 +66,29 @@ class ApplicationMetrics(BaseModel):
             service_name=self._SERVICE_CLUSTERCONTROLLER
         )
 
+    def documentDb_diskUsage_bytes(self, document_type: str) -> Optional[Union[int, float]]:
+        """
+        Get the on-disk size, in bytes, of a given document type (Marqo index schema), summed across all
+        content nodes.
+
+        Args:
+            document_type: The Vespa document type / schema name of the Marqo index
+
+        Returns:
+            Total disk usage in bytes for the document type, or None if the metric is not reported
+        """
+        return self._aggregate_metric(
+            metric_name='content.proton.documentdb.documentstore.disk_usage.last',
+            aggregation=Aggregation.Sum,
+            dimension_filter={'documenttype': document_type}
+        )
+
     def _aggregate_metric(
             self,
             metric_name: str,
             aggregation,
-            service_name: Optional[str] = None
+            service_name: Optional[str] = None,
+            dimension_filter: Optional[Dict[str, str]] = None
     ) -> Optional[Union[int, float]]:
         """
         Aggregate a metric across all nodes and services.
@@ -80,6 +98,8 @@ class ApplicationMetrics(BaseModel):
             aggregation: Aggregation to use
             service_name: Optional name of service to aggregate metric for. Provioding this will speed up the
                 aggregation process
+            dimension_filter: Optional dict of dimension name/value pairs that must all match a metric set's
+                dimensions for it to be included in the aggregation
 
         Returns:
             Aggregated metric value. If no values are found and aggregation type is not Aggregation.Count,
@@ -92,6 +112,11 @@ class ApplicationMetrics(BaseModel):
                     continue
 
                 for metric_set in service.metrics:
+                    if dimension_filter is not None and not all(
+                            metric_set.dimensions.get(key) == value for key, value in dimension_filter.items()
+                    ):
+                        continue
+
                     if metric_name in metric_set.values:
                         values.append(metric_set.values[metric_name])
 
