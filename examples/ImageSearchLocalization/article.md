@@ -56,7 +56,7 @@ For the model based approaches, ideally we want "important" or relevant parts of
   <img src="article/1 VMk4UqhEcL0_47A6Yg48rw.png"/>
 </p>
 
-For example, in two-stage detectors like Faster-RCNN the first stage consists of a region-proposal netwrok (RPN). The RPN is used to propose regions of the image that contains objects of interest and happens before any fine-grained classification occurs. The RPN is trainable and can be used to propose possible interesting parts of an image. Alternatives are to simply use a fast lighter-weight detector like yolo and make the output boxes the proposed regions (ignoring class) or use "objectness" scores to rank the proposed (now class agnostic) boxes. Finally, other alternatives exist like models that output "saliency" maps which can be obtained from supervised learning or through self-supervised methods like DINO. DINO has the added benefit that since it is self-supervised, it makes fine-tuning on custom datasets simple and a way to provide domain specific localisation.
+For example, in two-stage detectors like Faster-RCNN the first stage consists of a region-proposal network (RPN). The RPN is used to propose regions of the image that contains objects of interest and happens before any fine-grained classification occurs. The RPN is trainable and can be used to propose possible interesting parts of an image. Alternatives are to simply use a fast lighter-weight detector like yolo and make the output boxes the proposed regions (ignoring class) or use "objectness" scores to rank the proposed (now class agnostic) boxes. Finally, other alternatives exist like models that output "saliency" maps which can be obtained from supervised learning or through self-supervised methods like DINO. DINO has the added benefit that since it is self-supervised, it makes fine-tuning on custom datasets simple and a way to provide domain specific localisation.
 
 ## Re-ranking
 An alternative approach to single-stage retrieval is two-stage retrieval. Two-stage retrieval consists of an initial retrieval of documents which are then reranked by a localization model or heuristic. The first stage is where the initial candidate documents are retrieved and the second stage can re-rank (i.e. re-order) the results based on another model or heuristic.
@@ -124,7 +124,7 @@ Now we have the document we are going to index them using no index-time localiza
 from marqo import Client
 client = Client()
 
-# setup the settings so we can comapre the different methods
+# setup the settings so we can compare the different methods
 patch_methods = [None, "dino-v2", "yolox"]
 
 settings = {

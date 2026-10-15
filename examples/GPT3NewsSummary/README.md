@@ -112,7 +112,7 @@ Answer:
 There are a few major stories happening in business today. Firstly, Marks and Spencer has warned of a "gathering storm" of higher costs for retailers and pressure on household budgets. Secondly, Facebook-owner Meta is cutting 11,000 staff in its first mass lay-offs. And finally, Tesla stock has hit a 2-year low after CEO Elon Musk sold $4 billion worth of shares.
 ```
 
-Sucess! You'll notice that using Marqo to add relevant and temporally correct context means we can build a news summarisation application with ease. So instead of wrong and vague answers, we get factually-grounded summaries based on retrieved facts such as:
+Success! You'll notice that using Marqo to add relevant and temporally correct context means we can build a news summarisation application with ease. So instead of wrong and vague answers, we get factually-grounded summaries based on retrieved facts such as:
 <ol>
   <li>Marks and Spencer has warned of a "gathering storm" of higher costs for retailers</li>
   <li>Facebook-owner Meta is cutting 11,000 staff</li>
