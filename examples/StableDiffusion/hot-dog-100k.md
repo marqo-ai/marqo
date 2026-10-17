@@ -211,4 +211,4 @@ After we have done this walk we have the "sorted" list of images. These can then
 </p>
 
 ## Closing thoughts
-Its amazing to watch the progress in image generation and the multi-modality of it all. The fidelity of the images is incredible and the ability to maniuplate images via prompt engineering is very interesting. Of particular interest is  how this will impact search given their shared models. If you are interested in this check out [Marqo](https://github.com/marqo-ai/marqo) for yourself and [sign up](https://q78175g1wwa.typeform.com/to/d0PEuRPC) for the cloud beta.
+Its amazing to watch the progress in image generation and the multi-modality of it all. The fidelity of the images is incredible and the ability to manipulate images via prompt engineering is very interesting. Of particular interest is  how this will impact search given their shared models. If you are interested in this check out [Marqo](https://github.com/marqo-ai/marqo) for yourself and [sign up](https://q78175g1wwa.typeform.com/to/d0PEuRPC) for the cloud beta.

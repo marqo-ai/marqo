@@ -47,7 +47,7 @@ We use pip to install the Marqo client (`pip install marqo`) and the datasets py
 We will use the `datasets` package from [Hugging Face](https://huggingface.co/docs/datasets/index)
 to import the MultiEURLEX dataset.
 
-Then, we start work on our Python script. We start by loading the the validation splits for the English and Deutsch datasets:
+Then, we start work on our Python script. We start by loading the validation splits for the English and Deutsch datasets:
 ```python
 from datasets import load_dataset 
 dataset_en = load_dataset('multi_eurlex', 'en', split="validation")
